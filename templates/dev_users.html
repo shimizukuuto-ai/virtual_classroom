@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Dev Users{% endblock %}
+{% block content %}
+<style>
+  .user-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .user-card {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 10px 14px; display: flex; justify-content: space-between; align-items: center;
+  }
+  .user-card .name { font-weight: 600; color: #1e293b; }
+  .user-card .id { font-size: 11px; color: #94a3b8; }
+  .user-card a { font-size: 12px; text-decoration: none; color: #3b82f6; }
+  .dev-note { background: #fef3c7; padding: 10px 14px; border-radius: 8px; font-size: 13px; color: #78350f; margin-bottom: 14px; }
+</style>
+
+<div class="card">
+  <h1>Dev Users</h1>
+  <div class="dev-note">
+    実験用ページです。本番では削除するか、パスワード保護してください。
+  </div>
+
+  <h3>大量作成</h3>
+  <form method="post" action="/dev/users/create">
+    <input type="text" name="name" placeholder="名前のベース（例: テスト）" required>
+    <input type="number" name="count" value="5" min="1" max="50">
+    <button type="submit">作成</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3>全ユーザー（{{ users|length }}）</h3>
+  <div class="user-grid">
+    {% for u in users %}
+      <div class="user-card">
+        <div>
+          <div class="name">{{ u.name }}</div>
+          <div class="id">#{{ u.id }} / {{ u.lang }}</div>
+        </div>
+        <div>
+          <a href="/dev/login_as/{{ u.id }}" target="_blank">Login</a>
+          <form method="post" action="/dev/delete/{{ u.id }}" style="display:inline;margin-left:8px;">
+            <button type="submit" style="background:#dc2626;padding:3px 8px;font-size:11px;border-radius:4px;">x</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

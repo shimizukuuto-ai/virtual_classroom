@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}クラス参加 - 仮想教室{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>クラス参加</h1>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  <form method="post" action="/join_class">
+    <label>参加コード</label>
+    <input type="text" name="join_code" placeholder="例: a3k9x2" required autofocus>
+    <button type="submit">参加</button>
+  </form>
+</div>
+{% endblock %}

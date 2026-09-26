@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{{ T.join_class }}{% endblock %}
+{% block content %}
+<style>
+  .search-bar { display: flex; gap: 10px; }
+  .search-bar input { margin: 0; flex: 1; }
+  .class-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+  .class-card {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+    padding: 16px 18px; box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    display: flex; flex-direction: column; gap: 8px;
+    transition: transform .15s, box-shadow .15s;
+  }
+  .class-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+  .class-card h3 { margin: 0; font-size: 16px; color: #1e293b; }
+  .class-card .subject-tag {
+    display: inline-block; background: #dbeafe; color: #1e40af;
+    padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;
+  }
+  .class-card .desc { font-size: 13px; color: #475569; line-height: 1.5; }
+  .class-card .footer {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: auto; padding-top: 10px; border-top: 1px solid #f1f5f9;
+  }
+  .class-card .meta { font-size: 12px; color: #64748b; }
+  .class-card .meta strong { color: #334155; }
+  .class-card .count-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #ecfdf5; color: #065f46;
+    padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;
+  }
+  .class-card .teacher { font-size: 12px; color: #64748b; }
+  .empty-state {
+    text-align: center; padding: 60px 20px; color: #94a3b8;
+  }
+</style>
+
+<div class="card">
+  <h1>{{ T.search_classes }}</h1>
+  <form method="get" action="/classes" class="search-bar">
+    <input type="text" name="q" value="{{ q }}" placeholder="{{ T.subject }} / {{ T.class_name }}">
+    <button type="submit">{{ T.search }}</button>
+  </form>
+</div>
+
+{% if results %}
+  <div class="class-grid">
+    {% for c in results %}
+      <div class="class-card">
+        <div>
+          <span class="subject-tag">{{ c.subject }}</span>
+        </div>
+        <h3>{{ c.title }}</h3>
+        {% if c.description %}
+          <div class="desc">{{ c.description }}</div>
+        {% endif %}
+        <div class="footer">
+          <div>
+            <div class="teacher">{{ T.teacher }}: {{ c.teacher_name }}</div>
+            <div style="margin-top:4px;">
+              <span class="count-badge">{{ c.student_count }} {{ T.student }}</span>
+            </div>
+          </div>
+          <div>
+            {% if c.id in my_classes %}
+              <a class="btn gray" href="/class/{{ c.id }}">{{ T.home }}</a>
+            {% else %}
+              <form method="post" action="/classes/{{ c.id }}/request" style="display:inline;">
+                <button type="submit">{{ T.request_join }}</button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card empty-state">
+    {{ T.no_public_classes }}
+  </div>
+{% endif %}
+{% endblock %}
