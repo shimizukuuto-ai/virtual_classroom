@@ -57,11 +57,6 @@
   .info-row:last-child { border-bottom: none; }
   .info-row .label { color: #64748b; }
   .info-row .value { color: #1e293b; font-weight: 600; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
-  .badge-on { background: #16a34a; color: #fff; }
-  .badge-off { background: #64748b; color: #fff; }
-  .badge-ai { background: #7c3aed; color: #fff; }
-  .badge-human { background: #0891b2; color: #fff; }
 
   /* ===== コントロール ===== */
   .controls-card {
@@ -192,24 +187,58 @@
     resize: vertical;
   }
   .status { font-size: 12px; color: #64748b; margin-top: 6px; min-height: 16px; }
-  .ai-answer {
-    background: #fefce8; border-left: 4px solid #eab308;
-    padding: 10px 14px; border-radius: 6px; margin-top: 10px;
-    white-space: pre-wrap; font-size: 13px; line-height: 1.6;
-  }
-  .banner {
-    padding: 10px 14px; border-radius: 8px; margin-bottom: 12px;
-    font-size: 13px;
-  }
-  .banner.ai { background: #ede9fe; border-left: 4px solid #7c3aed; color: #4c1d95; }
-  .banner.human { background: #cffafe; border-left: 4px solid #0891b2; color: #155e75; }
-</style>
 
-{% if cls.ai_teacher_mode %}
-  <div class="banner ai">AI Teacher Mode: ON{% if cls.teaching_focus %} — Focus: {{ cls.teaching_focus }}{% endif %}</div>
-{% else %}
-  <div class="banner human">Human Teacher Mode — {{ cls.taught_by or '' }}。AIは個別サポートのみ。</div>
-{% endif %}
+  /* ===== 3D 読み込み失敗時のフォールバック ===== */
+  .threed-fallback {
+    height: 100%; display: flex; align-items: center; justify-content: center;
+    color: #334155; font-size: 13px; text-align: center; padding: 20px;
+    background: linear-gradient(180deg, #7fb5e6 0%, #a8cfee 45%, #cfe3f4 80%, #e8f1f8 100%);
+  }
+
+  /* ===== 視点リセット ===== */
+  .reset-view-btn {
+    position: absolute; top: 10px; right: 10px; z-index: 5;
+    background: rgba(15,23,42,.85); color: #fff; border: none;
+    padding: 6px 10px; border-radius: 8px; font-size: 11px; cursor: pointer;
+  }
+  .reset-view-btn:hover { background: rgba(15,23,42,1); }
+
+  /* ===== 授業フェーズバー ===== */
+  .stage-bar {
+    background: #fff; border-radius: 12px; padding: 12px 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06); margin-bottom: 12px;
+  }
+  .stage-bar-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .stage-bar-title { font-weight: 700; font-size: 13px; color: #334155; }
+  .stage-bar-controls button.mini {
+    padding: 4px 10px; font-size: 11px; border-radius: 6px; border: none;
+    background: #3b82f6; color: #fff; cursor: pointer; margin-left: 6px;
+  }
+  .stage-steps { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 4px; }
+  .stage-step { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 64px; opacity: .45; flex-shrink: 0; }
+  .stage-step .dot { width: 10px; height: 10px; border-radius: 50%; background: #cbd5e1; }
+  .stage-step .label { font-size: 10px; color: #64748b; white-space: nowrap; }
+  .stage-step.done { opacity: .8; }
+  .stage-step.done .dot { background: #16a34a; }
+  .stage-step.current { opacity: 1; }
+  .stage-step.current .dot { background: #3b82f6; box-shadow: 0 0 0 4px rgba(59,130,246,.25); }
+  .stage-step.current .label { color: #1e293b; font-weight: 700; }
+
+  /* ===== 未読タブ ===== */
+  .tab.has-unread { position: relative; }
+  .tab.has-unread::after {
+    content: ""; position: absolute; top: 6px; right: 2px;
+    width: 7px; height: 7px; border-radius: 50%; background: #ef4444;
+  }
+
+  /* ===== 最新へジャンプ ===== */
+  .jump-latest-btn {
+    display: none; margin: 4px auto 0; padding: 4px 14px;
+    font-size: 11px; border-radius: 14px; border: none;
+    background: #1e293b; color: #fff; cursor: pointer;
+  }
+  .jump-latest-btn.show { display: block; }
+</style>
 
 <!-- 上部: 3D + 情報 -->
 <div class="top-grid">
@@ -218,68 +247,72 @@
       <h2>{{ cls.title }}</h2>
       <div class="meta">{{ cls.subject }} / {{ T[role] if role in ['teacher','student'] else role }} / <code>{{ cls.join_code }}</code></div>
     </div>
+    <button id="btn-reset-view" class="reset-view-btn" type="button">{{ T.reset_view }}</button>
     <div class="hint">{{ T.drag_hint }}</div>
   </div>
 
   <div class="info-side">
-    <h3>Class Info</h3>
+    <h3>{{ T.class_info }}</h3>
     <div class="info-row">
       <span class="label">{{ T.subject }}</span>
       <span class="value">{{ cls.subject }}</span>
     </div>
     <div class="info-row">
-      <span class="label">Mode</span>
-      {% if cls.ai_teacher_mode %}<span class="badge badge-ai">AI</span>{% else %}<span class="badge badge-human">HUMAN</span>{% endif %}
+      <span class="label">{{ T.stage }}</span>
+      <span class="value" id="info-stage-name">{{ STAGES[cls.stage] if cls.stage is not none and cls.stage < STAGES|length else STAGES[0] }}</span>
     </div>
     <div class="info-row">
-      <span class="label">AI auto-reply</span>
-      <span class="badge {% if cls.ai_mode %}badge-on{% else %}badge-off{% endif %}" id="ai-mode-badge">{% if cls.ai_mode %}ON{% else %}OFF{% endif %}</span>
-    </div>
-    <div class="info-row">
-      <span class="label">Members</span>
+      <span class="label">{{ T.members_label }}</span>
       <span class="value">{{ members|length }}</span>
     </div>
     <div class="info-row">
-      <span class="label">You</span>
+      <span class="label">{{ T.you_label }}</span>
       <span class="value">{{ user.name }}</span>
     </div>
     <div class="status" id="status"></div>
   </div>
 </div>
 
+<!-- 授業フェーズ -->
+<div class="stage-bar">
+  <div class="stage-bar-head">
+    <span class="stage-bar-title">{{ T.stage }}</span>
+    {% if role == 'teacher' %}
+    <div class="stage-bar-controls">
+      <button id="btn-stage-prev" class="mini" type="button">◀ {{ T.prev_stage }}</button>
+      <button id="btn-stage-next" class="mini" type="button">{{ T.next_stage }} ▶</button>
+    </div>
+    {% endif %}
+  </div>
+  <div class="stage-steps" id="stage-steps">
+    {% for s in STAGES %}
+      <div class="stage-step {% if loop.index0 == cls.stage %}current{% elif loop.index0 < cls.stage %}done{% endif %}" data-idx="{{ loop.index0 }}">
+        <span class="dot"></span><span class="label">{{ s }}</span>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
 <!-- 教師コントロール -->
 {% if role == 'teacher' %}
 <div class="controls-card">
-  <details>
-    <summary>Teacher Controls</summary>
+  <details open>
+    <summary>{{ T.teacher_menu }}</summary>
     <div class="btn-row">
       <button id="btn-bb-open" class="dark">{{ T.write_blackboard }}</button>
       <button id="btn-bb-clear" class="red">{{ T.clear_blackboard }}</button>
-      <button id="btn-img-upload" class="purple">Upload Image</button>
+      <button id="btn-img-upload" class="purple">{{ T.upload_image }}</button>
       <input type="file" id="img-file" accept="image/*" style="display:none;">
     </div>
-    <div class="btn-row">
-      <button id="btn-ai-explain" class="green">AI Explain</button>
-      <button id="btn-ai-quiz" class="green">AI Quiz</button>
-      <button id="btn-toggle-ai" class="{% if cls.ai_mode %}red{% else %}orange{% endif %}">
-        {% if cls.ai_mode %}AI Mode OFF{% else %}AI Mode ON{% endif %}
-      </button>
-    </div>
-    <input type="text" id="ai-topic" class="topic-input" placeholder="{{ T.ai_topic_placeholder }}">
   </details>
 </div>
 {% endif %}
 
 {% if role == 'student' %}
 <div class="controls-card">
-  <details open>
-    <summary>Student Menu</summary>
-    <div class="btn-row">
-      <button id="btn-hand" class="green">{{ T.raise_hand }}</button>
-      <button id="btn-ai-ask" class="orange">{{ T.ai_ask }}</button>
-    </div>
-    <div id="ai-answer" class="ai-answer" style="display:none;"></div>
-  </details>
+  <div class="btn-row">
+    <button id="btn-hand" class="green">{{ T.raise_hand }}</button>
+  </div>
 </div>
 {% endif %}
 
@@ -287,8 +320,8 @@
 <div class="tabs">
   <button class="tab active" data-tab="board">{{ T.blackboard }}</button>
   <button class="tab" data-tab="chat">{{ T.log }}</button>
-  <button class="tab" data-tab="history">History</button>
-  <button class="tab" data-tab="members">Members</button>
+  <button class="tab" data-tab="history">{{ T.history_tab }}</button>
+  <button class="tab" data-tab="members">{{ T.members_label }}</button>
 </div>
 
 <!-- 黒板タブ -->
@@ -303,16 +336,22 @@
   <div class="chat-wrap">
     <div id="messages">
       {% for m in messages %}
-        <div class="msg {{ m.sender_type }}">
-          <div class="who">
-            {% if m.sender_type == 'ai' %}{{ T.ai_teacher }}
-            {% elif m.sender_type == 'system' %}{{ T.system }}
-            {% else %}{{ m.sender_name }}{% endif %}
+        {% if m.content == "__HANDRAISE__" %}
+          <div class="msg system">
+            <div>{{ m.sender_name }}{{ T.hand_raise_suffix }}</div>
           </div>
-          <div>{{ m.content }}</div>
-        </div>
+        {% else %}
+          <div class="msg {{ m.sender_type }}">
+            <div class="who">
+              {% if m.sender_type == 'system' %}{{ T.system }}
+              {% else %}{{ m.sender_name }}{% endif %}
+            </div>
+            <div>{{ m.content }}</div>
+          </div>
+        {% endif %}
       {% endfor %}
     </div>
+    <button id="jump-latest" class="jump-latest-btn" type="button">{{ T.jump_to_latest }}</button>
     <form id="announce-form" style="margin-top:12px;">
       <input type="text" id="announce-input" class="topic-input" placeholder="{{ T.send }}">
       <button type="submit">{{ T.send }}</button>
@@ -337,10 +376,6 @@
           <div class="role">{{ m.role }}</div>
         </div>
       {% endfor %}
-      <div class="member-card ai">
-        <div class="name">AI Teacher</div>
-        <div class="role">assistant</div>
-      </div>
     </div>
   </div>
 </div>
@@ -364,39 +399,345 @@
 
 <script>
 window.I18N = {
-  ai_teacher: {{ T.ai_teacher|tojson }},
   system: {{ T.system|tojson }},
   error: {{ T.error|tojson }},
   thinking: {{ T.thinking|tojson }},
   save: {{ T.save|tojson }},
-  ask_placeholder: {{ T.ask_placeholder|tojson }},
-  ai_teacher_mode: {{ (1 if cls.ai_teacher_mode else 0) }}
+  loading: {{ T.loading|tojson }},
+  no_history: {{ T.no_history|tojson }},
+  load_failed: {{ T.load_failed|tojson }},
+  confirm_clear_blackboard: {{ T.confirm_clear_blackboard|tojson }},
+  hand_raise_suffix: {{ T.hand_raise_suffix|tojson }},
+  image_too_large: {{ T.image_too_large|tojson }},
+  threed_fallback: {{ T.threed_fallback|tojson }}
 };
 window.CLASS_ID = {{ cls.id }};
 window.ROLE = {{ role|tojson }};
 window.USER_NAME = {{ user.name|tojson }};
 window.INITIAL_BB = {{ (cls.blackboard or '')|tojson }};
+window.TEACHER_DISPLAY_NAME = {{ (cls.taught_by or T.teacher)|tojson }};
+window.STAGE_NAMES = {{ STAGES|tojson }};
 window.MEMBERS = [
   {% for m in members %}{ name: {{ m.name|tojson }}, role: {{ m.role|tojson }} },{% endfor %}
 ];
-</script>
 
-<script type="module">
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
+(function () {
 const I18N = window.I18N;
 const CLASS_ID = window.CLASS_ID;
 const ROLE = window.ROLE;
 const USER_NAME = window.USER_NAME;
-const INITIAL_BB = window.INITIAL_BB;
-const MEMBERS = window.MEMBERS;
+const HAND_RAISE_SENTINEL = "__HANDRAISE__";
 
-// ===== 3D =====
+// ===== Tabs =====
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    const name = tab.dataset.tab;
+    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === tab));
+    document.querySelectorAll(".tab-pane").forEach(p => p.classList.toggle("active", p.dataset.pane === name));
+    if (name === "history") loadHistory();
+    if (name === "chat") tab.classList.remove("has-unread");
+  });
+});
+
+// ===== Blackboard rendering (flat panel) =====
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, (ch) => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  })[ch]);
+}
+function renderBlackboardHTML(text) {
+  if (!text || !text.trim()) {
+    return '<span style="color:#8aa393;font-style:italic;">(Blackboard is empty)</span>';
+  }
+  const escaped = escapeHtml(text);
+  return escaped.replace(/\[img\]([^\[]+)\[\/img\]/g, (m, url) => {
+    return `<img src="${url}" alt="attachment" />`;
+  });
+}
+function setDirectBB(text) {
+  const el = document.getElementById("bb-wrap");
+  const c = document.getElementById("bb-content");
+  c.innerHTML = renderBlackboardHTML(text);
+  if (text && text.trim()) el.classList.remove("empty");
+  else el.classList.add("empty");
+}
+setDirectBB(window.INITIAL_BB);
+
+// ===== 授業フェーズ =====
+function applyStage(idx) {
+  document.querySelectorAll(".stage-step").forEach(el => {
+    const i = parseInt(el.dataset.idx, 10);
+    el.classList.toggle("current", i === idx);
+    el.classList.toggle("done", i < idx);
+  });
+  const nameEl = document.getElementById("info-stage-name");
+  if (nameEl && window.STAGE_NAMES[idx] !== undefined) nameEl.textContent = window.STAGE_NAMES[idx];
+}
+async function stageAction(action) {
+  const res = await fetch(`/api/stage/${CLASS_ID}/${action}`, { method: "POST" });
+  const d = await res.json();
+  if (res.ok) applyStage(d.stage);
+}
+document.getElementById("btn-stage-next")?.addEventListener("click", () => stageAction("next"));
+document.getElementById("btn-stage-prev")?.addEventListener("click", () => stageAction("prev"));
+
+// ===== Chat / Poll =====
+const messagesEl = document.getElementById("messages");
+const statusEl = document.getElementById("status");
+const jumpBtn = document.getElementById("jump-latest");
+let lastMsgId = {{ messages[-1].id if messages else 0 }};
+let lastBlackboardSeen = window.INITIAL_BB;
+
+function isNearBottom() {
+  return messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 60;
+}
+function scrollBottom() { messagesEl.scrollTop = messagesEl.scrollHeight; }
+scrollBottom();
+messagesEl.addEventListener("scroll", () => {
+  if (isNearBottom()) jumpBtn?.classList.remove("show");
+});
+jumpBtn?.addEventListener("click", () => {
+  scrollBottom();
+  jumpBtn.classList.remove("show");
+});
+
+function addMsg(type, name, text) {
+  const wasNearBottom = isNearBottom();
+  const div = document.createElement("div");
+  if (text === HAND_RAISE_SENTINEL) {
+    div.className = "msg system";
+    div.textContent = name + I18N.hand_raise_suffix;
+  } else {
+    div.className = "msg " + type;
+    const who = document.createElement("div");
+    who.className = "who";
+    who.textContent = (type === "system") ? I18N.system : name;
+    const body = document.createElement("div");
+    body.innerHTML = renderBlackboardHTML(text).replace(/<span[^>]*>\(Blackboard is empty\)<\/span>/, "");
+    div.appendChild(who); div.appendChild(body);
+  }
+  messagesEl.appendChild(div);
+  if (wasNearBottom) {
+    scrollBottom();
+  } else {
+    const chatPane = document.querySelector('.tab-pane[data-pane="chat"]');
+    if (chatPane && chatPane.classList.contains("active")) jumpBtn?.classList.add("show");
+  }
+}
+
+function notifyChatBadge() {
+  const chatPane = document.querySelector('.tab-pane[data-pane="chat"]');
+  const chatTabActive = chatPane && chatPane.classList.contains("active");
+  if (!chatTabActive) {
+    document.querySelector('.tab[data-tab="chat"]')?.classList.add("has-unread");
+  }
+}
+
+async function poll() {
+  if (document.hidden) return;
+  try {
+    const res = await fetch(`/api/poll/${CLASS_ID}`, { method: "POST" });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.blackboard !== undefined && data.blackboard !== lastBlackboardSeen) {
+      lastBlackboardSeen = data.blackboard;
+      window.__3d?.drawBlackboardText(data.blackboard);
+      setDirectBB(data.blackboard);
+    }
+    if (data.stage !== undefined) applyStage(data.stage);
+    for (const m of data.messages) {
+      if (m.id > lastMsgId) {
+        addMsg(m.type, m.name, m.content);
+        lastMsgId = m.id;
+        if (m.name !== USER_NAME) notifyChatBadge();
+        const threeD = window.__3d;
+        const c = threeD && threeD.characterMap[m.name];
+        if (c) {
+          c.userData.highlight = 1.5;
+          if (m.content === HAND_RAISE_SENTINEL) {
+            c.userData.handRaised = true;
+            setTimeout(() => { c.userData.handRaised = false; }, 4000);
+          }
+        }
+      }
+    }
+  } catch (e) {}
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
+setInterval(poll, 2500);
+
+// ===== History =====
+async function loadHistory() {
+  const list = document.getElementById("history-list");
+  list.textContent = I18N.loading;
+  const res = await fetch(`/api/history/${CLASS_ID}`);
+  const d = await res.json();
+  if (!res.ok) { list.textContent = I18N.load_failed; return; }
+  if (!d.items.length) { list.textContent = I18N.no_history; return; }
+  list.innerHTML = "";
+  for (const item of d.items) {
+    const div = document.createElement("div");
+    div.className = "history-item";
+    const preview = item.content
+      ? escapeHtml(item.content).slice(0, 300)
+      : "(empty)";
+    div.innerHTML = `
+      <div class="head">
+        <span>${escapeHtml(item.author || "unknown")}</span>
+        <span>${item.created_at}</span>
+      </div>
+      <div class="preview">${preview}</div>
+      ${ROLE === "teacher" ? `<div class="actions"><button data-hid="${item.id}">${I18N.save}</button></div>` : ""}
+    `;
+    list.appendChild(div);
+  }
+  list.querySelectorAll("button[data-hid]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const hid = btn.dataset.hid;
+      const r = await fetch(`/api/history/restore/${CLASS_ID}/${hid}`, { method: "POST" });
+      const dd = await r.json();
+      if (r.ok) {
+        lastBlackboardSeen = dd.content;
+        window.__3d?.drawBlackboardText(dd.content);
+        setDirectBB(dd.content);
+        document.querySelector('.tab[data-tab="board"]').click();
+      } else {
+        list.textContent = I18N.error + ": " + (dd.error || I18N.load_failed);
+      }
+    });
+  });
+}
+
+// ===== Chat form =====
+document.getElementById("announce-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = document.getElementById("announce-input");
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  statusEl.textContent = I18N.thinking + "...";
+  try {
+    const res = await fetch(`/api/announce/${CLASS_ID}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text })
+    });
+    const data = await res.json();
+    if (!res.ok) { statusEl.textContent = I18N.error + ": " + (data.error || res.status); return; }
+    statusEl.textContent = "";
+    await poll();
+  } catch (e) { statusEl.textContent = I18N.error + ": " + e; }
+});
+
+// ===== Blackboard editor drawer =====
+const drawer = document.getElementById("bb-drawer");
+const bbTextarea = document.getElementById("bb-textarea");
+document.getElementById("btn-bb-open")?.addEventListener("click", async () => {
+  const res = await fetch(`/api/poll/${CLASS_ID}`, { method: "POST" });
+  const data = await res.json();
+  bbTextarea.value = data.blackboard || "";
+  drawer.classList.add("open");
+});
+document.getElementById("bb-cancel")?.addEventListener("click", () => drawer.classList.remove("open"));
+document.getElementById("bb-save")?.addEventListener("click", async () => {
+  statusEl.textContent = I18N.save + "...";
+  const res = await fetch(`/api/blackboard/${CLASS_ID}`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: bbTextarea.value })
+  });
+  if (res.ok) {
+    lastBlackboardSeen = bbTextarea.value;
+    window.__3d?.drawBlackboardText(bbTextarea.value);
+    setDirectBB(bbTextarea.value);
+    drawer.classList.remove("open");
+    statusEl.textContent = "";
+  } else statusEl.textContent = I18N.error;
+});
+document.getElementById("btn-bb-clear")?.addEventListener("click", async () => {
+  if (!confirm(I18N.confirm_clear_blackboard)) return;
+  await fetch(`/api/blackboard/clear/${CLASS_ID}`, { method: "POST" });
+  lastBlackboardSeen = "";
+  window.__3d?.drawBlackboardText("");
+  setDirectBB("");
+});
+
+// ===== Image upload =====
+const imgFile = document.getElementById("img-file");
+document.getElementById("btn-img-upload")?.addEventListener("click", () => imgFile.click());
+imgFile?.addEventListener("change", async () => {
+  const file = imgFile.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) {
+    statusEl.textContent = I18N.image_too_large;
+    imgFile.value = "";
+    return;
+  }
+  statusEl.textContent = "Uploading...";
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`/api/upload/${CLASS_ID}`, { method: "POST", body: fd });
+  const d = await res.json();
+  if (!res.ok) { statusEl.textContent = I18N.error + ": " + (d.error || ""); return; }
+  const pollRes = await fetch(`/api/poll/${CLASS_ID}`, {method:"POST"});
+  const pollData = await pollRes.json();
+  const newBB = (pollData.blackboard || "") + `\n[img]${d.url}[/img]\n`;
+  const saveRes = await fetch(`/api/blackboard/${CLASS_ID}`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: newBB })
+  });
+  if (saveRes.ok) {
+    lastBlackboardSeen = newBB;
+    window.__3d?.drawBlackboardText(newBB);
+    setDirectBB(newBB);
+    statusEl.textContent = "";
+  } else statusEl.textContent = I18N.error;
+  imgFile.value = "";
+});
+
+// ===== Hand raise =====
+document.getElementById("btn-hand")?.addEventListener("click", async () => {
+  await fetch(`/api/announce/${CLASS_ID}`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: HAND_RAISE_SENTINEL })
+  });
+  const threeD = window.__3d;
+  const me = threeD && threeD.characterMap[USER_NAME];
+  if (me) {
+    me.userData.handRaised = true;
+    setTimeout(() => { me.userData.handRaised = false; }, 4000);
+  }
+  await poll();
+});
+
+// ===== 視点リセット =====
+document.getElementById("btn-reset-view")?.addEventListener("click", () => {
+  window.__resetCamera && window.__resetCamera();
+});
+})();
+</script>
+
+<script type="module">
+(async () => {
 const container = document.getElementById("canvas-container");
+const I18N = window.I18N;
+const MEMBERS = window.MEMBERS;
+const TEACHER_DISPLAY_NAME = window.TEACHER_DISPLAY_NAME;
+const USER_NAME = window.USER_NAME;
+
+let THREE, OrbitControls;
+try {
+  THREE = await import('three');
+  ({ OrbitControls } = await import('three/addons/controls/OrbitControls.js'));
+} catch (e) {
+  container.innerHTML = `<div class="threed-fallback">${I18N.threed_fallback}</div>`;
+  return;
+}
+
+try {
+
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, container.clientWidth / container.clientHeight, 0.1, 300);
-camera.position.set(0, 6, 14);
+const CAMERA_START = { pos: [0, 6, 14], target: [0, 1.5, -1] };
+camera.position.set(...CAMERA_START.pos);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(container.clientWidth, container.clientHeight);
@@ -407,7 +748,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 container.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 1.5, -1);
+controls.target.set(...CAMERA_START.target);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.minDistance = 6;
@@ -417,6 +758,12 @@ controls.zoomSpeed = 0.4;
 controls.dollySpeed = 0.6;
 controls.rotateSpeed = 0.7;
 controls.update();
+
+window.__resetCamera = () => {
+  camera.position.set(...CAMERA_START.pos);
+  controls.target.set(...CAMERA_START.target);
+  controls.update();
+};
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.65));
 scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x6b8f3a, 0.7));
@@ -490,7 +837,6 @@ function drawClock() {
   clockCtx.strokeStyle = "#1e293b"; clockCtx.lineWidth = 8;
   clockCtx.stroke();
 
-  // 目盛り
   for (let i = 0; i < 12; i++) {
     const ang = (i / 12) * Math.PI * 2 - Math.PI/2;
     const x1 = cx + Math.cos(ang) * (r - 20);
@@ -506,7 +852,6 @@ function drawClock() {
   const now = new Date();
   const h = now.getHours() % 12, m = now.getMinutes(), s = now.getSeconds();
 
-  // 時針
   const hAng = ((h + m/60) / 12) * Math.PI * 2 - Math.PI/2;
   clockCtx.strokeStyle = "#1e293b"; clockCtx.lineWidth = 10;
   clockCtx.beginPath();
@@ -514,7 +859,6 @@ function drawClock() {
   clockCtx.lineTo(cx + Math.cos(hAng) * (r * 0.5), cy + Math.sin(hAng) * (r * 0.5));
   clockCtx.stroke();
 
-  // 分針
   const mAng = ((m + s/60) / 60) * Math.PI * 2 - Math.PI/2;
   clockCtx.strokeStyle = "#1e293b"; clockCtx.lineWidth = 6;
   clockCtx.beginPath();
@@ -522,7 +866,6 @@ function drawClock() {
   clockCtx.lineTo(cx + Math.cos(mAng) * (r * 0.75), cy + Math.sin(mAng) * (r * 0.75));
   clockCtx.stroke();
 
-  // 秒針
   const sAng = (s / 60) * Math.PI * 2 - Math.PI/2;
   clockCtx.strokeStyle = "#dc2626"; clockCtx.lineWidth = 3;
   clockCtx.beginPath();
@@ -660,7 +1003,7 @@ const chalkTray = new THREE.Mesh(
 chalkTray.position.set(0, 0.05, -6.0);
 chalkTray.castShadow = true;
 scene.add(chalkTray);
-drawBlackboardText(INITIAL_BB);
+drawBlackboardText(window.INITIAL_BB);
 
 // ===== Characters =====
 function roundRect(ctx, x, y, w, h, r) {
@@ -690,7 +1033,7 @@ function makeNameSprite(name) {
   return sp;
 }
 
-function createCharacter({ color, skin = 0xffd8b0, name = "", isRobot = false, seated = false }) {
+function createCharacter({ color, skin = 0xffd8b0, name = "", seated = false }) {
   const g = new THREE.Group();
   const body = new THREE.Mesh(
     new THREE.CylinderGeometry(0.28, 0.34, 0.6, 16),
@@ -701,40 +1044,24 @@ function createCharacter({ color, skin = 0xffd8b0, name = "", isRobot = false, s
 
   const head = new THREE.Mesh(
     new THREE.SphereGeometry(0.32, 24, 24),
-    new THREE.MeshStandardMaterial({
-      color: isRobot ? 0xc8d4e0 : skin,
-      roughness: 0.55, metalness: isRobot ? 0.5 : 0
-    })
+    new THREE.MeshStandardMaterial({ color: skin, roughness: 0.55 })
   );
   head.position.y = seated ? 1.1 : 1.25;
   head.castShadow = true; g.add(head);
 
-  if (!isRobot) {
-    const hair = new THREE.Mesh(
-      new THREE.SphereGeometry(0.335, 24, 24, 0, Math.PI*2, 0, Math.PI/1.75),
-      new THREE.MeshStandardMaterial({ color: 0x2a1a0a, roughness: 0.8 })
-    );
-    hair.position.copy(head.position); hair.position.y += 0.02;
-    g.add(hair);
-  }
+  const hair = new THREE.Mesh(
+    new THREE.SphereGeometry(0.335, 24, 24, 0, Math.PI*2, 0, Math.PI/1.75),
+    new THREE.MeshStandardMaterial({ color: 0x2a1a0a, roughness: 0.8 })
+  );
+  hair.position.copy(head.position); hair.position.y += 0.02;
+  g.add(hair);
 
-  const eyeMat = new THREE.MeshBasicMaterial({ color: isRobot ? 0x22dd88 : 0x111111 });
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
   const eyeGeo = new THREE.SphereGeometry(0.05, 12, 12);
   const eyeY = head.position.y + 0.02;
   const lEye = new THREE.Mesh(eyeGeo, eyeMat); lEye.position.set(-0.11, eyeY, 0.28);
   const rEye = new THREE.Mesh(eyeGeo, eyeMat); rEye.position.set(0.11, eyeY, 0.28);
   g.add(lEye, rEye);
-
-  if (isRobot) {
-    const ant = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.015, 0.015, 0.2, 8),
-      new THREE.MeshStandardMaterial({ color: 0x999 })
-    );
-    ant.position.y = head.position.y + 0.42; g.add(ant);
-    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 12),
-      new THREE.MeshBasicMaterial({ color: 0xff4444 }));
-    tip.position.y = head.position.y + 0.54; g.add(tip);
-  }
 
   const armMat = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
   const armGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.55, 8);
@@ -766,22 +1093,15 @@ function createCharacter({ color, skin = 0xffd8b0, name = "", isRobot = false, s
     baseRotZ: { l: 0.3, r: -0.3 },
     handRaised: false,
     highlight: 0,
-    isAI: isRobot,
     baseY: g.position.y,
   };
   return g;
 }
 
-const teacherName = ROLE === "teacher" ? USER_NAME : "Teacher";
-const teacher = createCharacter({ color: 0x3b82f6, name: teacherName, isRobot: false, seated: false });
-teacher.position.set(-1.6, 0.15, -4.8);
+const teacher = createCharacter({ color: 0x3b82f6, name: TEACHER_DISPLAY_NAME, seated: false });
+teacher.position.set(0, 0.15, -4.8);
 teacher.rotation.y = Math.PI;
 scene.add(teacher);
-
-const aiTeacher = createCharacter({ color: 0x16a34a, name: I18N.ai_teacher, isRobot: true, seated: false });
-aiTeacher.position.set(1.6, 0.15, -4.8);
-aiTeacher.rotation.y = Math.PI;
-scene.add(aiTeacher);
 
 function createDesk() {
   const g = new THREE.Group();
@@ -828,7 +1148,7 @@ for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
 }
 
 const studentColors = [0xea580c, 0xdc2626, 0x9333ea, 0x0891b2, 0x0d9488, 0xdb2777, 0x5b21b6, 0xf59e0b];
-const characterMap = { "Teacher": teacher, [I18N.ai_teacher]: aiTeacher };
+const characterMap = { [TEACHER_DISPLAY_NAME]: teacher };
 
 studentMembers.forEach((m, i) => {
   if (i >= positions.length) return;
@@ -837,18 +1157,26 @@ studentMembers.forEach((m, i) => {
   const chair = createChair(); chair.position.set(p.x, 0.15, p.z + 0.9); scene.add(chair);
   const stu = createCharacter({
     color: studentColors[i % studentColors.length],
-    name: m.name, isRobot: false, seated: true
+    name: m.name, seated: true
   });
   stu.position.set(p.x, 0.15, p.z + 0.9);
   scene.add(stu);
   characterMap[m.name] = stu;
 });
 
+const overflowCount = studentMembers.length - positions.length;
+if (overflowCount > 0) {
+  const sp = makeNameSprite(`+${overflowCount}`);
+  sp.position.set(0, 2.4, 2.6);
+  scene.add(sp);
+}
+
+window.__3d = { characterMap, drawBlackboardText };
+
 let t = 0;
 function animate() {
   requestAnimationFrame(animate);
   t += 0.016;
-  if (aiTeacher) aiTeacher.position.y = 0.15 + Math.sin(t * 1.5) * 0.04;
 
   for (const name in characterMap) {
     const c = characterMap[name];
@@ -875,272 +1203,9 @@ window.addEventListener("resize", () => {
   renderer.setSize(w, h);
 });
 
-// ===== Tabs =====
-document.querySelectorAll(".tab").forEach(tab => {
-  tab.addEventListener("click", () => {
-    const name = tab.dataset.tab;
-    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === tab));
-    document.querySelectorAll(".tab-pane").forEach(p => p.classList.toggle("active", p.dataset.pane === name));
-    if (name === "history") loadHistory();
-  });
-});
-
-// ===== Blackboard rendering =====
-function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, (ch) => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-  })[ch]);
+} catch (e) {
+  container.innerHTML = `<div class="threed-fallback">${I18N.threed_fallback}</div>`;
 }
-function renderBlackboardHTML(text) {
-  if (!text || !text.trim()) {
-    return '<span style="color:#8aa393;font-style:italic;">(Blackboard is empty)</span>';
-  }
-  const escaped = escapeHtml(text);
-  return escaped.replace(/\[img\]([^\[]+)\[\/img\]/g, (m, url) => {
-    return `<img src="${url}" alt="attachment" />`;
-  });
-}
-function setDirectBB(text) {
-  const el = document.getElementById("bb-wrap");
-  const c = document.getElementById("bb-content");
-  c.innerHTML = renderBlackboardHTML(text);
-  if (text && text.trim()) el.classList.remove("empty");
-  else el.classList.add("empty");
-}
-setDirectBB(INITIAL_BB);
-
-// ===== Poll =====
-const messagesEl = document.getElementById("messages");
-const statusEl = document.getElementById("status");
-let lastMsgId = {{ messages[-1].id if messages else 0 }};
-
-function scrollBottom() { messagesEl.scrollTop = messagesEl.scrollHeight; }
-scrollBottom();
-
-function addMsg(type, name, text) {
-  const div = document.createElement("div");
-  div.className = "msg " + type;
-  const who = document.createElement("div");
-  who.className = "who";
-  if (type === "ai") who.textContent = I18N.ai_teacher;
-  else if (type === "system") who.textContent = I18N.system;
-  else who.textContent = name;
-  const body = document.createElement("div");
-  body.innerHTML = renderBlackboardHTML(text).replace(/<span[^>]*>\(Blackboard is empty\)<\/span>/, "");
-  div.appendChild(who); div.appendChild(body);
-  messagesEl.appendChild(div);
-  scrollBottom();
-}
-
-async function poll() {
-  try {
-    const res = await fetch(`/api/poll/${CLASS_ID}`, { method: "POST" });
-    if (!res.ok) return;
-    const data = await res.json();
-    if (data.blackboard !== undefined) {
-      drawBlackboardText(data.blackboard);
-      setDirectBB(data.blackboard);
-    }
-    if (data.ai_mode !== undefined) {
-      const b = document.getElementById("ai-mode-badge");
-      if (b) {
-        b.textContent = data.ai_mode ? "ON" : "OFF";
-        b.className = "badge " + (data.ai_mode ? "badge-on" : "badge-off");
-      }
-    }
-    for (const m of data.messages) {
-      if (m.id > lastMsgId) {
-        addMsg(m.type, m.name, m.content);
-        lastMsgId = m.id;
-        const c = characterMap[m.name];
-        if (c) {
-          c.userData.highlight = 1.5;
-          if (/raise|挙手|✋/i.test(m.content)) {
-            c.userData.handRaised = true;
-            setTimeout(() => { c.userData.handRaised = false; }, 4000);
-          }
-        }
-      }
-    }
-  } catch (e) {}
-}
-setInterval(poll, 2500);
-
-// ===== History =====
-async function loadHistory() {
-  const list = document.getElementById("history-list");
-  list.textContent = "Loading...";
-  const res = await fetch(`/api/history/${CLASS_ID}`);
-  const d = await res.json();
-  if (!res.ok) { list.textContent = "Failed to load"; return; }
-  if (!d.items.length) { list.textContent = "No history yet"; return; }
-  list.innerHTML = "";
-  for (const item of d.items) {
-    const div = document.createElement("div");
-    div.className = "history-item";
-    const preview = item.content
-      ? escapeHtml(item.content).slice(0, 300)
-      : "(empty)";
-    div.innerHTML = `
-      <div class="head">
-        <span>${escapeHtml(item.author || "unknown")}</span>
-        <span>${item.created_at}</span>
-      </div>
-      <div class="preview">${preview}</div>
-      ${ROLE === "teacher" ? `<div class="actions"><button data-hid="${item.id}">Restore</button></div>` : ""}
-    `;
-    list.appendChild(div);
-  }
-  list.querySelectorAll("button[data-hid]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const hid = btn.dataset.hid;
-      const r = await fetch(`/api/history/restore/${CLASS_ID}/${hid}`, { method: "POST" });
-      const dd = await r.json();
-      if (r.ok) {
-        drawBlackboardText(dd.content);
-        setDirectBB(dd.content);
-        document.querySelector('.tab[data-tab="board"]').click();
-      } else {
-        alert(dd.error || "failed");
-      }
-    });
-  });
-}
-
-// ===== Chat =====
-document.getElementById("announce-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const input = document.getElementById("announce-input");
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = "";
-  statusEl.textContent = I18N.thinking + "...";
-  try {
-    const res = await fetch(`/api/announce/${CLASS_ID}`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text })
-    });
-    const data = await res.json();
-    if (!res.ok) { statusEl.textContent = I18N.error + ": " + (data.error || res.status); return; }
-    statusEl.textContent = "";
-    await poll();
-  } catch (e) { statusEl.textContent = I18N.error + ": " + e; }
-});
-
-// ===== Drawer =====
-const drawer = document.getElementById("bb-drawer");
-const bbTextarea = document.getElementById("bb-textarea");
-document.getElementById("btn-bb-open")?.addEventListener("click", async () => {
-  const res = await fetch(`/api/poll/${CLASS_ID}`, { method: "POST" });
-  const data = await res.json();
-  bbTextarea.value = data.blackboard || "";
-  drawer.classList.add("open");
-});
-document.getElementById("bb-cancel")?.addEventListener("click", () => drawer.classList.remove("open"));
-document.getElementById("bb-save")?.addEventListener("click", async () => {
-  statusEl.textContent = I18N.save + "...";
-  const res = await fetch(`/api/blackboard/${CLASS_ID}`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: bbTextarea.value })
-  });
-  if (res.ok) {
-    drawBlackboardText(bbTextarea.value);
-    setDirectBB(bbTextarea.value);
-    drawer.classList.remove("open");
-    statusEl.textContent = "";
-  } else statusEl.textContent = I18N.error;
-});
-document.getElementById("btn-bb-clear")?.addEventListener("click", async () => {
-  if (!confirm("Clear blackboard?")) return;
-  await fetch(`/api/blackboard/clear/${CLASS_ID}`, { method: "POST" });
-  drawBlackboardText("");
-  setDirectBB("");
-});
-
-// ===== AI helpers =====
-async function aiAction(url, body) {
-  statusEl.textContent = I18N.thinking + "...";
-  const res = await fetch(url, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body || {})
-  });
-  const d = await res.json();
-  if (res.ok) {
-    if (d.blackboard !== undefined) {
-      drawBlackboardText(d.blackboard);
-      setDirectBB(d.blackboard);
-    }
-    statusEl.textContent = "";
-    await poll();
-  } else statusEl.textContent = I18N.error + ": " + (d.error || "");
-}
-document.getElementById("btn-ai-explain")?.addEventListener("click", () => {
-  const topic = document.getElementById("ai-topic").value.trim();
-  aiAction(`/api/ai/explain/${CLASS_ID}`, { topic });
-});
-document.getElementById("btn-ai-quiz")?.addEventListener("click", () => aiAction(`/api/ai/quiz/${CLASS_ID}`));
-document.getElementById("btn-toggle-ai")?.addEventListener("click", async () => {
-  if (!confirm("Toggle AI auto-reply?")) return;
-  const res = await fetch(`/api/ai/toggle/${CLASS_ID}`, { method: "POST" });
-  const d = await res.json();
-  if (res.ok) location.reload(); else alert(d.error);
-});
-
-// ===== Image upload =====
-const imgFile = document.getElementById("img-file");
-document.getElementById("btn-img-upload")?.addEventListener("click", () => imgFile.click());
-imgFile?.addEventListener("change", async () => {
-  const file = imgFile.files[0];
-  if (!file) return;
-  statusEl.textContent = "Uploading...";
-  const fd = new FormData();
-  fd.append("file", file);
-  const res = await fetch(`/api/upload/${CLASS_ID}`, { method: "POST", body: fd });
-  const d = await res.json();
-  if (!res.ok) { statusEl.textContent = I18N.error + ": " + (d.error || ""); return; }
-  const pollRes = await fetch(`/api/poll/${CLASS_ID}`, {method:"POST"});
-  const pollData = await pollRes.json();
-  const newBB = (pollData.blackboard || "") + `\n[img]${d.url}[/img]\n`;
-  const saveRes = await fetch(`/api/blackboard/${CLASS_ID}`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: newBB })
-  });
-  if (saveRes.ok) {
-    drawBlackboardText(newBB);
-    setDirectBB(newBB);
-    statusEl.textContent = "";
-  } else statusEl.textContent = I18N.error;
-  imgFile.value = "";
-});
-
-// ===== Hand raise =====
-document.getElementById("btn-hand")?.addEventListener("click", async () => {
-  await fetch(`/api/announce/${CLASS_ID}`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: "挙手しました" })
-  });
-  const me = characterMap[USER_NAME];
-  if (me) {
-    me.userData.handRaised = true;
-    setTimeout(() => { me.userData.handRaised = false; }, 4000);
-  }
-  await poll();
-});
-
-// ===== AI private ask =====
-document.getElementById("btn-ai-ask")?.addEventListener("click", async () => {
-  const q = prompt(I18N.ask_placeholder);
-  if (!q) return;
-  const ansEl = document.getElementById("ai-answer");
-  ansEl.style.display = "block";
-  ansEl.textContent = I18N.thinking + "...";
-  const res = await fetch(`/api/ai/ask/${CLASS_ID}`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question: q })
-  });
-  const d = await res.json();
-  if (res.ok) ansEl.textContent = "Q: " + q + "\n\nA: " + d.answer;
-  else ansEl.textContent = I18N.error + ": " + (d.error || "");
-});
+})();
 </script>
 {% endblock %}
