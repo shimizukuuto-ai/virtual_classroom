@@ -687,7 +687,7 @@ def apply_skin(request: Request, skin_key: str):
     if not user:
         return RedirectResponse("/login")
     set_user_skin(user["id"], skin_key)
-    return RedirectResponse(request.headers.get("referer") or "/badges")
+    return RedirectResponse(request.headers.get("referer") or "/badges", status_code=303)
 
 
 @app.get("/api/stats/{uid}")
