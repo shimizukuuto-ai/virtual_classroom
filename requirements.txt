@@ -3,3 +3,4 @@ uvicorn
 jinja2
 itsdangerous
 python-multipart
+psycopg[binary,pool]

@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from db import init_pool, close_pool
 
 from db import (
     init_db, create_user, get_user_by_name, get_user_by_id, set_user_lang,
@@ -105,7 +106,12 @@ def ctx(request, user, **extra):
 
 @app.on_event("startup")
 def startup():
-    init_db()
+    init_pool()
+
+
+@app.on_event("shutdown")
+def shutdown():
+    close_pool()
 
 
 @app.get("/", response_class=HTMLResponse)
