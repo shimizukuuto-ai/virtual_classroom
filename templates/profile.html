@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{{ profile_user.name }} - {{ T.app_title }}{% endblock %}
+{% block content %}
+<style>
+.p-head {
+  background: #fff; border-radius: 12px; padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06); margin-bottom: 16px;
+}
+.p-name { font-size: 22px; font-weight: 700; margin: 0 0 4px 0; }
+.p-title { color: #475569; font-size: 14px; margin-bottom: 12px; }
+.p-bio { color: #334155; font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 16px; }
+.stat {
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+  padding: 12px 14px; text-align: center;
+}
+.stat .n { font-size: 22px; font-weight: 700; color: #1e293b; }
+.stat .l { font-size: 11px; color: #64748b; margin-top: 2px; }
+.q-item {
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+  padding: 14px 16px; margin-bottom: 10px;
+}
+.q-a { background: #ecfdf5; border-left: 3px solid #16a34a; padding: 10px 12px; border-radius: 6px; margin-top: 8px; font-size: 13px; }
+</style>
+
+<div class="p-head">
+  <h1 class="p-name">{{ profile_user.name }}</h1>
+  {% if profile_user.title %}<div class="p-title">{{ profile_user.title }}</div>{% endif %}
+  {% if profile_user.bio %}<div class="p-bio">{{ profile_user.bio }}</div>{% endif %}
+
+  <div class="stats">
+    <div class="stat"><div class="n">{{ stats.helpful }}</div><div class="l">{{ T.stat_helpful }}</div></div>
+    <div class="stat"><div class="n">{{ stats.messages }}</div><div class="l">{{ T.stat_messages }}</div></div>
+    <div class="stat"><div class="n">{{ stats.answers }}</div><div class="l">{{ T.stat_answers }}</div></div>
+    <div class="stat"><div class="n">{{ stats.taught }}</div><div class="l">{{ T.stat_taught }}</div></div>
+    <div class="stat"><div class="n">{{ stats.joined }}</div><div class="l">{{ T.stat_joined }}</div></div>
+  </div>
+
+  {% if is_me %}
+  <details style="margin-top:16px;">
+    <summary style="cursor:pointer;font-weight:600;color:#334155;">{{ T.edit_profile }}</summary>
+    <form method="post" action="/u/{{ profile_user.id }}/edit" style="margin-top:10px;">
+      <label class="muted">{{ T.title_label }}</label>
+      <input type="text" name="title" value="{{ profile_user.title or '' }}" placeholder="{{ T.title_placeholder }}">
+      <label class="muted">{{ T.bio_label }}</label>
+      <textarea name="bio" rows="4" placeholder="{{ T.bio_placeholder }}">{{ profile_user.bio or '' }}</textarea>
+      <button type="submit">{{ T.save }}</button>
+    </form>
+  </details>
+  {% endif %}
+</div>
+
+{% if taught %}
+<div class="card">
+  <h2>{{ T.taught_classes }}</h2>
+  {% for c in taught %}
+  <a class="class-item" href="/class/{{ c.id }}">
+    <strong>{{ c.title }}</strong>
+    <span class="role">{{ c.subject }}</span>
+    <div class="muted" style="margin-top:4px;">{{ c.description or "" }}</div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if recent_answers %}
+<div class="card">
+  <h2>{{ T.stat_answers }}</h2>
+  {% for q in recent_answers %}
+  <div class="q-item">
+    <div class="muted" style="font-size:11px;">{{ q.class_title }} / {{ q.created_at }}</div>
+    <div style="margin-top:4px;font-size:13px;"><strong>Q.</strong> {{ q.content }}</div>
+    <div class="q-a"><strong>A.</strong> {{ q.answer }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

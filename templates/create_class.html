@@ -2,24 +2,27 @@
 {% block title %}{{ T.create_class }} - {{ T.app_title }}{% endblock %}
 {% block content %}
 <div class="card">
-  <h1>{{ T.create_class }}</h1>
-  <form method="post" action="/create_class">
-    <label>{{ T.class_name }}</label>
-    <input type="text" name="title" required>
+<h1>{{ T.create_class }}</h1>
+<form method="post" action="/create_class">
+<label>{{ T.class_name }}</label>
+<input type="text" name="title" required>
 
-    <label>{{ T.subject }}</label>
-    <input type="text" name="subject" required>
+<label>{{ T.subject }}</label>
+<input type="text" name="subject" required>
 
-    <label>{{ T.description }}</label>
-    <textarea name="description" rows="3"></textarea>
+<label>{{ T.description }}</label>
+<textarea name="description" rows="3"></textarea>
 
-    <label>公開設定</label>
-    <select name="is_public">
-      <option value="1">公開（検索で見つかる）</option>
-      <option value="0">非公開（参加コードのみ）</option>
-    </select>
+<label>公開設定</label>
+<select name="is_public">
+<option value="1">公開（検索で見つかる）</option>
+<option value="0">非公開（参加コードのみ）</option>
+</select>
 
-    <button type="submit">{{ T.create }}</button>
-  </form>
+<label>進行ステップ（1行に1つ。空欄なら完全自由進行）</label>
+<textarea name="steps_text" rows="6" placeholder="{{ default_steps|join('\n') }}"></textarea>
+
+<button type="submit">{{ T.create }}</button>
+</form>
 </div>
 {% endblock %}

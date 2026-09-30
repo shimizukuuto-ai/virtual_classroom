@@ -1,7 +1,7 @@
 import os
-import shutil
 import random
 import string
+import shutil
 
 from fastapi import FastAPI, Request, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -10,16 +10,21 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from db import (
-    init_db, create_user, get_user_by_name, get_user_by_id, set_user_lang,
+    init_db, create_user, get_user_by_name, get_user_by_id, set_user_lang, update_user_profile,
+    user_stats, list_classes_taught_by,
     create_class, get_class_by_code, get_class_by_id, join_class,
     list_classes_for_user, list_public_classes, list_members, get_role,
-    add_message, get_messages, set_blackboard, set_stage,
+    add_message, get_messages, get_message, mark_helpful, set_blackboard, set_stage,
     create_join_request, list_pending_requests_for_teacher, get_request_by_id,
     set_request_status, count_pending_for_teacher, list_my_requests,
     count_students, list_all_users, delete_user,
     save_blackboard_history, list_blackboard_history, get_blackboard_history_by_id,
+    add_step, list_steps, delete_step,
+    ban_user, unban_user, is_banned, list_bans,
+    create_question, list_questions, get_question, answer_question, delete_question,
+    list_questions_answered_by,
 )
-from i18n import all_t, stages as stage_list
+from i18n import all_t, default_steps
 
 
 app = FastAPI()
@@ -35,22 +40,6 @@ def gen_code():
 
 
 def current_user(request: Request):
-    h = request.headers.get("X-User-Id")
-    if h:
-        try:
-            u = get_user_by_id(int(h))
-            if u:
-                return u
-        except (ValueError, TypeError):
-            pass
-    q = request.query_params.get("uid")
-    if q:
-        try:
-            u = get_user_by_id(int(q))
-            if u:
-                return u
-        except (ValueError, TypeError):
-            pass
     uid = request.session.get("user_id")
     if not uid:
         return None
@@ -68,13 +57,7 @@ def ctx(request, user, **extra):
             lang = (user["lang"] or "ja")
         except (KeyError, TypeError, IndexError):
             lang = "ja"
-    base = {
-        "request": request,
-        "user": user,
-        "T": all_t(lang),
-        "lang": lang,
-        "STAGES": stage_list(lang),
-    }
+    base = {"request": request, "user": user, "T": all_t(lang), "lang": lang}
     base.update(extra)
     return base
 
@@ -89,7 +72,7 @@ def index(request: Request):
     return RedirectResponse("/dashboard" if current_user(request) else "/login")
 
 
-# ---------- auth ----------
+# ---- auth ----
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     return templates.TemplateResponse(request, "login.html", ctx(request, None))
@@ -105,7 +88,6 @@ def login_submit(request: Request, name: str = Form(...)):
         create_user(name)
         user = get_user_by_name(name)
     request.session["user_id"] = int(user["id"])
-
     accept = request.headers.get("accept", "")
     if "application/json" in accept:
         return JSONResponse({"ok": True, "id": int(user["id"]), "name": user["name"]})
@@ -126,7 +108,36 @@ def switch_lang(request: Request, code: str):
     return RedirectResponse(request.headers.get("referer") or "/dashboard")
 
 
-# ---------- dashboard ----------
+# ---- profile ----
+@app.get("/u/{uid}", response_class=HTMLResponse)
+def profile_page(request: Request, uid: int):
+    me = current_user(request)
+    if not me:
+        return RedirectResponse("/login")
+    u = get_user_by_id(uid)
+    if not u:
+        return HTMLResponse("User not found", status_code=404)
+    stats = user_stats(uid)
+    taught = list_classes_taught_by(uid)
+    recent_answers = list_questions_answered_by(uid, limit=10)
+    is_me = (int(me["id"]) == int(uid))
+    return templates.TemplateResponse(
+        request, "profile.html",
+        ctx(request, me, profile_user=u, stats=stats,
+            taught=taught, recent_answers=recent_answers, is_me=is_me),
+    )
+
+
+@app.post("/u/{uid}/edit")
+def profile_edit(request: Request, uid: int, title: str = Form(""), bio: str = Form("")):
+    me = current_user(request)
+    if not me or int(me["id"]) != int(uid):
+        return RedirectResponse("/login")
+    update_user_profile(uid, title.strip(), bio.strip())
+    return RedirectResponse(f"/u/{uid}", status_code=303)
+
+
+# ---- dashboard ----
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
     user = current_user(request)
@@ -139,14 +150,12 @@ def dashboard(request: Request):
     flash = request.session.pop("flash", None)
     return templates.TemplateResponse(
         request, "dashboard.html",
-        ctx(request, user,
-            classes=classes, pending=pending,
-            my_requests=my_requests, pending_count=pending_count,
-            flash=flash),
+        ctx(request, user, classes=classes, pending=pending,
+            my_requests=my_requests, pending_count=pending_count, flash=flash),
     )
 
 
-# ---------- browse ----------
+# ---- browse ----
 @app.get("/classes", response_class=HTMLResponse)
 def browse_classes(request: Request, q: str = ""):
     user = current_user(request)
@@ -170,6 +179,9 @@ def request_join(request: Request, class_id: int):
     user = current_user(request)
     if not user:
         return RedirectResponse("/login")
+    if is_banned(class_id, user["id"]):
+        request.session["flash"] = "Banned"
+        return RedirectResponse("/classes", status_code=303)
     if get_role(class_id, user["id"]):
         return RedirectResponse("/classes", status_code=303)
     create_join_request(class_id, user["id"])
@@ -200,13 +212,17 @@ def handle_request(request: Request, rid: int, action: str):
     return RedirectResponse("/dashboard", status_code=303)
 
 
-# ---------- create / join ----------
+# ---- create / join ----
 @app.get("/create_class", response_class=HTMLResponse)
 def create_class_page(request: Request):
     user = current_user(request)
     if not user:
         return RedirectResponse("/login")
-    return templates.TemplateResponse(request, "create_class.html", ctx(request, user))
+    lang = (user["lang"] or "ja")
+    return templates.TemplateResponse(
+        request, "create_class.html",
+        ctx(request, user, default_steps=default_steps(lang)),
+    )
 
 
 @app.post("/create_class")
@@ -216,6 +232,7 @@ def create_class_submit(
     subject: str = Form(...),
     description: str = Form(""),
     is_public: str = Form("1"),
+    steps_text: str = Form(""),
 ):
     user = current_user(request)
     if not user:
@@ -234,6 +251,10 @@ def create_class_submit(
             break
     if not cid:
         return HTMLResponse("Failed to create class", status_code=500)
+    for line in steps_text.splitlines():
+        line = line.strip()
+        if line:
+            add_step(cid, line)
     return RedirectResponse(f"/class/{cid}", status_code=303)
 
 
@@ -259,11 +280,17 @@ def join_class_submit(request: Request, join_code: str = Form(...)):
             ctx(request, user, error="No class with that code"),
             status_code=400,
         )
+    if is_banned(cls["id"], user["id"]):
+        return templates.TemplateResponse(
+            request, "join_class.html",
+            ctx(request, user, error="You are banned from this class"),
+            status_code=403,
+        )
     join_class(cls["id"], user["id"], role="student")
     return RedirectResponse(f"/class/{cls['id']}", status_code=303)
 
 
-# ---------- class room ----------
+# ---- class room ----
 @app.get("/class/{class_id}", response_class=HTMLResponse)
 def class_room(request: Request, class_id: int):
     user = current_user(request)
@@ -272,38 +299,57 @@ def class_room(request: Request, class_id: int):
     cls = get_class_by_id(class_id)
     if not cls:
         return HTMLResponse("Class not found", status_code=404)
+    if is_banned(class_id, user["id"]):
+        return HTMLResponse("You are banned from this class.", status_code=403)
     role = get_role(class_id, user["id"])
     if not role:
         return HTMLResponse("Not a member", status_code=403)
     members = list_members(class_id)
     messages = get_messages(class_id, limit=80)
+    steps = list_steps(class_id)
+    questions = list_questions(class_id, limit=100)
+    bans = list_bans(class_id) if role == "teacher" else []
     return templates.TemplateResponse(
         request, "class_room.html",
-        ctx(request, user, cls=cls, role=role, members=members, messages=messages),
+        ctx(request, user, cls=cls, role=role, members=members,
+            messages=messages, steps=steps, questions=questions, bans=bans),
     )
 
 
-# ---------- poll ----------
+# ---- poll ----
 @app.post("/api/poll/{class_id}")
 async def api_poll(request: Request, class_id: int):
     user = current_user(request)
     if not user:
         return JSONResponse({"error": "not logged in"}, status_code=401)
+    if is_banned(class_id, user["id"]):
+        return JSONResponse({"error": "banned"}, status_code=403)
     cls = get_class_by_id(class_id)
     if not cls:
         return JSONResponse({"error": "not found"}, status_code=404)
-    msgs = get_messages(class_id, limit=80)
+    msg = get_messages(class_id, limit=80)
+    steps = list_steps(class_id)
+    questions = list_questions(class_id, limit=100)
     return JSONResponse({
         "blackboard": cls["blackboard"] or "",
         "stage": cls["stage"] if "stage" in cls.keys() else 0,
+        "steps": [{"id": s["id"], "title": s["title"]} for s in steps],
         "messages": [
-            {"id": m["id"], "type": m["sender_type"], "name": m["sender_name"], "content": m["content"]}
-            for m in msgs
+            {"id": m["id"], "type": m["sender_type"], "name": m["sender_name"],
+             "content": m["content"], "helpful": m["helpful_count"] or 0}
+            for m in msg
+        ],
+        "questions": [
+            {"id": q["id"], "content": q["content"], "answer": q["answer"],
+             "is_anonymous": q["is_anonymous"],
+             "asker": q["asker_name"], "answerer": q["answerer_name"],
+             "answered_at": q["answered_at"], "created_at": q["created_at"]}
+            for q in questions
         ],
     })
 
 
-# ---------- blackboard ----------
+# ---- blackboard ----
 @app.post("/api/blackboard/{class_id}")
 async def api_blackboard(request: Request, class_id: int):
     user = current_user(request)
@@ -330,7 +376,7 @@ async def api_blackboard_clear(request: Request, class_id: int):
     return JSONResponse({"ok": True})
 
 
-# ---------- upload ----------
+# ---- upload ----
 @app.post("/api/upload/{class_id}")
 async def api_upload(request: Request, class_id: int, file: UploadFile = File(...)):
     user = current_user(request)
@@ -338,46 +384,73 @@ async def api_upload(request: Request, class_id: int, file: UploadFile = File(..
         return JSONResponse({"error": "not logged in"}, status_code=401)
     if get_role(class_id, user["id"]) != "teacher":
         return JSONResponse({"error": "teachers only"}, status_code=403)
-
-    ext = os.path.splitext(file.filename or "")[1].lower()
-    if ext not in (".png", ".jpg", ".jpeg", ".gif", ".webp"):
+    ext = os.path.splitext(file.filename or "")[1].lower().lstrip(".")
+    if ext not in ("png", "jpg", "jpeg", "gif", "webp"):
         return JSONResponse({"error": "unsupported file type"}, status_code=400)
-
-    safe_name = f"c{class_id}_{random.randint(10000, 99999)}{ext}"
+    safe_name = f"c{class_id}_{random.randint(10000, 99999)}.{ext}"
     path = os.path.join("static", "uploads", safe_name)
     with open(path, "wb") as f:
         shutil.copyfileobj(file.file, f)
-
     url = f"/static/uploads/{safe_name}"
     return JSONResponse({"ok": True, "url": url})
 
 
-# ---------- stage ----------
-@app.post("/api/stage/{class_id}/{action}")
-async def api_stage(request: Request, class_id: int, action: str):
+# ---- steps ----
+@app.post("/api/step/{class_id}/{action}")
+async def api_step(request: Request, class_id: int, action: str):
     user = current_user(request)
     if not user:
         return JSONResponse({"error": "not logged in"}, status_code=401)
     if get_role(class_id, user["id"]) != "teacher":
         return JSONResponse({"error": "teachers only"}, status_code=403)
     cls = get_class_by_id(class_id)
+    steps = list_steps(class_id)
+    total = len(steps)
     cur = cls["stage"] or 0
-    lang = user["lang"] or "ja"
-    total = len(stage_list(lang))
-    if action == "next":
+    if total == 0:
+        cur = 0
+    elif action == "next":
         cur = min(cur + 1, total - 1)
     elif action == "prev":
         cur = max(cur - 1, 0)
     set_stage(class_id, cur)
-    return JSONResponse({"ok": True, "stage": cur})
+    return JSONResponse({"ok": True, "stage": cur, "total": total})
 
 
-# ---------- announce ----------
+@app.post("/api/steps/{class_id}")
+async def api_steps_add(request: Request, class_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if get_role(class_id, user["id"]) != "teacher":
+        return JSONResponse({"error": "teachers only"}, status_code=403)
+    data = await request.json()
+    title = (data.get("title") or "").strip()
+    if not title:
+        return JSONResponse({"error": "empty"}, status_code=400)
+    add_step(class_id, title, data.get("description", ""))
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/steps/{class_id}/{step_id}/delete")
+async def api_steps_delete(request: Request, class_id: int, step_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if get_role(class_id, user["id"]) != "teacher":
+        return JSONResponse({"error": "teachers only"}, status_code=403)
+    delete_step(step_id)
+    return JSONResponse({"ok": True})
+
+
+# ---- announce ----
 @app.post("/api/announce/{class_id}")
 async def api_announce(request: Request, class_id: int):
     user = current_user(request)
     if not user:
         return JSONResponse({"error": "not logged in"}, status_code=401)
+    if is_banned(class_id, user["id"]):
+        return JSONResponse({"error": "banned"}, status_code=403)
     role = get_role(class_id, user["id"])
     if not role:
         return JSONResponse({"error": "not member"}, status_code=403)
@@ -389,7 +462,120 @@ async def api_announce(request: Request, class_id: int):
     return JSONResponse({"ok": True})
 
 
-# ---------- history ----------
+# ---- helpful ----
+@app.post("/api/helpful/{class_id}/{message_id}")
+async def api_helpful(request: Request, class_id: int, message_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if not get_role(class_id, user["id"]):
+        return JSONResponse({"error": "not member"}, status_code=403)
+    m = get_message(message_id)
+    if not m or m["class_id"] != class_id:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    if m["sender_name"] == user["name"]:
+        return JSONResponse({"error": "cannot mark your own"}, status_code=400)
+    ok, count = mark_helpful(message_id, user["id"])
+    return JSONResponse({"ok": True, "count": count, "new": ok})
+
+
+# ---- kick / ban ----
+@app.post("/api/kick/{class_id}/{user_id}")
+async def api_kick(request: Request, class_id: int, user_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if get_role(class_id, user["id"]) != "teacher":
+        return JSONResponse({"error": "teachers only"}, status_code=403)
+    if int(user_id) == int(user["id"]):
+        return JSONResponse({"error": "cannot kick yourself"}, status_code=400)
+    # キック = enrollment から削除（BANはしない）
+    from db import get_conn
+    conn = get_conn()
+    conn.execute("DELETE FROM enrollments WHERE class_id = ? AND user_id = ?", (class_id, user_id))
+    conn.commit()
+    conn.close()
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/ban/{class_id}/{user_id}")
+async def api_ban(request: Request, class_id: int, user_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if get_role(class_id, user["id"]) != "teacher":
+        return JSONResponse({"error": "teachers only"}, status_code=403)
+    if int(user_id) == int(user["id"]):
+        return JSONResponse({"error": "cannot ban yourself"}, status_code=400)
+    data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    reason = (data.get("reason") or "").strip()
+    ban_user(class_id, user_id, reason)
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/unban/{class_id}/{user_id}")
+async def api_unban(request: Request, class_id: int, user_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if get_role(class_id, user["id"]) != "teacher":
+        return JSONResponse({"error": "teachers only"}, status_code=403)
+    unban_user(class_id, user_id)
+    return JSONResponse({"ok": True})
+
+
+# ---- questions (Q&A) ----
+@app.post("/api/questions/{class_id}")
+async def api_question_create(request: Request, class_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if is_banned(class_id, user["id"]):
+        return JSONResponse({"error": "banned"}, status_code=403)
+    if not get_role(class_id, user["id"]):
+        return JSONResponse({"error": "not member"}, status_code=403)
+    data = await request.json()
+    content = (data.get("content") or "").strip()
+    if not content:
+        return JSONResponse({"error": "empty"}, status_code=400)
+    is_anon = bool(data.get("anonymous", True))
+    create_question(class_id, content, is_anon, user["id"])
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/questions/{class_id}/{qid}/answer")
+async def api_question_answer(request: Request, class_id: int, qid: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if get_role(class_id, user["id"]) != "teacher":
+        return JSONResponse({"error": "teachers only"}, status_code=403)
+    q = get_question(qid)
+    if not q or q["class_id"] != class_id:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    data = await request.json()
+    answer = (data.get("answer") or "").strip()
+    if not answer:
+        return JSONResponse({"error": "empty"}, status_code=400)
+    answer_question(qid, answer, user["id"])
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/questions/{class_id}/{qid}/delete")
+async def api_question_delete(request: Request, class_id: int, qid: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if get_role(class_id, user["id"]) != "teacher":
+        return JSONResponse({"error": "teachers only"}, status_code=403)
+    q = get_question(qid)
+    if not q or q["class_id"] != class_id:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    delete_question(qid)
+    return JSONResponse({"ok": True})
+
+
+# ---- history ----
 @app.get("/api/history/{class_id}")
 async def api_history(request: Request, class_id: int):
     user = current_user(request)
@@ -400,12 +586,8 @@ async def api_history(request: Request, class_id: int):
     rows = list_blackboard_history(class_id, limit=50)
     return JSONResponse({
         "items": [
-            {
-                "id": r["id"],
-                "content": r["content"] or "",
-                "author": r["author"] or "",
-                "created_at": r["created_at"],
-            }
+            {"id": r["id"], "content": r["content"] or "",
+             "author": r["author"] or "", "created_at": r["created_at"]}
             for r in rows
         ]
     })
@@ -426,45 +608,37 @@ async def api_history_restore(request: Request, class_id: int, hid: int):
     return JSONResponse({"ok": True, "content": r["content"] or ""})
 
 
-# ---------- dev ----------
-@app.get("/dev/users", response_class=HTMLResponse)
-def dev_users(request: Request):
-    users = list_all_users()
-    return templates.TemplateResponse(
-        request, "dev_users.html", ctx(request, None, users=users)
-    )
+# ---- dev (ENABLE_DEV=1 のみ) ----
+if os.environ.get("ENABLE_DEV") == "1":
+    @app.get("/dev/users", response_class=HTMLResponse)
+    def dev_users(request: Request):
+        users = list_all_users()
+        return templates.TemplateResponse(
+            request, "dev_users.html", ctx(request, None, users=users)
+        )
 
-
-@app.post("/dev/users/create")
-def dev_create_user(request: Request, name: str = Form(...), count: int = Form(1)):
-    name = name.strip()
-    if not name:
+    @app.post("/dev/users/create")
+    def dev_create_user(request: Request, name: str = Form(...), count: int = Form(1)):
+        name = name.strip()
+        if not name:
+            return RedirectResponse("/dev/users", status_code=303)
+        for i in range(max(1, min(count, 50))):
+            suffix = f"{i+1:02d}" if count > 1 else ""
+            try:
+                create_user(f"{name}{suffix}")
+            except Exception:
+                pass
         return RedirectResponse("/dev/users", status_code=303)
-    for i in range(max(1, min(count, 50))):
-        suffix = f"{i+1:02d}" if count > 1 else ""
-        try:
-            create_user(f"{name}{suffix}")
-        except Exception:
-            pass
-    return RedirectResponse("/dev/users", status_code=303)
 
+    @app.get("/dev/login_as/{uid}", response_class=HTMLResponse)
+    def dev_login_as(request: Request, uid: int):
+        u = get_user_by_id(uid)
+        if not u:
+            return RedirectResponse("/dev/users", status_code=303)
+        request.session["user_id"] = int(u["id"])
+        return RedirectResponse("/dashboard", status_code=303)
 
-@app.get("/dev/login_as/{uid}", response_class=HTMLResponse)
-def dev_login_as(request: Request, uid: int):
-    u = get_user_by_id(uid)
-    if not u:
+    @app.post("/dev/delete/{uid}")
+    def dev_delete(request: Request, uid: int):
+        delete_user(uid)
         return RedirectResponse("/dev/users", status_code=303)
-    html = f"""<!DOCTYPE html>
-<html><body>
-<script>
-  sessionStorage.setItem('uid', '{uid}');
-  location.replace('/dashboard?uid={uid}');
-</script>
-</body></html>"""
-    return HTMLResponse(html)
-
-
-@app.post("/dev/delete/{uid}")
-def dev_delete(request: Request, uid: int):
-    delete_user(uid)
-    return RedirectResponse("/dev/users", status_code=303)

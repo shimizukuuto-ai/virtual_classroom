@@ -5,72 +5,71 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}{{ T.app_title }}{% endblock %}</title>
 <style>
-  * { box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Segoe UI", sans-serif;
-    margin: 0; background: #f4f6fb; color: #222;
-  }
-  header {
-    background: #1e293b; color: #fff; padding: 12px 20px;
-    display: flex; justify-content: space-between; align-items: center;
-    flex-wrap: wrap; gap: 8px;
-  }
-  header a { color: #cbd5e1; text-decoration: none; margin-left: 14px; font-size: 14px; }
-  header a:hover { color: #fff; }
-  header .brand { font-weight: 700; font-size: 16px; letter-spacing: .5px; }
-  header .brand span { color: #60a5fa; }
-  header .user { font-size: 14px; color: #e2e8f0; }
-  header .lang a {
-    display: inline-block; padding: 3px 8px; border-radius: 4px;
-    border: 1px solid #475569; margin-left: 4px; font-size: 12px;
-  }
-  header .lang a.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
-  .badge-count {
-    background: #ef4444; color: #fff; font-size: 10px;
-    padding: 1px 6px; border-radius: 8px; margin-left: 4px;
-  }
-  main { max-width: 1000px; margin: 24px auto; padding: 0 16px; }
-  .card {
-    background: #fff; border-radius: 10px; padding: 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,.06); margin-bottom: 16px;
-  }
-  h1, h2 { margin-top: 0; }
-  input, textarea, select {
-    width: 100%; padding: 10px; margin: 6px 0 14px 0;
-    border: 1px solid #cbd5e1; border-radius: 6px; font-size: 15px;
-    font-family: inherit;
-  }
-  button, .btn {
-    background: #3b82f6; color: #fff; border: none; padding: 9px 16px;
-    border-radius: 6px; font-size: 14px; cursor: pointer;
-    display: inline-block; text-decoration: none;
-  }
-  button:hover, .btn:hover { background: #2563eb; }
-  button.gray { background: #64748b; }
-  button.green { background: #16a34a; }
-  button.orange { background: #ea580c; }
-  button.red { background: #dc2626; }
-  button:disabled { background: #94a3b8; cursor: not-allowed; }
-  .class-item {
-    display: block; padding: 14px 16px; border: 1px solid #e2e8f0;
-    border-radius: 8px; margin-bottom: 10px; text-decoration: none;
-    color: #222; background: #f8fafc;
-  }
-  .class-item:hover { background: #eff6ff; border-color: #93c5fd; }
-  .role { font-size: 12px; color: #64748b; margin-left: 8px; }
-  .row { display: flex; gap: 10px; flex-wrap: wrap; }
-  .row > * { flex: 1; min-width: 180px; }
-  .muted { color: #64748b; font-size: 13px; }
-  .error { color: #dc2626; margin-bottom: 10px; }
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Segoe UI", sans-serif;
+  margin: 0; background: #f4f6fb; color: #222;
+}
+header {
+  background: #1e293b; color: #fff; padding: 12px 20px;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 8px;
+}
+header a { color: #cbd5e1; text-decoration: none; margin-left: 14px; font-size: 14px; }
+header a:hover { color: #fff; }
+header .brand { font-weight: 700; font-size: 16px; letter-spacing: .5px; }
+header .brand span { color: #60a5fa; }
+header .user { font-size: 14px; color: #e2e8f0; }
+header .lang a {
+  display: inline-block; padding: 3px 8px; border-radius: 4px;
+  border: 1px solid #475569; margin-left: 4px; font-size: 12px;
+}
+header .lang a.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+.badge-count {
+  background: #ef4444; color: #fff; font-size: 10px;
+  padding: 1px 6px; border-radius: 8px; margin-left: 4px;
+}
+main { max-width: 1000px; margin: 24px auto; padding: 0 16px; }
+.card {
+  background: #fff; border-radius: 10px; padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 16px;
+}
+h1, h2 { margin-top: 0; }
+input, textarea, select {
+  width: 100%; padding: 10px; margin: 6px 0 14px 0;
+  border: 1px solid #cbd5e1; border-radius: 6px; font-size: 15px;
+  font-family: inherit;
+}
+button, .btn {
+  background: #3b82f6; color: #fff; border: none; padding: 9px 16px;
+  border-radius: 6px; font-size: 14px; cursor: pointer;
+  display: inline-block; text-decoration: none;
+}
+button:hover, .btn:hover { background: #2563eb; }
+button.gray { background: #64748b; }
+button.green { background: #16a34a; }
+button.orange { background: #ea580c; }
+button.red { background: #dc2626; }
+button:disabled { background: #94a3b8; cursor: not-allowed; }
+.class-item {
+  display: block; padding: 14px 16px; border: 1px solid #e2e8f0;
+  border-radius: 8px; margin-bottom: 10px; text-decoration: none;
+  color: #222; background: #f8fafc;
+}
+.class-item:hover { background: #eff6ff; border-color: #93c5fd; }
+.role { font-size: 12px; color: #64748b; margin-left: 8px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.row > * { flex: 1; min-width: 180px; }
+.muted { color: #64748b; font-size: 13px; }
+.error { color: #dc2626; margin-bottom: 10px; }
 </style>
 </head>
 <body>
 <header>
-  <div class="brand"><span>VC</span> {{ T.app_title }}</div>
+  <div class="brand"><span>WC</span> {{ T.app_title }}</div>
   <div>
     {% if user %}
-      <span class="user">{{ user.name }}</span>
-      <a href="/dev/users">Dev</a>
+      <a href="/u/{{ user.id }}"><span class="user">{{ user.name }}</span></a>
       <a href="/dashboard">{{ T.home }}</a>
       <a href="/classes">{{ T.join_class }}</a>
       <a href="/logout">{{ T.logout }}</a>
@@ -89,58 +88,5 @@
 <main>
 {% block content %}{% endblock %}
 </main>
-<script>
-(function () {
-  const uid = sessionStorage.getItem("uid");
-
-  if (uid) {
-    // すべての内部リンクに ?uid= を付与
-    document.querySelectorAll('a[href^="/"]').forEach(a => {
-      const href = a.getAttribute("href");
-      if (href.includes("uid=")) return;
-      if (href.startsWith("/static/")) return;
-
-      // dev の Login リンクはクリック時に sessionStorage を書き換える
-      if (href.startsWith("/dev/login_as/")) {
-        const targetUid = href.split("/").pop();
-        a.addEventListener("click", (e) => {
-          e.preventDefault();
-          sessionStorage.setItem("uid", targetUid);
-          location.href = "/dashboard?uid=" + targetUid;
-        });
-        return;
-      }
-      const sep = href.includes("?") ? "&" : "?";
-      a.setAttribute("href", href + sep + "uid=" + uid);
-    });
-
-    // すべての form action に ?uid= を付与
-    document.querySelectorAll("form").forEach(f => {
-      const action = f.getAttribute("action");
-      if (!action) return;
-      if (action.includes("uid=")) return;
-      const sep = action.includes("?") ? "&" : "?";
-      f.setAttribute("action", action + sep + "uid=" + uid);
-    });
-
-    // すべての fetch に X-User-Id ヘッダを付与
-    const origFetch = window.fetch;
-    window.fetch = function (url, opts) {
-      opts = opts || {};
-      const headers = new Headers(opts.headers || {});
-      headers.set("X-User-Id", uid);
-      opts.headers = headers;
-      return origFetch(url, opts);
-    };
-
-    // ログアウト時に sessionStorage をクリア
-    document.querySelectorAll('a[href*="/logout"]').forEach(a => {
-      a.addEventListener("click", () => {
-        sessionStorage.removeItem("uid");
-      });
-    });
-  }
-})();
-</script>
 </body>
 </html>

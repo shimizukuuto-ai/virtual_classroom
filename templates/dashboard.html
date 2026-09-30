@@ -2,17 +2,19 @@
 {% block title %}{{ T.home }} - {{ T.app_title }}{% endblock %}
 {% block content %}
 
-<div class="card">
-    {% if flash %}
+{% if flash %}
 <div class="card" style="background:#fef3c7;border-left:4px solid #f59e0b;">
   {{ flash }}
 </div>
 {% endif %}
+
+<div class="card">
   <h1>{{ T.welcome }}, {{ user.name }}</h1>
   <div class="row">
     <a class="btn" href="/create_class">{{ T.create_class }}</a>
     <a class="btn gray" href="/classes">{{ T.join_class }}</a>
     <a class="btn gray" href="/join_class">{{ T.join_code }}</a>
+    <a class="btn gray" href="/u/{{ user.id }}">{{ T.my_profile }}</a>
   </div>
 </div>
 
@@ -20,20 +22,20 @@
 <div class="card">
   <h2>{{ T.pending_requests }} <span class="badge-count">{{ pending_count }}</span></h2>
   {% for r in pending %}
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #e2e8f0;">
-      <div>
-        <strong>{{ r.user_name }}</strong> → {{ r.class_title }}
-        <div class="muted">{{ r.created_at }}</div>
-      </div>
-      <div>
-        <form method="post" action="/requests/{{ r.id }}/approve" style="display:inline;">
-          <button class="green" type="submit">{{ T.approve }}</button>
-        </form>
-        <form method="post" action="/requests/{{ r.id }}/reject" style="display:inline;">
-          <button class="red" type="submit">{{ T.reject }}</button>
-        </form>
-      </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #e2e8f0;">
+    <div>
+      <strong>{{ r.user_name }}</strong> → {{ r.class_title }}
+      <div class="muted">{{ r.created_at }}</div>
     </div>
+    <div>
+      <form method="post" action="/requests/{{ r.id }}/approve" style="display:inline;">
+        <button class="green" type="submit">{{ T.approve }}</button>
+      </form>
+      <form method="post" action="/requests/{{ r.id }}/reject" style="display:inline;">
+        <button class="red" type="submit">{{ T.reject }}</button>
+      </form>
+    </div>
+  </div>
   {% endfor %}
 </div>
 {% endif %}
@@ -42,11 +44,11 @@
   <h2>{{ T.my_classes }}</h2>
   {% if classes %}
     {% for c in classes %}
-      <a class="class-item" href="/class/{{ c.id }}">
-        <strong>{{ c.title }}</strong>
-        <span class="role">{{ c.subject }} / {{ T[c.role] if c.role in ['teacher','student'] else c.role }}</span>
-        <div class="muted" style="margin-top:4px;">{{ c.description or "" }}</div>
-      </a>
+    <a class="class-item" href="/class/{{ c.id }}">
+      <strong>{{ c.title }}</strong>
+      <span class="role">{{ c.subject }} / {{ T[c.role] if c.role in ['teacher','student'] else c.role }}</span>
+      <div class="muted" style="margin-top:4px;">{{ c.description or "" }}</div>
+    </a>
     {% endfor %}
   {% else %}
     <p class="muted">{{ T.no_classes }}</p>
@@ -57,14 +59,11 @@
 <div class="card">
   <h2>{{ T.join_requests_sent }}</h2>
   {% for r in my_requests %}
-    <div style="padding:8px 0;border-bottom:1px solid #e2e8f0;">
-      <strong>{{ r.class_title }}</strong>
-      <span class="muted">
-        - {{ T[r.status] if r.status in ['pending','approved','rejected'] else r.status }}
-      </span>
-    </div>
+  <div style="padding:8px 0;border-bottom:1px solid #e2e8f0;">
+    <strong>{{ r.class_title }}</strong>
+    <span class="muted">- {{ T[r.status] if r.status in ['pending','approved','rejected'] else r.status }}</span>
+  </div>
   {% endfor %}
 </div>
 {% endif %}
-
 {% endblock %}
