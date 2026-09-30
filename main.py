@@ -25,7 +25,7 @@ from db import (
     create_question, list_questions, get_question, answer_question, delete_question,
     list_questions_answered_by,
     create_card, list_user_cards,
-    list_user_badges, count_badges, check_badges, record_attendance,
+    list_user_badges, count_badges, check_badges, record_attendance, list_subjects,
     BADGES, SKINS, RANKS,
 )
 from i18n import all_t, default_steps
@@ -206,11 +206,11 @@ def dashboard(request: Request):
 
 # ---- browse ----
 @app.get("/classes", response_class=HTMLResponse)
-def browse_classes(request: Request, q: str = ""):
+def browse_classes(request: Request, q: str = "", subject: str = ""):
     user = current_user(request)
     if not user:
         return RedirectResponse("/login")
-    raw = list_public_classes(q)
+    raw = list_public_classes(q, subject)
     results = []
     for c in raw:
         d = dict(c)
@@ -219,7 +219,8 @@ def browse_classes(request: Request, q: str = ""):
     my_classes = {c["id"] for c in list_classes_for_user(user["id"])}
     return templates.TemplateResponse(
         request, "browse.html",
-        ctx(request, user, results=results, q=q, my_classes=my_classes),
+        ctx(request, user, results=results, q=q, subject=subject,
+            my_classes=my_classes, subjects=list_subjects()),
     )
 
 
@@ -284,6 +285,7 @@ def create_class_submit(
     steps_text: str = Form(""),
     is_weekly: str = Form("0"),
     weekly_time: str = Form(""),
+    next_session: str = Form(""),
 ):
     user = current_user(request)
     if not user:
@@ -299,6 +301,7 @@ def create_class_submit(
             taught_by=user["name"],
             is_weekly=1 if is_weekly == "1" else 0,
             weekly_time=weekly_time.strip(),
+            next_session=next_session.strip(),
         )
         if cid:
             break
@@ -730,6 +733,41 @@ def cards_page(request: Request):
     return templates.TemplateResponse(
         request, "cards.html", ctx(request, user, cards=cards)
     )
+
+# ---- invite (magic link) ----
+@app.get("/invite/{join_code}", response_class=HTMLResponse)
+def invite_page(request: Request, join_code: str):
+    cls = get_class_by_code(join_code.strip().lower())
+    if not cls:
+        return templates.TemplateResponse(
+            request, "invite.html",
+            ctx(request, current_user(request), invite_cls=None, join_code=join_code),
+            status_code=404,
+        )
+    me = current_user(request)
+    return templates.TemplateResponse(
+        request, "invite.html",
+        ctx(request, me, invite_cls=cls, join_code=join_code.strip().lower()),
+    )
+
+
+@app.post("/invite/{join_code}")
+def invite_join(request: Request, join_code: str, name: str = Form(...)):
+    cls = get_class_by_code(join_code.strip().lower())
+    if not cls:
+        return RedirectResponse(f"/invite/{join_code}", status_code=303)
+    name = name.strip()
+    if not name:
+        return RedirectResponse(f"/invite/{join_code}", status_code=303)
+    user = get_user_by_name(name)
+    if not user:
+        create_user(name)
+        user = get_user_by_name(name)
+    request.session["user_id"] = int(user["id"])
+    if is_banned(cls["id"], user["id"]):
+        return HTMLResponse("You are banned from this class.", status_code=403)
+    join_class(cls["id"], user["id"], role="student")
+    return RedirectResponse(f"/class/{cls['id']}", status_code=303)
 
 
 # ---- dev (ENABLE_DEV=1 のみ) ----

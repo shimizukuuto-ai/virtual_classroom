@@ -30,18 +30,20 @@
     <label>{{ T.description }}</label>
     <textarea name="description" rows="3" placeholder="{{ T.ph_description }}"></textarea>
 
-    <label>{{ T.weekly_class }}</label>
-<select name="is_weekly">
-  <option value="0">通常クラス</option>
-  <option value="1">{{ T.make_weekly }}</option>
-</select>
-<input type="text" name="weekly_time" placeholder="{{ T.weekly_time }}">
-
     <label>{{ T.visibility_label }}</label>
     <select name="is_public">
       <option value="1">{{ T.public_yes }}</option>
       <option value="0">{{ T.public_no }}</option>
     </select>
+
+    <label>{{ T.weekly_class }}</label>
+    <select name="is_weekly">
+      <option value="0">{{ T.weekly_class }} OFF</option>
+      <option value="1">{{ T.make_weekly }}</option>
+    </select>
+
+    <label>{{ T.next_session }}</label>
+    <input type="text" name="next_session" placeholder="{{ T.next_session_placeholder }}">
 
     <label>{{ T.steps_label }}</label>
     <textarea name="steps_text" rows="8" placeholder="{{ default_steps|join('\n') }}"></textarea>

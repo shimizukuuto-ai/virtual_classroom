@@ -2,36 +2,44 @@
 {% block title %}{{ T.search_classes }}{% endblock %}
 {% block content %}
 <style>
-.search-h {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 20px; gap: 16px; flex-wrap: wrap;
+.search-h { margin-bottom: 16px; }
+.search-h h1 { margin: 0 0 16px; font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
+.search-bar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.search-bar input { margin: 0; flex: 1; min-width: 200px; }
+
+.subject-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
+.subject-tab {
+  padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600;
+  background: var(--surface); border: 1.5px solid var(--border);
+  color: var(--text-muted); text-decoration: none;
+  transition: all .15s;
 }
-.search-h h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
-.search-bar { display: flex; gap: 8px; flex: 1; max-width: 480px; }
-.search-bar input { margin: 0; }
+.subject-tab:hover { border-color: var(--primary); color: var(--primary); }
+.subject-tab.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 14px;
 }
+@media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
 .class-card {
   background: var(--surface); border: 1.5px solid var(--border);
   border-radius: var(--radius); padding: 20px;
   display: flex; flex-direction: column; gap: 10px;
   transition: all .15s;
 }
-.class-card:hover {
-  border-color: var(--primary); transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-}
-.class-card h3 {
-  margin: 0; font-size: 17px; font-weight: 700;
-  letter-spacing: -.01em; color: var(--text);
-}
+.class-card:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.class-card h3 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
 .class-card .desc { font-size: 13px; color: var(--text-muted); line-height: 1.5; min-height: 20px; }
+.class-card .next {
+  background: #eef2ff; color: #4338ca; border-radius: 8px;
+  padding: 6px 10px; font-size: 12px; font-weight: 700;
+}
 .class-card .foot {
   display: flex; justify-content: space-between; align-items: center;
   padding-top: 12px; border-top: 1px solid var(--border); margin-top: auto;
+  gap: 8px; flex-wrap: wrap;
 }
 .class-card .teacher { font-size: 12px; color: var(--text-muted); }
 .class-card .count {
@@ -41,7 +49,7 @@
   font-size: 11px; font-weight: 700;
 }
 .empty {
-  grid-column: 1 / -1; text-align: center; padding: 80px 20px;
+  grid-column: 1 / -1; text-align: center; padding: 60px 20px;
   color: var(--text-soft);
 }
 .empty .ic {
@@ -57,8 +65,18 @@
   <h1>{{ T.search_classes }}</h1>
   <form method="get" action="/classes" class="search-bar">
     <input type="text" name="q" value="{{ q }}" placeholder="{{ T.search_placeholder }}">
+    {% if subject %}<input type="hidden" name="subject" value="{{ subject }}">{% endif %}
     <button class="btn" type="submit">{{ T.search }}</button>
   </form>
+
+  <div class="subject-tabs">
+    <a class="subject-tab {% if not subject %}active{% endif %}"
+       href="/classes{% if q %}?q={{ q }}{% endif %}">{{ T.all_subjects }}</a>
+    {% for s in subjects %}
+      <a class="subject-tab {% if subject == s.subject %}active{% endif %}"
+         href="/classes?subject={{ s.subject }}{% if q %}&q={{ q }}{% endif %}">{{ s.subject }} ({{ s.n }})</a>
+    {% endfor %}
+  </div>
 </div>
 
 {% if results %}
@@ -68,10 +86,11 @@
     <span class="pill">{{ c.subject }}</span>
     <h3>{{ c.title }}</h3>
     <div class="desc">{{ c.description or "" }}</div>
+    {% if c.next_session %}<div class="next">{{ T.next_session }}: {{ c.next_session }}</div>{% endif %}
     <div class="foot">
       <div>
         <div class="teacher">{{ T.teacher }}: <strong>{{ c.teacher_name }}</strong></div>
-        <div class="count">{{ c.student_count }} {{ T.student }}</div>
+        <div class="count" style="margin-top:4px;">{{ c.student_count }} {{ T.student }}</div>
       </div>
       {% if c.id in my_classes %}
         <a class="btn sm ghost" href="/class/{{ c.id }}">{{ T.open }}</a>
@@ -93,7 +112,6 @@
       </svg>
     </div>
     <div style="font-weight:600;color:var(--text);margin-bottom:6px;">{{ T.no_public_classes }}</div>
-    <div>{{ T.search_placeholder }}</div>
   </div>
 </div>
 {% endif %}

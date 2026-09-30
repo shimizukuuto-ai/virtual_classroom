@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}{{ T.invite_title }} - {{ T.app_title }}{% endblock %}
+{% block content %}
+<style>
+.invite-wrap { max-width: 480px; margin: 40px auto 0; text-align: center; }
+.invite-icon {
+  width: 72px; height: 72px; border-radius: 24px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 20px; color: #fff;
+  box-shadow: 0 12px 32px rgba(99,102,241,.3);
+}
+.invite-icon svg { width: 32px; height: 32px; }
+.invite-wrap h1 { font-size: 22px; font-weight: 800; margin: 0 0 6px; letter-spacing: -.02em; }
+.invite-wrap .sub { color: var(--text-muted); margin: 0 0 24px; font-size: 14px; }
+
+.class-preview {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 20px; margin-bottom: 20px;
+  text-align: left;
+}
+.class-preview .subject { font-size: 11px; color: var(--primary); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.class-preview h2 { font-size: 20px; font-weight: 800; margin: 6px 0; letter-spacing: -.01em; }
+.class-preview .teacher { font-size: 13px; color: var(--text-muted); }
+.class-preview .desc { font-size: 13px; color: var(--text-muted); margin-top: 8px; line-height: 1.6; }
+.class-preview .next {
+  background: #eef2ff; color: #4338ca; border-radius: 8px;
+  padding: 8px 12px; font-size: 13px; font-weight: 700; margin-top: 12px;
+}
+
+.join-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 28px;
+  box-shadow: var(--shadow-lg);
+}
+.join-card .label { font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; display: block; text-align: left; }
+.join-card input { margin-bottom: 12px; text-align: center; font-size: 16px; padding: 14px; }
+.join-card button { width: 100%; }
+
+.already-box {
+  background: var(--primary-soft); border: 1.5px solid #c7d2fe;
+  border-radius: 12px; padding: 16px; margin-bottom: 16px;
+  text-align: left;
+}
+.already-box .who { font-weight: 700; font-size: 14px; color: #3730a3; }
+.already-box .form { margin-top: 10px; }
+.already-box button { width: 100%; }
+
+.back-link { display: inline-block; margin-top: 20px; color: var(--text-muted); font-size: 13px; text-decoration: none; }
+.back-link:hover { color: var(--text); }
+</style>
+
+{% if not invite_cls %}
+<div class="invite-wrap">
+  <div class="invite-icon" style="background:#f1f5f9;color:#94a3b8;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v4M12 16h.01"></path></svg>
+  </div>
+  <h1>{{ T.invite_not_found }}</h1>
+  <p class="sub">{{ T.invite_not_found_desc }}</p>
+  <a href="/" class="btn">{{ T.home }}</a>
+</div>
+{% else %}
+
+<div class="invite-wrap">
+  <div class="invite-icon">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+  </div>
+  <h1>{{ T.invite_title }}</h1>
+  <p class="sub">{{ T.invite_sub }}</p>
+
+  <div class="class-preview">
+    <div class="subject">{{ invite_cls.subject }}</div>
+    <h2>{{ invite_cls.title }}</h2>
+    {% if invite_cls.taught_by %}<div class="teacher">{{ T.teacher }}: {{ invite_cls.taught_by }}</div>{% endif %}
+    {% if invite_cls.description %}<div class="desc">{{ invite_cls.description }}</div>{% endif %}
+    {% if invite_cls.next_session %}
+      <div class="next">{{ T.next_session }}: {{ invite_cls.next_session }}</div>
+    {% endif %}
+  </div>
+
+  {% if user %}
+    <div class="already-box">
+      <div class="who">{{ T.invite_join_as }}: {{ user.name }}</div>
+      <form class="form" method="post" action="/invite/{{ join_code }}">
+        <input type="hidden" name="name" value="{{ user.name }}">
+        <button class="btn lg" type="submit">{{ T.invite_join_button }}</button>
+      </form>
+    </div>
+    <details style="margin-top:8px;text-align:left;">
+      <summary style="cursor:pointer;font-size:13px;color:var(--text-muted);">{{ T.invite_enter_name }}</summary>
+      <form method="post" action="/invite/{{ join_code }}" style="margin-top:10px;">
+        <input type="text" name="name" placeholder="{{ T.name }}" required>
+        <button class="btn lg" type="submit">{{ T.invite_join_button }}</button>
+      </form>
+    </details>
+  {% else %}
+    <div class="join-card">
+      <label class="label">{{ T.invite_enter_name }}</label>
+      <form method="post" action="/invite/{{ join_code }}">
+        <input type="text" name="name" placeholder="{{ T.name }}" required autofocus>
+        <button class="btn lg" type="submit">{{ T.invite_join_button }}</button>
+      </form>
+    </div>
+  {% endif %}
+
+  <a href="/" class="back-link">{{ T.invite_back }}</a>
+</div>
+{% endif %}
+{% endblock %}

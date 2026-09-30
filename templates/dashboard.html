@@ -22,12 +22,39 @@
 }
 .rank-name { font-weight: 800; font-size: 15px; }
 .rank-xp { color: var(--text-muted); font-size: 12px; }
-.xp-bar {
-  height: 6px; background: var(--surface-2); border-radius: 3px;
-  overflow: hidden; margin-top: 4px;
-}
+.xp-bar { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; margin-top: 4px; }
 .xp-bar > div { height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6); }
 .xp-next { font-size: 11px; color: var(--text-soft); margin-top: 4px; }
+
+.onboard {
+  background: linear-gradient(135deg, #eef2ff, #f5f3ff);
+  border: 1.5px solid #c7d2fe; border-radius: var(--radius-lg);
+  padding: 24px; margin-bottom: 24px; position: relative;
+}
+.onboard h2 { font-size: 20px; font-weight: 800; margin: 0 0 6px; letter-spacing: -.02em; }
+.onboard p { color: #4338ca; margin: 0 0 20px; font-size: 14px; }
+.onboard-steps {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.onboard-step {
+  background: #fff; border-radius: 12px; padding: 16px;
+  display: flex; flex-direction: column; gap: 8px;
+  transition: all .15s;
+}
+.onboard-step:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(99,102,241,.15); }
+.onboard-step .num {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: #6366f1; color: #fff; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; font-size: 13px;
+}
+.onboard-step .t { font-weight: 700; font-size: 14px; }
+.onboard-step .d { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.onboard-close {
+  position: absolute; top: 16px; right: 16px;
+  background: transparent; border: none; cursor: pointer;
+  color: #6366f1; font-size: 20px; padding: 4px 8px;
+}
 
 .actions-grid {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -60,22 +87,45 @@
   border: 1.5px solid #c7d2fe; border-radius: var(--radius);
   padding: 18px 20px; margin-bottom: 10px;
   display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; flex-wrap: wrap;
 }
 .weekly-card .ttl { font-weight: 800; font-size: 15px; color: #3730a3; }
 .weekly-card .mt { font-size: 12px; color: #4338ca; margin-top: 4px; }
+.weekly-card .next { font-size: 12px; color: #4338ca; margin-top: 6px; font-weight: 700; }
 .weekly-pill {
   display: inline-block; padding: 2px 8px; border-radius: 10px;
   background: #6366f1; color: #fff; font-size: 10px; font-weight: 700;
   letter-spacing: .04em; margin-right: 6px;
 }
 
-.badge-mini-row { display: flex; gap: 6px; flex-wrap: wrap; }
-.badge-mini {
-  width: 36px; height: 36px; border-radius: 10px;
+.flash {
+  background: #fef3c7; border: 1px solid #fcd34d;
+  border-radius: 10px; padding: 14px 18px;
+  color: #92400e; font-size: 14px; margin-bottom: 20px;
+}
+
+.req-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 18px; background: var(--surface);
+  border: 1.5px solid var(--border); border-radius: 10px;
+  margin-bottom: 8px;
+}
+.req-row .who { font-weight: 600; }
+.req-row .cls { color: var(--text-muted); font-size: 13px; }
+
+.empty-card {
+  text-align: center; padding: 48px 20px;
+  background: var(--surface); border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+}
+.empty-card .ic {
+  width: 56px; height: 56px; border-radius: 18px;
   background: var(--primary-soft); color: var(--primary);
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 800;
+  margin: 0 auto 14px;
 }
+.empty-card .ic svg { width: 26px; height: 26px; }
+.empty-card .t { font-weight: 700; margin-bottom: 6px; }
 </style>
 
 {% if flash %}
@@ -102,10 +152,33 @@
     </div>
     {% if stats.next_rank %}
       <div class="xp-bar"><div style="width: {{ ((stats.xp - stats.rank[1]) / (stats.next_rank[1] - stats.rank[1]) * 100)|round(1) }}%;"></div></div>
-      <div class="xp-next">{{ T.next_rank }}: {{ stats.next_rank[1] - stats.xp }} XP ({{ stats.next_rank[2] if lang == 'ja' else stats.next_rank[3] }})</div>
+      <div class="xp-next">{{ T.next_rank }}: {{ stats.next_rank[1] - stats.xp }} XP</div>
     {% else %}
       <div class="xp-next">{{ T.rank }} MAX</div>
     {% endif %}
+  </div>
+</div>
+
+<div class="onboard" id="onboard" style="display:none;">
+  <button class="onboard-close" onclick="dismissOnboard()" aria-label="close">×</button>
+  <h2>{{ T.onboard_title }}{{ user.name }}</h2>
+  <p>{{ T.onboard_sub }}</p>
+  <div class="onboard-steps">
+    <a class="onboard-step" href="/classes">
+      <div class="num">1</div>
+      <div class="t">{{ T.onboard_step1_t }}</div>
+      <div class="d">{{ T.onboard_step1_d }}</div>
+    </a>
+    <a class="onboard-step" href="/join_class">
+      <div class="num">2</div>
+      <div class="t">{{ T.onboard_step2_t }}</div>
+      <div class="d">{{ T.onboard_step2_d }}</div>
+    </a>
+    <a class="onboard-step" href="/create_class">
+      <div class="num">3</div>
+      <div class="t">{{ T.onboard_step3_t }}</div>
+      <div class="d">{{ T.onboard_step3_d }}</div>
+    </a>
   </div>
 </div>
 
@@ -128,9 +201,23 @@
   <a class="action-card" href="/badges">
     <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"></circle><path d="m8 14-2 8 6-3 6 3-2-8"></path></svg></div>
     <div class="t">{{ T.badges }}</div>
-    <div class="d">{{ T.badges_earned }}: {{ stats and stats.helpful >= 0 and '' }}{{ earned_badges_count }}</div>
+    <div class="d">{{ T.badges_earned }}: {{ earned_badges_count }}</div>
   </a>
 </div>
+
+<script>
+(function(){
+  if (!localStorage.getItem("onboarded")) {
+    var el = document.getElementById("onboard");
+    if (el) el.style.display = "block";
+  }
+})();
+function dismissOnboard() {
+  localStorage.setItem("onboarded", "1");
+  var el = document.getElementById("onboard");
+  if (el) el.style.display = "none";
+}
+</script>
 
 {% if weekly and weekly|length > 0 %}
 <div class="section-h">{{ T.weekly_section }}</div>
@@ -139,6 +226,7 @@
   <div>
     <div class="ttl"><span class="weekly-pill">{{ T.weekly_badge }}</span>{{ w.title }}</div>
     <div class="mt">{{ w.subject }} / {{ w.teacher_name }}{% if w.weekly_time %} · {{ w.weekly_time }}{% endif %}</div>
+    {% if w.next_session %}<div class="next">{{ T.next_session }}: {{ w.next_session }}</div>{% endif %}
   </div>
   <span class="btn sm ghost">{{ T.open }}</span>
 </a>
@@ -168,6 +256,7 @@
       <span class="pill {{ 'teacher' if c.role == 'teacher' else 'student' }}">{{ T[c.role] if c.role in ['teacher','student'] else c.role }}</span>
     </div>
     <div class="meta">{{ c.subject }}{% if c.description %} · {{ c.description }}{% endif %}</div>
+    {% if c.next_session %}<div class="meta" style="color:#4338ca;font-weight:600;">{{ T.next_session }}: {{ c.next_session }}</div>{% endif %}
   </a>
   {% endfor %}
 {% else %}

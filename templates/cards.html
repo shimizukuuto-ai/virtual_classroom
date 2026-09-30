@@ -12,22 +12,39 @@
   text-transform: uppercase; letter-spacing: .06em;
 }
 .card-item .body { font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
-.card-item .copy-btn {
-  position: absolute; top: 16px; right: 16px;
-  padding: 4px 10px; border-radius: 6px; font-size: 11px;
-  background: var(--surface-2); border: 1px solid var(--border);
-  color: var(--text-muted); cursor: pointer; font-weight: 600;
+.card-item .actions {
+  display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;
 }
+.card-item .share-x {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 8px; font-size: 13px;
+  background: #000; color: #fff; text-decoration: none;
+  font-weight: 600; border: none; cursor: pointer;
+}
+.card-item .share-x:hover { background: #1a1a1a; }
+.copy-btn {
+  padding: 7px 14px; border-radius: 8px; font-size: 13px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--text); cursor: pointer; font-weight: 600;
+}
+.copy-btn:hover { background: #eef2ff; border-color: var(--primary); color: var(--primary); }
 </style>
 
 <h1 style="font-size:22px;font-weight:800;margin:0 0 20px;">{{ T.my_cards }}</h1>
 
 {% if cards %}
   {% for c in cards %}
-  <div class="card-item">
-    <button class="copy-btn" onclick="copyCard(this, {{ c.content|tojson }})">{{ T.copy_card }}</button>
+  <div class="card-item" data-content="{{ c.content }}">
     <div class="meta">{{ c.class_title }} · {{ c.class_subject }} · {{ c.created_at }}</div>
     <div class="body">{{ c.content }}</div>
+    <div class="actions">
+      <a class="share-x" target="_blank" rel="noopener"
+         href="https://twitter.com/intent/tweet?text={{ c.content|urlencode }}&hashtags=VirtualClassroom">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        {{ T.share_on_x }}
+      </a>
+      <button class="copy-btn" onclick="copyCard(this)">{{ T.share_copy }}</button>
+    </div>
   </div>
   {% endfor %}
 {% else %}
@@ -35,10 +52,12 @@
 {% endif %}
 
 <script>
-function copyCard(btn, text) {
+function copyCard(btn) {
+  const item = btn.closest(".card-item");
+  const text = item.getAttribute("data-content");
   navigator.clipboard.writeText(text).then(() => {
     const orig = btn.textContent;
-    btn.textContent = "{{ T.card_copied }}";
+    btn.textContent = "{{ T.share_copied }}";
     setTimeout(() => btn.textContent = orig, 1500);
   });
 }

@@ -208,6 +208,7 @@ def init_db():
         "ALTER TABLE messages ADD COLUMN helpful_count INTEGER DEFAULT 0",
         "ALTER TABLE classes ADD COLUMN is_weekly INTEGER DEFAULT 0",
         "ALTER TABLE classes ADD COLUMN weekly_time TEXT DEFAULT ''",
+                "ALTER TABLE classes ADD COLUMN next_session TEXT DEFAULT ''",
     ]:
         try:
             c.execute(ddl)
@@ -502,16 +503,16 @@ def list_user_cards(uid, limit=20):
 # classes
 # ============================================================
 def create_class(title, subject, description, teacher_id, join_code,
-                 is_public=1, taught_by="", is_weekly=0, weekly_time=""):
+                 is_public=1, taught_by="", is_weekly=0, weekly_time="", next_session=""):
     conn = get_conn()
     try:
         conn.execute(
             """INSERT INTO classes
             (title, subject, description, teacher_id, join_code, is_public, created_at,
-             blackboard, stage, taught_by, is_weekly, weekly_time)
-            VALUES (?, ?, ?, ?, ?, ?, ?, '', 0, ?, ?, ?)""",
+             blackboard, stage, taught_by, is_weekly, weekly_time, next_session)
+            VALUES (?, ?, ?, ?, ?, ?, ?, '', 0, ?, ?, ?, ?)""",
             (title, subject, description, teacher_id, join_code, is_public, now(),
-             taught_by, is_weekly, weekly_time),
+             taught_by, is_weekly, weekly_time, next_session),
         )
         conn.commit()
     except sqlite3.IntegrityError:
@@ -542,25 +543,22 @@ def get_class_by_id(cid):
     return r
 
 
-def list_public_classes(query=""):
+def list_public_classes(query="", subject=""):
     conn = get_conn()
+    where = ["c.is_public = 1"]
+    params = []
     if query:
         like = f"%{query}%"
-        rows = conn.execute(
-            """SELECT c.*, u.name AS teacher_name FROM classes c
-            JOIN users u ON u.id = c.teacher_id
-            WHERE c.is_public = 1
-            AND (c.title LIKE ? OR c.subject LIKE ? OR c.description LIKE ?)
-            ORDER BY c.is_weekly DESC, c.created_at DESC LIMIT 50""",
-            (like, like, like),
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            """SELECT c.*, u.name AS teacher_name FROM classes c
-            JOIN users u ON u.id = c.teacher_id
-            WHERE c.is_public = 1
-            ORDER BY c.is_weekly DESC, c.created_at DESC LIMIT 50"""
-        ).fetchall()
+        where.append("(c.title LIKE ? OR c.subject LIKE ? OR c.description LIKE ?)")
+        params += [like, like, like]
+    if subject:
+        where.append("c.subject = ?")
+        params.append(subject)
+    sql = f"""SELECT c.*, u.name AS teacher_name FROM classes c
+        JOIN users u ON u.id = c.teacher_id
+        WHERE {' AND '.join(where)}
+        ORDER BY c.is_weekly DESC, c.created_at DESC LIMIT 50"""
+    rows = conn.execute(sql, params).fetchall()
     conn.close()
     return rows
 
@@ -991,6 +989,17 @@ def list_questions_answered_by(uid, limit=20):
         WHERE q.answered_by = ?
         ORDER BY q.answered_at DESC LIMIT ?""",
         (uid, limit),
+    ).fetchall()
+    conn.close()
+    return rows
+
+def list_subjects(limit=30):
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT subject, COUNT(*) as n FROM classes
+        WHERE is_public = 1 AND subject != ''
+        GROUP BY subject ORDER BY n DESC LIMIT ?""",
+        (limit,),
     ).fetchall()
     conn.close()
     return rows

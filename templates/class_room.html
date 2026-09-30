@@ -177,14 +177,8 @@ main { padding: 16px 20px; }
   cursor: pointer; color: #9ca3af; font-weight: 600;
   transition: all .15s;
 }
-.msg .helpful-btn:hover {
-  background: rgba(16,185,129,.15); border-color: #10b981;
-  color: #10b981;
-}
-.msg .helpful-btn.done {
-  background: rgba(16,185,129,.15); border-color: #10b981;
-  color: #10b981; cursor: default;
-}
+.msg .helpful-btn:hover { background: rgba(16,185,129,.15); border-color: #10b981; color: #10b981; }
+.msg .helpful-btn.done { background: rgba(16,185,129,.15); border-color: #10b981; color: #10b981; cursor: default; }
 .jump-latest-btn {
   display: none; margin: 6px auto 0; padding: 5px 14px;
   font-size: 11px; border-radius: 14px; border: none;
@@ -291,11 +285,35 @@ main { padding: 16px 20px; }
   border: 1px solid #2a2e3a; border-radius: 10px;
   box-sizing: border-box; line-height: 1.6; resize: vertical;
 }
-.status { font-size: 12px; color: #6b7280; margin-top: 8px; min-height: 16px; }
+.status { font-size: 12px; color: #6b7280; margin-top: 8px; min-height: 16px; word-break: break-all; }
 
 .side-tab.has-unread::before {
   content: ""; position: absolute; top: 8px; right: 8px;
   width: 6px; height: 6px; border-radius: 50%; background: #ef4444;
+}
+
+@media (max-width: 900px) {
+  main { padding: 8px 12px; }
+  .room-grid { grid-template-columns: 1fr; gap: 12px; }
+  #canvas-container { height: 35vh; min-height: 220px; border-radius: 12px; }
+  .hud { padding: 8px 10px; font-size: 11px; max-width: 200px; top: 10px; left: 10px; }
+  .hud h2 { font-size: 13px; }
+  .hud .meta { font-size: 10px; }
+  .hud code { font-size: 10px; padding: 1px 5px; }
+  .reset-view-btn { padding: 6px 10px; font-size: 11px; top: 10px; right: 10px; }
+  .hint { font-size: 10px; padding: 4px 10px; bottom: 10px; }
+  .stage-bar-dark { padding: 10px 12px; margin-top: 10px; }
+  .stage-step { min-width: 60px; }
+  .stage-step .label { font-size: 9px; }
+  .stage-controls button { padding: 5px 9px; font-size: 11px; }
+  .side { height: auto; min-height: 0; max-height: none; }
+  .side-info { padding: 12px 16px; }
+  .t-ctrl { padding: 10px 14px; }
+  .side-tabs .side-tab { padding: 10px 6px; font-size: 11px; }
+  .pane { padding: 12px 14px; }
+  .bb-wrap { min-height: 160px; font-size: 13px; padding: 12px 14px; }
+  .drawer { padding: 14px; }
+  .drawer textarea { min-height: 180px; font-size: 13px; }
 }
 </style>
 
@@ -363,6 +381,7 @@ main { padding: 16px 20px; }
       <button id="btn-bb-open" class="primary">{{ T.write_blackboard }}</button>
       <button id="btn-img-upload">{{ T.upload_image }}</button>
       <button id="btn-bb-clear" class="danger">{{ T.clear_blackboard }}</button>
+      <button id="btn-invite">{{ T.invite_link }}</button>
       <input type="file" id="img-file" accept="image/*" style="display:none;">
     </div>
     {% endif %}
@@ -502,9 +521,11 @@ window.I18N = {
   step_name_prompt: {{ T.step_name_prompt|tojson }},
   confirm_delete_step: {{ T.confirm_delete_step|tojson }},
   uploading: {{ T.uploading|tojson }},
-  card_made: {{ T.card_made|tojson }}
+  card_made: {{ T.card_made|tojson }},
+  invite_link_copied: {{ T.invite_link_copied|tojson }}
 };
 window.CLASS_ID = {{ cls.id }};
+window.CLASS_JOIN_CODE = {{ cls.join_code|tojson }};
 window.ROLE = {{ role|tojson }};
 window.USER_NAME = {{ user.name|tojson }};
 window.CLASS_TITLE = {{ cls.title|tojson }};
@@ -917,6 +938,17 @@ window.INITIAL_MESSAGES = [
 
   const rv = document.getElementById("btn-reset-view");
   if (rv) rv.addEventListener("click", () => { window._resetCamera && window._resetCamera(); });
+
+  const inviteBtn = document.getElementById("btn-invite");
+  if (inviteBtn) inviteBtn.addEventListener("click", () => {
+    const url = location.origin + "/invite/" + window.CLASS_JOIN_CODE;
+    navigator.clipboard.writeText(url).then(() => {
+      statusEl.textContent = I18N.invite_link_copied + ": " + url;
+      setTimeout(() => { statusEl.textContent = ""; }, 5000);
+    }).catch(() => {
+      prompt("Invite link:", url);
+    });
+  });
 
   const cardDrawer = document.getElementById("card-drawer");
   const cardTextarea = document.getElementById("card-textarea");
