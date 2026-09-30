@@ -1,169 +1,50 @@
 {% extends "base.html" %}
-{% block title %}{{ T.home }} - {{ T.app_title }}{% endblock %}
+{% block title %}{{ T.login_title }} - {{ T.app_title }}{% endblock %}
 {% block content %}
 <style>
-.greet { margin-bottom: 28px; }
-.greet h1 { font-size: 28px; font-weight: 800; margin: 0 0 6px; letter-spacing: -.02em; }
-.greet p { color: var(--text-muted); margin: 0; font-size: 15px; }
-
-.actions-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px; margin-bottom: 28px;
+.login-hero { max-width: 440px; margin: 60px auto 0; text-align: center; }
+.login-hero .big-logo {
+  width: 72px; height: 72px; border-radius: 22px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 26px; font-weight: 800;
+  margin: 0 auto 20px;
+  box-shadow: 0 12px 32px rgba(99,102,241,.3);
 }
-.action-card {
-  background: var(--surface); border: 1.5px solid var(--border);
-  border-radius: var(--radius); padding: 20px;
-  display: flex; flex-direction: column; gap: 10px;
-  transition: all .15s;
-}
-.action-card:hover {
-  border-color: var(--primary); transform: translateY(-2px);
+.login-hero h1 { font-size: 28px; font-weight: 800; margin: 0 0 8px; letter-spacing: -.02em; }
+.login-hero p { color: var(--text-muted); margin: 0 0 32px; font-size: 15px; }
+.login-form {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 32px;
   box-shadow: var(--shadow-lg);
 }
-.action-card .ic {
-  width: 40px; height: 40px; border-radius: 11px;
-  background: var(--primary-soft); color: var(--primary);
-  display: flex; align-items: center; justify-content: center;
-}
-.action-card .ic svg { width: 20px; height: 20px; }
-.action-card .t { font-weight: 700; font-size: 15px; }
-.action-card .d { color: var(--text-muted); font-size: 13px; }
-
-.flash {
-  background: var(--teacher-soft); border: 1px solid #fcd34d;
-  border-radius: var(--radius-sm); padding: 14px 18px;
-  color: #92400e; font-size: 14px; margin-bottom: 20px;
-}
-
-.section-h {
-  font-size: 13px; font-weight: 700; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: .08em;
-  margin: 32px 0 14px;
-}
-
-.req-row {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 14px 18px; background: var(--surface);
-  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
-  margin-bottom: 8px;
-}
-.req-row .who { font-weight: 600; }
-.req-row .cls { color: var(--text-muted); font-size: 13px; }
-
-.empty-card {
-  text-align: center; padding: 48px 20px;
-  background: var(--surface); border: 1.5px dashed var(--border);
-  border-radius: var(--radius);
-}
-.empty-card .ic {
-  width: 56px; height: 56px; border-radius: 18px;
-  background: var(--primary-soft); color: var(--primary);
-  display: flex; align-items: center; justify-content: center;
-  margin: 0 auto 14px;
-}
-.empty-card .ic svg { width: 26px; height: 26px; }
-.empty-card .t { font-weight: 700; margin-bottom: 6px; }
+.login-form input { margin-bottom: 12px; }
+.login-form button { width: 100%; }
+.footnote { color: var(--text-soft); font-size: 12px; margin-top: 20px; }
 </style>
 
-{% if flash %}
-<div class="flash">{{ flash }}</div>
-{% endif %}
-
-<div class="greet">
-  <h1>{{ T.greet_back }}{{ user.name }}</h1>
-  <p>{{ T.greet_sub }}</p>
+<div class="login-hero">
+  <div class="big-logo">WC</div>
+  <h1>{{ T.login_title }}</h1>
+  <p>{{ T.login_desc }}</p>
+  <form id="login-form" class="login-form" method="post" action="/login">
+    <input type="text" name="name" placeholder="{{ T.name }}" required autofocus>
+    <button type="submit" class="btn lg">{{ T.enter }}</button>
+  </form>
+  <div class="footnote">{{ T.login_footnote }}</div>
 </div>
 
-<div class="actions-grid">
-  <a class="action-card" href="/classes">
-    <div class="ic">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path>
-      </svg>
-    </div>
-    <div class="t">{{ T.act_browse_title }}</div>
-    <div class="d">{{ T.act_browse_desc }}</div>
-  </a>
-  <a class="action-card" href="/join_class">
-    <div class="ic">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 2l-2 2m-7.6 7.6a5 5 0 1 0-7 7 5 5 0 0 0 7-7zm0 0L15 8m0 0 3 3m-3-3 3-3m-3 3-3-3"></path>
-      </svg>
-    </div>
-    <div class="t">{{ T.act_join_title }}</div>
-    <div class="d">{{ T.act_join_desc }}</div>
-  </a>
-  <a class="action-card" href="/create_class">
-    <div class="ic">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M22 10 12 5 2 10l10 5 10-5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path>
-      </svg>
-    </div>
-    <div class="t">{{ T.act_teach_title }}</div>
-    <div class="d">{{ T.act_teach_desc }}</div>
-  </a>
-  <a class="action-card" href="/u/{{ user.id }}">
-    <div class="ic">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path>
-      </svg>
-    </div>
-    <div class="t">{{ T.act_profile_title }}</div>
-    <div class="d">{{ T.act_profile_desc }}</div>
-  </a>
-</div>
-
-{% if pending_count > 0 %}
-<div class="section-h">{{ T.pending_requests }} <span class="badge-count">{{ pending_count }}</span></div>
-{% for r in pending %}
-<div class="req-row">
-  <div>
-    <div class="who">{{ r.user_name }}</div>
-    <div class="cls">{{ r.class_title }}</div>
-  </div>
-  <div style="display:flex;gap:6px;">
-    <form method="post" action="/requests/{{ r.id }}/approve">
-      <button class="btn sm green" type="submit">{{ T.approve }}</button>
-    </form>
-    <form method="post" action="/requests/{{ r.id }}/reject">
-      <button class="btn sm ghost" type="submit">{{ T.reject }}</button>
-    </form>
-  </div>
-</div>
-{% endfor %}
-{% endif %}
-
-<div class="section-h">{{ T.my_classes }}</div>
-{% if classes %}
-  {% for c in classes %}
-  <a class="class-item" href="/class/{{ c.id }}">
-    <div class="title">
-      {{ c.title }}
-      <span class="pill {{ 'teacher' if c.role == 'teacher' else 'student' }}">{{ T[c.role] if c.role in ['teacher','student'] else c.role }}</span>
-    </div>
-    <div class="meta">{{ c.subject }}{% if c.description %} · {{ c.description }}{% endif %}</div>
-  </a>
-  {% endfor %}
-{% else %}
-  <div class="empty-card">
-    <div class="ic">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-      </svg>
-    </div>
-    <div class="t">{{ T.empty_title }}</div>
-    <div class="muted">{{ T.empty_desc }}</div>
-  </div>
-{% endif %}
-
-{% if my_requests %}
-<div class="section-h">{{ T.my_requests }}</div>
-{% for r in my_requests %}
-<div class="req-row">
-  <div class="who">{{ r.class_title }}</div>
-  <div class="pill">{{ T[r.status] if r.status in ['pending','approved','rejected'] else r.status }}</div>
-</div>
-{% endfor %}
-{% endif %}
+<script>
+document.getElementById("login-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const res = await fetch("/login", {
+    method: "POST", body: fd,
+    headers: {"Accept": "application/json"}
+  });
+  if (!res.ok) { alert("Login failed"); return; }
+  const d = await res.json();
+  location.href = "/dashboard";
+});
+</script>
 {% endblock %}

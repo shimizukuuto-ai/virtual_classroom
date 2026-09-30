@@ -24,8 +24,8 @@
   width: 40px; height: 40px; border-radius: 11px;
   background: var(--primary-soft); color: var(--primary);
   display: flex; align-items: center; justify-content: center;
-  font-size: 20px;
 }
+.action-card .ic svg { width: 20px; height: 20px; }
 .action-card .t { font-weight: 700; font-size: 15px; }
 .action-card .d { color: var(--text-muted); font-size: 13px; }
 
@@ -49,6 +49,20 @@
 }
 .req-row .who { font-weight: 600; }
 .req-row .cls { color: var(--text-muted); font-size: 13px; }
+
+.empty-card {
+  text-align: center; padding: 48px 20px;
+  background: var(--surface); border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+}
+.empty-card .ic {
+  width: 56px; height: 56px; border-radius: 18px;
+  background: var(--primary-soft); color: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 14px;
+}
+.empty-card .ic svg { width: 26px; height: 26px; }
+.empty-card .t { font-weight: 700; margin-bottom: 6px; }
 </style>
 
 {% if flash %}
@@ -56,40 +70,56 @@
 {% endif %}
 
 <div class="greet">
-  <h1>おかえり、{{ user.name }} 👋</h1>
-  <p>今日は何を学ぶ？</p>
+  <h1>{{ T.greet_back }}{{ user.name }}</h1>
+  <p>{{ T.greet_sub }}</p>
 </div>
 
 <div class="actions-grid">
   <a class="action-card" href="/classes">
-    <div class="ic">🔍</div>
-    <div class="t">クラスを探す</div>
-    <div class="d">公開クラスから学びたい授業を選ぶ</div>
+    <div class="ic">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path>
+      </svg>
+    </div>
+    <div class="t">{{ T.act_browse_title }}</div>
+    <div class="d">{{ T.act_browse_desc }}</div>
   </a>
   <a class="action-card" href="/join_class">
-    <div class="ic">🔑</div>
-    <div class="t">参加コードで入る</div>
-    <div class="d">先生から共有されたコードを使う</div>
+    <div class="ic">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 2l-2 2m-7.6 7.6a5 5 0 1 0-7 7 5 5 0 0 0 7-7zm0 0L15 8m0 0 3 3m-3-3 3-3m-3 3-3-3"></path>
+      </svg>
+    </div>
+    <div class="t">{{ T.act_join_title }}</div>
+    <div class="d">{{ T.act_join_desc }}</div>
   </a>
   <a class="action-card" href="/create_class">
-    <div class="ic">🎓</div>
-    <div class="t">教える側になる</div>
-    <div class="d">自分の知識をクラスとして開く</div>
+    <div class="ic">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 10 12 5 2 10l10 5 10-5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+      </svg>
+    </div>
+    <div class="t">{{ T.act_teach_title }}</div>
+    <div class="d">{{ T.act_teach_desc }}</div>
   </a>
   <a class="action-card" href="/u/{{ user.id }}">
-    <div class="ic">👤</div>
-    <div class="t">マイプロフィール</div>
-    <div class="d">肩書き・実績を編集して信頼を積む</div>
+    <div class="ic">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path>
+      </svg>
+    </div>
+    <div class="t">{{ T.act_profile_title }}</div>
+    <div class="d">{{ T.act_profile_desc }}</div>
   </a>
 </div>
 
 {% if pending_count > 0 %}
-<div class="section-h">参加リクエスト <span class="badge-count">{{ pending_count }}</span></div>
+<div class="section-h">{{ T.pending_requests }} <span class="badge-count">{{ pending_count }}</span></div>
 {% for r in pending %}
 <div class="req-row">
   <div>
     <div class="who">{{ r.user_name }}</div>
-    <div class="cls">→ {{ r.class_title }}</div>
+    <div class="cls">{{ r.class_title }}</div>
   </div>
   <div style="display:flex;gap:6px;">
     <form method="post" action="/requests/{{ r.id }}/approve">
@@ -115,15 +145,20 @@
   </a>
   {% endfor %}
 {% else %}
-  <div class="card" style="text-align:center;padding:48px;">
-    <div style="font-size:40px;margin-bottom:12px;">📚</div>
-    <div style="font-weight:600;margin-bottom:6px;">まだクラスがありません</div>
-    <div class="muted">公開クラスを探すか、参加コードで入ってみましょう</div>
+  <div class="empty-card">
+    <div class="ic">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+      </svg>
+    </div>
+    <div class="t">{{ T.empty_title }}</div>
+    <div class="muted">{{ T.empty_desc }}</div>
   </div>
 {% endif %}
 
 {% if my_requests %}
-<div class="section-h">{{ T.join_requests_sent }}</div>
+<div class="section-h">{{ T.my_requests }}</div>
 {% for r in my_requests %}
 <div class="req-row">
   <div class="who">{{ r.class_title }}</div>
