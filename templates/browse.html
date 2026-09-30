@@ -1,82 +1,92 @@
 {% extends "base.html" %}
-{% block title %}{{ T.join_class }}{% endblock %}
+{% block title %}{{ T.search_classes }}{% endblock %}
 {% block content %}
 <style>
-  .search-bar { display: flex; gap: 10px; }
-  .search-bar input { margin: 0; flex: 1; }
-  .class-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
-  .class-card {
-    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
-    padding: 16px 18px; box-shadow: 0 1px 3px rgba(0,0,0,.04);
-    display: flex; flex-direction: column; gap: 8px;
-    transition: transform .15s, box-shadow .15s;
-  }
-  .class-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.08); }
-  .class-card h3 { margin: 0; font-size: 16px; color: #1e293b; }
-  .class-card .subject-tag {
-    display: inline-block; background: #dbeafe; color: #1e40af;
-    padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;
-  }
-  .class-card .desc { font-size: 13px; color: #475569; line-height: 1.5; }
-  .class-card .footer {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-top: auto; padding-top: 10px; border-top: 1px solid #f1f5f9;
-  }
-  .class-card .meta { font-size: 12px; color: #64748b; }
-  .class-card .meta strong { color: #334155; }
-  .class-card .count-badge {
-    display: inline-flex; align-items: center; gap: 4px;
-    background: #ecfdf5; color: #065f46;
-    padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;
-  }
-  .class-card .teacher { font-size: 12px; color: #64748b; }
-  .empty-state {
-    text-align: center; padding: 60px 20px; color: #94a3b8;
-  }
+.search-h {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 20px; gap: 16px; flex-wrap: wrap;
+}
+.search-h h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
+.search-bar {
+  display: flex; gap: 8px; flex: 1; max-width: 480px;
+}
+.search-bar input { margin: 0; }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+.class-card {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 20px;
+  display: flex; flex-direction: column; gap: 10px;
+  transition: all .15s;
+}
+.class-card:hover {
+  border-color: var(--primary); transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+.class-card h3 {
+  margin: 0; font-size: 17px; font-weight: 700;
+  letter-spacing: -.01em; color: var(--text);
+}
+.class-card .desc { font-size: 13px; color: var(--text-muted); line-height: 1.5; min-height: 20px; }
+.class-card .foot {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-top: 12px; border-top: 1px solid var(--border); margin-top: auto;
+}
+.class-card .teacher { font-size: 12px; color: var(--text-muted); }
+.class-card .count {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--student-soft); color: #047857;
+  padding: 3px 10px; border-radius: 12px;
+  font-size: 11px; font-weight: 700;
+}
+.empty {
+  grid-column: 1 / -1; text-align: center; padding: 80px 20px;
+  color: var(--text-soft);
+}
+.empty .ic { font-size: 48px; margin-bottom: 12px; }
 </style>
 
-<div class="card">
+<div class="search-h">
   <h1>{{ T.search_classes }}</h1>
   <form method="get" action="/classes" class="search-bar">
-    <input type="text" name="q" value="{{ q }}" placeholder="{{ T.subject }} / {{ T.class_name }}">
-    <button type="submit">{{ T.search }}</button>
+    <input type="text" name="q" value="{{ q }}" placeholder="科目 / クラス名で検索">
+    <button class="btn" type="submit">{{ T.search }}</button>
   </form>
 </div>
 
 {% if results %}
-  <div class="class-grid">
-    {% for c in results %}
-      <div class="class-card">
-        <div>
-          <span class="subject-tag">{{ c.subject }}</span>
-        </div>
-        <h3>{{ c.title }}</h3>
-        {% if c.description %}
-          <div class="desc">{{ c.description }}</div>
-        {% endif %}
-        <div class="footer">
-          <div>
-            <div class="teacher">{{ T.teacher }}: {{ c.teacher_name }}</div>
-            <div style="margin-top:4px;">
-              <span class="count-badge">{{ c.student_count }} {{ T.student }}</span>
-            </div>
-          </div>
-          <div>
-            {% if c.id in my_classes %}
-              <a class="btn gray" href="/class/{{ c.id }}">{{ T.home }}</a>
-            {% else %}
-              <form method="post" action="/classes/{{ c.id }}/request" style="display:inline;">
-                <button type="submit">{{ T.request_join }}</button>
-              </form>
-            {% endif %}
-          </div>
-        </div>
+<div class="grid">
+  {% for c in results %}
+  <div class="class-card">
+    <span class="pill">{{ c.subject }}</span>
+    <h3>{{ c.title }}</h3>
+    <div class="desc">{{ c.description or "" }}</div>
+    <div class="foot">
+      <div>
+        <div class="teacher">{{ T.teacher }}: <strong>{{ c.teacher_name }}</strong></div>
+        <div class="count" style="margin-top:4px;">👥 {{ c.student_count }} {{ T.student }}</div>
       </div>
-    {% endfor %}
+      {% if c.id in my_classes %}
+        <a class="btn sm ghost" href="/class/{{ c.id }}">開く →</a>
+      {% else %}
+        <form method="post" action="/classes/{{ c.id }}/request">
+          <button class="btn sm" type="submit">{{ T.request_join }}</button>
+        </form>
+      {% endif %}
+    </div>
   </div>
+  {% endfor %}
+</div>
 {% else %}
-  <div class="card empty-state">
-    {{ T.no_public_classes }}
+<div class="grid">
+  <div class="empty">
+    <div class="ic">🔍</div>
+    <div style="font-weight:600;color:var(--text);margin-bottom:6px;">{{ T.no_public_classes }}</div>
+    <div>別のキーワードで検索するか、参加コードで入ってみましょう</div>
   </div>
+</div>
 {% endif %}
 {% endblock %}

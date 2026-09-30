@@ -1,28 +1,46 @@
 {% extends "base.html" %}
 {% block title %}{{ T.create_class }} - {{ T.app_title }}{% endblock %}
 {% block content %}
-<div class="card">
-<h1>{{ T.create_class }}</h1>
-<form method="post" action="/create_class">
-<label>{{ T.class_name }}</label>
-<input type="text" name="title" required>
+<style>
+.form-wrap { max-width: 640px; margin: 0 auto; }
+.form-head { margin-bottom: 28px; }
+.form-head h1 { margin: 0 0 6px; font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
+.form-head p { color: var(--text-muted); margin: 0; }
+.form-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 28px;
+  box-shadow: var(--shadow-sm);
+}
+.hint { font-size: 12px; color: var(--text-soft); margin-top: 4px; }
+</style>
 
-<label>{{ T.subject }}</label>
-<input type="text" name="subject" required>
+<div class="form-wrap">
+  <div class="form-head">
+    <h1>{{ T.create_class }}</h1>
+    <p>教えたいことをクラスとして開きましょう</p>
+  </div>
 
-<label>{{ T.description }}</label>
-<textarea name="description" rows="3"></textarea>
+  <form method="post" action="/create_class" class="form-card">
+    <label>{{ T.class_name }}</label>
+    <input type="text" name="title" required placeholder="例: 線形代数入門">
 
-<label>公開設定</label>
-<select name="is_public">
-<option value="1">公開（検索で見つかる）</option>
-<option value="0">非公開（参加コードのみ）</option>
-</select>
+    <label>{{ T.subject }}</label>
+    <input type="text" name="subject" required placeholder="例: 数学">
 
-<label>進行ステップ（1行に1つ。空欄なら完全自由進行）</label>
-<textarea name="steps_text" rows="6" placeholder="{{ default_steps|join('\n') }}"></textarea>
+    <label>{{ T.description }}</label>
+    <textarea name="description" rows="3" placeholder="どんなことを教えるか、対象は誰か"></textarea>
 
-<button type="submit">{{ T.create }}</button>
-</form>
+    <label>公開設定</label>
+    <select name="is_public">
+      <option value="1">🌐 公開（検索で見つかる）</option>
+      <option value="0">🔒 非公開（参加コードのみ）</option>
+    </select>
+
+    <label>進行ステップ（1行に1つ）</label>
+    <textarea name="steps_text" rows="8" placeholder="{{ default_steps|join('\n') }}"></textarea>
+    <div class="hint">空欄なら「自由進行」になります。後から追加・削除できます。</div>
+
+    <button type="submit" class="btn lg" style="width:100%; margin-top:20px;">{{ T.create }} →</button>
+  </form>
 </div>
 {% endblock %}

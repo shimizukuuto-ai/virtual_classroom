@@ -1,17 +1,40 @@
 {% extends "base.html" %}
 {% block title %}{{ T.login_title }} - {{ T.app_title }}{% endblock %}
 {% block content %}
-<div class="card">
+<style>
+.login-hero {
+  max-width: 440px; margin: 60px auto 0;
+  text-align: center;
+}
+.login-hero .big-logo {
+  width: 72px; height: 72px; border-radius: 22px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 26px; font-weight: 800;
+  margin: 0 auto 20px;
+  box-shadow: 0 12px 32px rgba(99,102,241,.3);
+}
+.login-hero h1 { font-size: 28px; font-weight: 800; margin: 0 0 8px; letter-spacing: -.02em; }
+.login-hero p { color: var(--text-muted); margin: 0 0 32px; font-size: 15px; }
+.login-form {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 32px;
+  box-shadow: var(--shadow-lg);
+}
+.login-form input { margin-bottom: 12px; }
+.login-form button { width: 100%; }
+.footnote { color: var(--text-soft); font-size: 12px; margin-top: 20px; }
+</style>
+
+<div class="login-hero">
+  <div class="big-logo">WC</div>
   <h1>{{ T.login_title }}</h1>
-  <p class="muted">{{ T.login_desc }}</p>
-  <form id="login-form" method="post" action="/login">
+  <p>{{ T.login_desc }}</p>
+  <form id="login-form" class="login-form" method="post" action="/login">
     <input type="text" name="name" placeholder="{{ T.name }}" required autofocus>
-    <button type="submit">{{ T.enter }}</button>
+    <button type="submit" class="btn lg">{{ T.enter }} →</button>
   </form>
-  <p class="muted" style="margin-top:14px;">
-    タブごとに別アカウントでログインできます。<br>
-    別のタブで開いて、違う名前で入ってください。
-  </p>
+  <div class="footnote">無料・登録不要・名前を入れるだけ</div>
 </div>
 
 <script>
@@ -19,14 +42,12 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const fd = new FormData(e.target);
   const res = await fetch("/login", {
-    method: "POST",
-    body: fd,
-    headers: { "Accept": "application/json" }
+    method: "POST", body: fd,
+    headers: {"Accept": "application/json"}
   });
   if (!res.ok) { alert("Login failed"); return; }
   const d = await res.json();
-  sessionStorage.setItem("uid", d.id);
-  location.href = "/dashboard?uid=" + d.id;
+  location.href = "/dashboard";
 });
 </script>
 {% endblock %}

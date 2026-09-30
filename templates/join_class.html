@@ -1,13 +1,36 @@
 {% extends "base.html" %}
-{% block title %}クラス参加 - 仮想教室{% endblock %}
+{% block title %}{{ T.join_code }}{% endblock %}
 {% block content %}
-<div class="card">
-  <h1>クラス参加</h1>
-  {% if error %}<div class="error">{{ error }}</div>{% endif %}
-  <form method="post" action="/join_class">
-    <label>参加コード</label>
-    <input type="text" name="join_code" placeholder="例: a3k9x2" required autofocus>
-    <button type="submit">参加</button>
+<style>
+.center-wrap { max-width: 480px; margin: 40px auto 0; text-align: center; }
+.center-wrap .ic {
+  width: 64px; height: 64px; border-radius: 20px;
+  background: var(--primary-soft); color: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; margin: 0 auto 20px;
+}
+.center-wrap h1 { font-size: 26px; font-weight: 800; margin: 0 0 8px; letter-spacing: -.02em; }
+.center-wrap p { color: var(--text-muted); margin: 0 0 28px; }
+.code-form {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 28px;
+  box-shadow: var(--shadow-lg);
+}
+.code-form input {
+  text-align: center; font-size: 22px; font-weight: 700;
+  letter-spacing: .15em; padding: 16px;
+}
+.code-form button { width: 100%; margin-top: 12px; }
+</style>
+
+<div class="center-wrap">
+  <div class="ic">🔑</div>
+  <h1>参加コードで入室</h1>
+  <p>先生から共有された6桁のコードを入力</p>
+  <form method="post" action="/join_class" class="code-form">
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <input type="text" name="join_code" placeholder="a3k9x2" required autofocus maxlength="6">
+    <button class="btn lg" type="submit">入室する →</button>
   </form>
 </div>
 {% endblock %}
