@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 STRINGS = {
     "ja": {
         "app_title": "仮想教室",
@@ -78,7 +80,6 @@ STRINGS = {
         "already_member": "すでに参加しています",
         "no_public_classes": "公開クラスはありません",
         "open": "開く",
-        # profile
         "profile": "プロフィール",
         "my_profile": "マイプロフィール",
         "edit_profile": "プロフィールを編集",
@@ -94,7 +95,6 @@ STRINGS = {
         "stat_joined": "参加クラス",
         "stat_answers": "回答数",
         "taught_classes": "開講中のクラス",
-        # qa
         "qa_tab": "質問箱",
         "qa_ask": "質問する",
         "qa_placeholder": "質問を入力（匿名で投稿できます）",
@@ -106,7 +106,6 @@ STRINGS = {
         "qa_anonymous_label": "匿名",
         "qa_delete": "削除",
         "qa_confirm_delete": "この質問を削除しますか?",
-        # members / ban
         "member_kick": "キック",
         "member_ban": "BAN",
         "member_unban": "解除",
@@ -116,7 +115,6 @@ STRINGS = {
         "no_bans": "BANされたユーザーはいません",
         "banned_notice": "あなたはこのクラスからBANされています。",
         "reason_label": "理由（任意）",
-        # dashboard
         "greet_back": "おかえり、",
         "greet_sub": "今日は何を学ぶ？",
         "act_browse_title": "クラスを探す",
@@ -128,7 +126,6 @@ STRINGS = {
         "act_profile_title": "マイプロフィール",
         "act_profile_desc": "肩書き・実績を編集して信頼を積む",
         "my_requests": "送信済みの参加リクエスト",
-        # create class page
         "ph_class_name": "例: 線形代数入門",
         "ph_subject": "例: 数学",
         "ph_description": "どんなことを教えるか、対象は誰か",
@@ -137,7 +134,6 @@ STRINGS = {
         "public_yes": "公開（検索で見つかる）",
         "public_no": "非公開（参加コードのみ）",
         "visibility_label": "公開設定",
-        # join page
         "join_hero_title": "参加コードで入室",
         "join_hero_desc": "先生から共有された6桁のコードを入力",
         "join_input_ph": "a3k9x2",
@@ -299,12 +295,18 @@ DEFAULT_STEPS = {
 }
 
 
+class _SafeDict(dict):
+    """存在しないキーは空文字を返す。テンプレで KeyError を出さない。"""
+    def __missing__(self, key):
+        return ""
+
+
 def t(lang, key):
     return STRINGS.get(lang, STRINGS["ja"]).get(key, key)
 
 
 def all_t(lang):
-    return STRINGS.get(lang, STRINGS["ja"])
+    return _SafeDict(STRINGS.get(lang, STRINGS["ja"]))
 
 
 def default_steps(lang):
