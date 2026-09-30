@@ -48,7 +48,7 @@
   list-style: none; display: flex; justify-content: space-between; align-items: center;
 }
 .edit-box summary::-webkit-details-marker { display: none; }
-.edit-box summary::after { content: "＋"; color: var(--text-muted); }
+.edit-box summary::after { content: "+"; color: var(--text-muted); font-size: 18px; }
 
 .q-item {
   background: var(--surface); border: 1px solid var(--border);
@@ -72,7 +72,7 @@
 <div class="stats-grid">
   <div class="stat highlight">
     <div class="n">{{ stats.helpful }}</div>
-    <div class="l">👍 {{ T.stat_helpful }}</div>
+    <div class="l">{{ T.stat_helpful }}</div>
   </div>
   <div class="stat"><div class="n">{{ stats.answers }}</div><div class="l">{{ T.stat_answers }}</div></div>
   <div class="stat"><div class="n">{{ stats.taught }}</div><div class="l">{{ T.stat_taught }}</div></div>

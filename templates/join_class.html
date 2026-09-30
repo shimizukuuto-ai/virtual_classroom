@@ -7,8 +7,9 @@
   width: 64px; height: 64px; border-radius: 20px;
   background: var(--primary-soft); color: var(--primary);
   display: flex; align-items: center; justify-content: center;
-  font-size: 28px; margin: 0 auto 20px;
+  margin: 0 auto 20px;
 }
+.center-wrap .ic svg { width: 30px; height: 30px; }
 .center-wrap h1 { font-size: 26px; font-weight: 800; margin: 0 0 8px; letter-spacing: -.02em; }
 .center-wrap p { color: var(--text-muted); margin: 0 0 28px; }
 .code-form {
@@ -24,13 +25,17 @@
 </style>
 
 <div class="center-wrap">
-  <div class="ic">🔑</div>
-  <h1>参加コードで入室</h1>
-  <p>先生から共有された6桁のコードを入力</p>
+  <div class="ic">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 2l-2 2m-7.6 7.6a5 5 0 1 0-7 7 5 5 0 0 0 7-7zm0 0L15 8m0 0 3 3m-3-3 3-3m-3 3-3-3"></path>
+    </svg>
+  </div>
+  <h1>{{ T.join_hero_title }}</h1>
+  <p>{{ T.join_hero_desc }}</p>
   <form method="post" action="/join_class" class="code-form">
     {% if error %}<div class="error">{{ error }}</div>{% endif %}
-    <input type="text" name="join_code" placeholder="a3k9x2" required autofocus maxlength="6">
-    <button class="btn lg" type="submit">入室する →</button>
+    <input type="text" name="join_code" placeholder="{{ T.join_input_ph }}" required autofocus maxlength="6">
+    <button class="btn lg" type="submit">{{ T.join_button }}</button>
   </form>
 </div>
 {% endblock %}

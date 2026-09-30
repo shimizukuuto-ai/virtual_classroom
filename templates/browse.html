@@ -7,9 +7,7 @@
   margin-bottom: 20px; gap: 16px; flex-wrap: wrap;
 }
 .search-h h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
-.search-bar {
-  display: flex; gap: 8px; flex: 1; max-width: 480px;
-}
+.search-bar { display: flex; gap: 8px; flex: 1; max-width: 480px; }
 .search-bar input { margin: 0; }
 .grid {
   display: grid;
@@ -46,13 +44,19 @@
   grid-column: 1 / -1; text-align: center; padding: 80px 20px;
   color: var(--text-soft);
 }
-.empty .ic { font-size: 48px; margin-bottom: 12px; }
+.empty .ic {
+  width: 64px; height: 64px; border-radius: 20px;
+  background: var(--primary-soft); color: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px;
+}
+.empty .ic svg { width: 30px; height: 30px; }
 </style>
 
 <div class="search-h">
   <h1>{{ T.search_classes }}</h1>
   <form method="get" action="/classes" class="search-bar">
-    <input type="text" name="q" value="{{ q }}" placeholder="科目 / クラス名で検索">
+    <input type="text" name="q" value="{{ q }}" placeholder="{{ T.search_placeholder }}">
     <button class="btn" type="submit">{{ T.search }}</button>
   </form>
 </div>
@@ -67,10 +71,10 @@
     <div class="foot">
       <div>
         <div class="teacher">{{ T.teacher }}: <strong>{{ c.teacher_name }}</strong></div>
-        <div class="count" style="margin-top:4px;">👥 {{ c.student_count }} {{ T.student }}</div>
+        <div class="count">{{ c.student_count }} {{ T.student }}</div>
       </div>
       {% if c.id in my_classes %}
-        <a class="btn sm ghost" href="/class/{{ c.id }}">開く →</a>
+        <a class="btn sm ghost" href="/class/{{ c.id }}">{{ T.open }}</a>
       {% else %}
         <form method="post" action="/classes/{{ c.id }}/request">
           <button class="btn sm" type="submit">{{ T.request_join }}</button>
@@ -83,9 +87,13 @@
 {% else %}
 <div class="grid">
   <div class="empty">
-    <div class="ic">🔍</div>
+    <div class="ic">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path>
+      </svg>
+    </div>
     <div style="font-weight:600;color:var(--text);margin-bottom:6px;">{{ T.no_public_classes }}</div>
-    <div>別のキーワードで検索するか、参加コードで入ってみましょう</div>
+    <div>{{ T.search_placeholder }}</div>
   </div>
 </div>
 {% endif %}

@@ -17,30 +17,30 @@
 <div class="form-wrap">
   <div class="form-head">
     <h1>{{ T.create_class }}</h1>
-    <p>教えたいことをクラスとして開きましょう</p>
+    <p>{{ T.create_class_subtitle }}</p>
   </div>
 
   <form method="post" action="/create_class" class="form-card">
     <label>{{ T.class_name }}</label>
-    <input type="text" name="title" required placeholder="例: 線形代数入門">
+    <input type="text" name="title" required placeholder="{{ T.ph_class_name }}">
 
     <label>{{ T.subject }}</label>
-    <input type="text" name="subject" required placeholder="例: 数学">
+    <input type="text" name="subject" required placeholder="{{ T.ph_subject }}">
 
     <label>{{ T.description }}</label>
-    <textarea name="description" rows="3" placeholder="どんなことを教えるか、対象は誰か"></textarea>
+    <textarea name="description" rows="3" placeholder="{{ T.ph_description }}"></textarea>
 
-    <label>公開設定</label>
+    <label>{{ T.visibility_label }}</label>
     <select name="is_public">
-      <option value="1">🌐 公開（検索で見つかる）</option>
-      <option value="0">🔒 非公開（参加コードのみ）</option>
+      <option value="1">{{ T.public_yes }}</option>
+      <option value="0">{{ T.public_no }}</option>
     </select>
 
-    <label>進行ステップ（1行に1つ）</label>
+    <label>{{ T.steps_label }}</label>
     <textarea name="steps_text" rows="8" placeholder="{{ default_steps|join('\n') }}"></textarea>
-    <div class="hint">空欄なら「自由進行」になります。後から追加・削除できます。</div>
+    <div class="hint">{{ T.steps_hint }}</div>
 
-    <button type="submit" class="btn lg" style="width:100%; margin-top:20px;">{{ T.create }} →</button>
+    <button type="submit" class="btn lg" style="width:100%; margin-top:20px;">{{ T.create }}</button>
   </form>
 </div>
 {% endblock %}
