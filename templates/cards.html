@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ T.my_cards }} - {{ T.app_title }}{% endblock %}
+{% block content %}
+<style>
+.card-item {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 20px; margin-bottom: 12px;
+  position: relative;
+}
+.card-item .meta {
+  font-size: 11px; color: var(--text-muted); margin-bottom: 8px;
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.card-item .body { font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
+.card-item .copy-btn {
+  position: absolute; top: 16px; right: 16px;
+  padding: 4px 10px; border-radius: 6px; font-size: 11px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--text-muted); cursor: pointer; font-weight: 600;
+}
+</style>
+
+<h1 style="font-size:22px;font-weight:800;margin:0 0 20px;">{{ T.my_cards }}</h1>
+
+{% if cards %}
+  {% for c in cards %}
+  <div class="card-item">
+    <button class="copy-btn" onclick="copyCard(this, {{ c.content|tojson }})">{{ T.copy_card }}</button>
+    <div class="meta">{{ c.class_title }} · {{ c.class_subject }} · {{ c.created_at }}</div>
+    <div class="body">{{ c.content }}</div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="muted">{{ T.no_cards }}</div>
+{% endif %}
+
+<script>
+function copyCard(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = "{{ T.card_copied }}";
+    setTimeout(() => btn.textContent = orig, 1500);
+  });
+}
+</script>
+{% endblock %}

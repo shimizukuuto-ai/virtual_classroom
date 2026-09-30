@@ -10,8 +10,9 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from db import (
-    init_db, create_user, get_user_by_name, get_user_by_id, set_user_lang, update_user_profile,
-    user_stats, list_classes_taught_by,
+    init_db, create_user, get_user_by_name, get_user_by_id, set_user_lang,
+    update_user_profile, set_user_skin, user_stats, calc_streak,
+    list_classes_taught_by, list_weekly_classes,
     create_class, get_class_by_code, get_class_by_id, join_class,
     list_classes_for_user, list_public_classes, list_members, get_role,
     add_message, get_messages, get_message, mark_helpful, set_blackboard, set_stage,
@@ -20,9 +21,12 @@ from db import (
     count_students, list_all_users, delete_user,
     save_blackboard_history, list_blackboard_history, get_blackboard_history_by_id,
     add_step, list_steps, delete_step,
-    ban_user, unban_user, is_banned, list_bans,
+    ban_user, unban_user, is_banned, list_bans, kick_user,
     create_question, list_questions, get_question, answer_question, delete_question,
     list_questions_answered_by,
+    create_card, list_user_cards,
+    list_user_badges, count_badges, check_badges, record_attendance,
+    BADGES, SKINS, RANKS,
 )
 from i18n import all_t, default_steps
 
@@ -57,7 +61,44 @@ def ctx(request, user, **extra):
             lang = (user["lang"] or "ja")
         except (KeyError, TypeError, IndexError):
             lang = "ja"
-    base = {"request": request, "user": user, "T": all_t(lang), "lang": lang}
+    base = {
+        "request": request,
+        "user": user,
+        "T": all_t(lang),
+        "lang": lang,
+        # テンプレート側で参照されても落ちないようにデフォルトを入れる
+        "flash": None,
+        "pending_count": 0,
+        "pending": [],
+        "classes": [],
+        "my_requests": [],
+        "results": [],
+        "q": "",
+        "my_classes": set(),
+        "error": None,
+        "steps": [],
+        "members": [],
+        "messages": [],
+        "questions": [],
+        "bans": [],
+        "profile_user": None,
+        "stats": None,
+        "taught": [],
+        "recent_answers": [],
+        "is_me": False,
+        "default_steps": [],
+        "cls": None,
+        "role": None,
+        "weekly": [],
+        "earned_badges_count": 0,
+        "earned_keys": set(),
+        "earned": [],
+        "streak": 0,
+        "BADGES": BADGES,
+        "SKINS": SKINS,
+        "RANKS": RANKS,
+        "cards": [],
+    }
     base.update(extra)
     return base
 
@@ -150,8 +191,16 @@ def dashboard(request: Request):
     flash = request.session.pop("flash", None)
     return templates.TemplateResponse(
         request, "dashboard.html",
-        ctx(request, user, classes=classes, pending=pending,
-            my_requests=my_requests, pending_count=pending_count, flash=flash),
+        ctx(request, user,
+            classes=classes,
+            pending=pending,
+            my_requests=my_requests,
+            pending_count=pending_count,
+            flash=flash,
+            stats=user_stats(user["id"]),
+            streak=calc_streak(user["id"]),
+            weekly=list_weekly_classes(limit=6),
+            earned_badges_count=count_badges(user["id"])),
     )
 
 
@@ -233,6 +282,8 @@ def create_class_submit(
     description: str = Form(""),
     is_public: str = Form("1"),
     steps_text: str = Form(""),
+    is_weekly: str = Form("0"),
+    weekly_time: str = Form(""),
 ):
     user = current_user(request)
     if not user:
@@ -246,6 +297,8 @@ def create_class_submit(
             title, subject, description, user["id"], gen_code(),
             is_public=1 if is_public == "1" else 0,
             taught_by=user["name"],
+            is_weekly=1 if is_weekly == "1" else 0,
+            weekly_time=weekly_time.strip(),
         )
         if cid:
             break
@@ -304,6 +357,8 @@ def class_room(request: Request, class_id: int):
     role = get_role(class_id, user["id"])
     if not role:
         return HTMLResponse("Not a member", status_code=403)
+    record_attendance(user["id"], class_id)
+    check_badges(user["id"])
     members = list_members(class_id)
     messages = get_messages(class_id, limit=80)
     steps = list_steps(class_id)
@@ -330,10 +385,12 @@ async def api_poll(request: Request, class_id: int):
     msg = get_messages(class_id, limit=80)
     steps = list_steps(class_id)
     questions = list_questions(class_id, limit=100)
+    members = list_members(class_id)
     return JSONResponse({
         "blackboard": cls["blackboard"] or "",
         "stage": cls["stage"] if "stage" in cls.keys() else 0,
         "steps": [{"id": s["id"], "title": s["title"]} for s in steps],
+        "members": [{"id": m["user_id"], "name": m["name"], "role": m["role"], "skin": m["skin"] or "default"} for m in members],
         "messages": [
             {"id": m["id"], "type": m["sender_type"], "name": m["sender_name"],
              "content": m["content"], "helpful": m["helpful_count"] or 0}
@@ -489,12 +546,7 @@ async def api_kick(request: Request, class_id: int, user_id: int):
         return JSONResponse({"error": "teachers only"}, status_code=403)
     if int(user_id) == int(user["id"]):
         return JSONResponse({"error": "cannot kick yourself"}, status_code=400)
-    # キック = enrollment から削除（BANはしない）
-    from db import get_conn
-    conn = get_conn()
-    conn.execute("DELETE FROM enrollments WHERE class_id = ? AND user_id = ?", (class_id, user_id))
-    conn.commit()
-    conn.close()
+    kick_user(class_id, user_id)
     return JSONResponse({"ok": True})
 
 
@@ -507,8 +559,12 @@ async def api_ban(request: Request, class_id: int, user_id: int):
         return JSONResponse({"error": "teachers only"}, status_code=403)
     if int(user_id) == int(user["id"]):
         return JSONResponse({"error": "cannot ban yourself"}, status_code=400)
-    data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
-    reason = (data.get("reason") or "").strip()
+    reason = ""
+    try:
+        data = await request.json()
+        reason = (data.get("reason") or "").strip()
+    except Exception:
+        pass
     ban_user(class_id, user_id, reason)
     return JSONResponse({"ok": True})
 
@@ -606,6 +662,74 @@ async def api_history_restore(request: Request, class_id: int, hid: int):
     set_blackboard(class_id, r["content"] or "")
     save_blackboard_history(class_id, r["content"] or "", f"{user['name']} (restore)")
     return JSONResponse({"ok": True, "content": r["content"] or ""})
+
+
+# ---- badges / skins ----
+@app.get("/badges", response_class=HTMLResponse)
+def badges_page(request: Request):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    earned = list_user_badges(user["id"])
+    earned_keys = {b["badge_key"] for b in earned}
+    stats = user_stats(user["id"])
+    streak = calc_streak(user["id"])
+    return templates.TemplateResponse(
+        request, "badges.html",
+        ctx(request, user, earned_keys=earned_keys, earned=earned,
+            stats=stats, streak=streak),
+    )
+
+
+@app.post("/skin/{skin_key}")
+def apply_skin(request: Request, skin_key: str):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    set_user_skin(user["id"], skin_key)
+    return RedirectResponse(request.headers.get("referer") or "/badges")
+
+
+@app.get("/api/stats/{uid}")
+def api_stats(request: Request, uid: int):
+    s = user_stats(uid)
+    if not s:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    streak = calc_streak(uid)
+    return JSONResponse({
+        "xp": s["xp"],
+        "rank": s["rank"][0],
+        "rank_name": s["rank"][2],
+        "badges": count_badges(uid),
+        "streak": streak,
+    })
+
+
+# ---- learning card ----
+@app.post("/card/{class_id}")
+async def make_card(request: Request, class_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if not get_role(class_id, user["id"]):
+        return JSONResponse({"error": "not member"}, status_code=403)
+    data = await request.json()
+    content = (data.get("content") or "").strip()
+    if not content:
+        return JSONResponse({"error": "empty"}, status_code=400)
+    create_card(user["id"], class_id, content)
+    return JSONResponse({"ok": True})
+
+
+@app.get("/cards", response_class=HTMLResponse)
+def cards_page(request: Request):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    cards = list_user_cards(user["id"], limit=50)
+    return templates.TemplateResponse(
+        request, "cards.html", ctx(request, user, cards=cards)
+    )
 
 
 # ---- dev (ENABLE_DEV=1 のみ) ----

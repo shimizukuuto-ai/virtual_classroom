@@ -2,132 +2,157 @@
 {% block title %}{{ T.home }} - {{ T.app_title }}{% endblock %}
 {% block content %}
 <style>
-.greet { margin-bottom: 28px; }
-.greet h1 { font-size: 28px; font-weight: 800; margin: 0 0 6px; letter-spacing: -.02em; }
-.greet p { color: var(--text-muted); margin: 0; font-size: 15px; }
+.hero-row {
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 16px; align-items: center; margin-bottom: 24px;
+}
+@media (max-width: 700px) { .hero-row { grid-template-columns: 1fr; } }
+.greet h1 { font-size: 26px; font-weight: 800; margin: 0 0 6px; letter-spacing: -.02em; }
+.greet p { color: var(--text-muted); margin: 0; font-size: 14px; }
+
+.rank-widget {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 16px 20px; min-width: 220px;
+}
+.rank-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.rank-badge {
+  width: 44px; height: 44px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 800; font-size: 16px;
+}
+.rank-name { font-weight: 800; font-size: 15px; }
+.rank-xp { color: var(--text-muted); font-size: 12px; }
+.xp-bar {
+  height: 6px; background: var(--surface-2); border-radius: 3px;
+  overflow: hidden; margin-top: 4px;
+}
+.xp-bar > div { height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6); }
+.xp-next { font-size: 11px; color: var(--text-soft); margin-top: 4px; }
 
 .actions-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px; margin-bottom: 28px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px; margin-bottom: 28px;
 }
 .action-card {
   background: var(--surface); border: 1.5px solid var(--border);
-  border-radius: var(--radius); padding: 20px;
-  display: flex; flex-direction: column; gap: 10px;
+  border-radius: var(--radius); padding: 18px;
+  display: flex; flex-direction: column; gap: 8px;
   transition: all .15s;
 }
-.action-card:hover {
-  border-color: var(--primary); transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-}
+.action-card:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: var(--shadow-lg); }
 .action-card .ic {
-  width: 40px; height: 40px; border-radius: 11px;
+  width: 36px; height: 36px; border-radius: 10px;
   background: var(--primary-soft); color: var(--primary);
   display: flex; align-items: center; justify-content: center;
 }
-.action-card .ic svg { width: 20px; height: 20px; }
-.action-card .t { font-weight: 700; font-size: 15px; }
-.action-card .d { color: var(--text-muted); font-size: 13px; }
-
-.flash {
-  background: var(--teacher-soft); border: 1px solid #fcd34d;
-  border-radius: var(--radius-sm); padding: 14px 18px;
-  color: #92400e; font-size: 14px; margin-bottom: 20px;
-}
+.action-card .ic svg { width: 18px; height: 18px; }
+.action-card .t { font-weight: 700; font-size: 14px; }
+.action-card .d { color: var(--text-muted); font-size: 12px; }
 
 .section-h {
-  font-size: 13px; font-weight: 700; color: var(--text-muted);
+  font-size: 12px; font-weight: 700; color: var(--text-muted);
   text-transform: uppercase; letter-spacing: .08em;
-  margin: 32px 0 14px;
+  margin: 28px 0 12px;
 }
 
-.req-row {
+.weekly-card {
+  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+  border: 1.5px solid #c7d2fe; border-radius: var(--radius);
+  padding: 18px 20px; margin-bottom: 10px;
   display: flex; justify-content: space-between; align-items: center;
-  padding: 14px 18px; background: var(--surface);
-  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
-  margin-bottom: 8px;
 }
-.req-row .who { font-weight: 600; }
-.req-row .cls { color: var(--text-muted); font-size: 13px; }
+.weekly-card .ttl { font-weight: 800; font-size: 15px; color: #3730a3; }
+.weekly-card .mt { font-size: 12px; color: #4338ca; margin-top: 4px; }
+.weekly-pill {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  background: #6366f1; color: #fff; font-size: 10px; font-weight: 700;
+  letter-spacing: .04em; margin-right: 6px;
+}
 
-.empty-card {
-  text-align: center; padding: 48px 20px;
-  background: var(--surface); border: 1.5px dashed var(--border);
-  border-radius: var(--radius);
-}
-.empty-card .ic {
-  width: 56px; height: 56px; border-radius: 18px;
+.badge-mini-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.badge-mini {
+  width: 36px; height: 36px; border-radius: 10px;
   background: var(--primary-soft); color: var(--primary);
   display: flex; align-items: center; justify-content: center;
-  margin: 0 auto 14px;
+  font-size: 11px; font-weight: 800;
 }
-.empty-card .ic svg { width: 26px; height: 26px; }
-.empty-card .t { font-weight: 700; margin-bottom: 6px; }
 </style>
 
 {% if flash %}
 <div class="flash">{{ flash }}</div>
 {% endif %}
 
-<div class="greet">
-  <h1>{{ T.greet_back }}{{ user.name }}</h1>
-  <p>{{ T.greet_sub }}</p>
+<div class="hero-row">
+  <div class="greet">
+    <h1>{{ T.greet_back }}{{ user.name }}</h1>
+    <p>{{ T.greet_sub }}</p>
+    {% if streak and streak > 0 %}
+      <p style="margin-top:6px;color:var(--teacher);font-weight:700;font-size:13px;">
+        {{ streak }}{{ T.streak_days }}
+      </p>
+    {% endif %}
+  </div>
+  <div class="rank-widget">
+    <div class="rank-row">
+      <div class="rank-badge" style="background: {{ stats.rank[4] }};">{{ stats.rank[2][0] }}</div>
+      <div>
+        <div class="rank-name">{{ stats.rank[2] if lang == 'ja' else stats.rank[3] }}</div>
+        <div class="rank-xp">{{ T.xp }}: {{ stats.xp }}</div>
+      </div>
+    </div>
+    {% if stats.next_rank %}
+      <div class="xp-bar"><div style="width: {{ ((stats.xp - stats.rank[1]) / (stats.next_rank[1] - stats.rank[1]) * 100)|round(1) }}%;"></div></div>
+      <div class="xp-next">{{ T.next_rank }}: {{ stats.next_rank[1] - stats.xp }} XP ({{ stats.next_rank[2] if lang == 'ja' else stats.next_rank[3] }})</div>
+    {% else %}
+      <div class="xp-next">{{ T.rank }} MAX</div>
+    {% endif %}
+  </div>
 </div>
 
 <div class="actions-grid">
   <a class="action-card" href="/classes">
-    <div class="ic">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path>
-      </svg>
-    </div>
+    <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg></div>
     <div class="t">{{ T.act_browse_title }}</div>
     <div class="d">{{ T.act_browse_desc }}</div>
   </a>
   <a class="action-card" href="/join_class">
-    <div class="ic">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 2l-2 2m-7.6 7.6a5 5 0 1 0-7 7 5 5 0 0 0 7-7zm0 0L15 8m0 0 3 3m-3-3 3-3m-3 3-3-3"></path>
-      </svg>
-    </div>
+    <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.6 7.6a5 5 0 1 0-7 7 5 5 0 0 0 7-7zm0 0L15 8m0 0 3 3m-3-3 3-3m-3 3-3-3"></path></svg></div>
     <div class="t">{{ T.act_join_title }}</div>
     <div class="d">{{ T.act_join_desc }}</div>
   </a>
   <a class="action-card" href="/create_class">
-    <div class="ic">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M22 10 12 5 2 10l10 5 10-5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path>
-      </svg>
-    </div>
+    <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg></div>
     <div class="t">{{ T.act_teach_title }}</div>
     <div class="d">{{ T.act_teach_desc }}</div>
   </a>
-  <a class="action-card" href="/u/{{ user.id }}">
-    <div class="ic">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path>
-      </svg>
-    </div>
-    <div class="t">{{ T.act_profile_title }}</div>
-    <div class="d">{{ T.act_profile_desc }}</div>
+  <a class="action-card" href="/badges">
+    <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"></circle><path d="m8 14-2 8 6-3 6 3-2-8"></path></svg></div>
+    <div class="t">{{ T.badges }}</div>
+    <div class="d">{{ T.badges_earned }}: {{ stats and stats.helpful >= 0 and '' }}{{ earned_badges_count }}</div>
   </a>
 </div>
+
+{% if weekly and weekly|length > 0 %}
+<div class="section-h">{{ T.weekly_section }}</div>
+{% for w in weekly %}
+<a class="weekly-card" href="/class/{{ w.id }}">
+  <div>
+    <div class="ttl"><span class="weekly-pill">{{ T.weekly_badge }}</span>{{ w.title }}</div>
+    <div class="mt">{{ w.subject }} / {{ w.teacher_name }}{% if w.weekly_time %} · {{ w.weekly_time }}{% endif %}</div>
+  </div>
+  <span class="btn sm ghost">{{ T.open }}</span>
+</a>
+{% endfor %}
+{% endif %}
 
 {% if pending_count > 0 %}
 <div class="section-h">{{ T.pending_requests }} <span class="badge-count">{{ pending_count }}</span></div>
 {% for r in pending %}
 <div class="req-row">
-  <div>
-    <div class="who">{{ r.user_name }}</div>
-    <div class="cls">{{ r.class_title }}</div>
-  </div>
+  <div><div class="who">{{ r.user_name }}</div><div class="cls">{{ r.class_title }}</div></div>
   <div style="display:flex;gap:6px;">
-    <form method="post" action="/requests/{{ r.id }}/approve">
-      <button class="btn sm green" type="submit">{{ T.approve }}</button>
-    </form>
-    <form method="post" action="/requests/{{ r.id }}/reject">
-      <button class="btn sm ghost" type="submit">{{ T.reject }}</button>
-    </form>
+    <form method="post" action="/requests/{{ r.id }}/approve"><button class="btn sm green" type="submit">{{ T.approve }}</button></form>
+    <form method="post" action="/requests/{{ r.id }}/reject"><button class="btn sm ghost" type="submit">{{ T.reject }}</button></form>
   </div>
 </div>
 {% endfor %}
@@ -138,6 +163,7 @@
   {% for c in classes %}
   <a class="class-item" href="/class/{{ c.id }}">
     <div class="title">
+      {% if c.is_weekly %}<span class="weekly-pill">{{ T.weekly_badge }}</span>{% endif %}
       {{ c.title }}
       <span class="pill {{ 'teacher' if c.role == 'teacher' else 'student' }}">{{ T[c.role] if c.role in ['teacher','student'] else c.role }}</span>
     </div>
@@ -146,12 +172,7 @@
   {% endfor %}
 {% else %}
   <div class="empty-card">
-    <div class="ic">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-      </svg>
-    </div>
+    <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg></div>
     <div class="t">{{ T.empty_title }}</div>
     <div class="muted">{{ T.empty_desc }}</div>
   </div>

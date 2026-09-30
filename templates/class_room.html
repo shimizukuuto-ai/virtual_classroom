@@ -41,8 +41,8 @@ main { padding: 16px 20px; }
   display: inline-block; padding: 2px 8px; border-radius: 10px;
   font-size: 10px; font-weight: 700; letter-spacing: .05em;
 }
-.hud .role-badge.teacher { background: var(--teacher-soft); color: #92400e; }
-.hud .role-badge.student { background: var(--student-soft); color: #047857; }
+.hud .role-badge.teacher { background: #fef3c7; color: #92400e; }
+.hud .role-badge.student { background: #d1fae5; color: #047857; }
 .hint {
   position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
   background: rgba(15,17,23,.75); backdrop-filter: blur(8px);
@@ -82,8 +82,8 @@ main { padding: 16px 20px; }
   cursor: pointer; font-weight: 600; transition: all .15s;
 }
 .stage-controls button:hover { background: #2a2e3a; color: #fff; }
-.stage-controls button.add { background: var(--primary); border-color: var(--primary); color: #fff; }
-.stage-controls button.add:hover { background: var(--primary-hover); }
+.stage-controls button.add { background: #6366f1; border-color: #6366f1; color: #fff; }
+.stage-controls button.add:hover { background: #4f46e5; }
 .stage-steps { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
 .stage-step {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
@@ -97,9 +97,9 @@ main { padding: 16px 20px; }
   font-weight: 600; letter-spacing: .02em;
 }
 .stage-step.done { opacity: .7; }
-.stage-step.done .dot { background: var(--student); }
+.stage-step.done .dot { background: #10b981; }
 .stage-step.current { opacity: 1; background: rgba(99,102,241,.15); }
-.stage-step.current .dot { background: var(--primary); box-shadow: 0 0 0 5px rgba(99,102,241,.2); }
+.stage-step.current .dot { background: #6366f1; box-shadow: 0 0 0 5px rgba(99,102,241,.2); }
 .stage-step.current .label { color: #fff; font-weight: 700; }
 .stage-step .step-del {
   position: absolute; top: 0; right: 4px;
@@ -108,7 +108,7 @@ main { padding: 16px 20px; }
   display: none;
 }
 .stage-step:hover .step-del { display: block; }
-.stage-step .step-del:hover { color: var(--danger); }
+.stage-step .step-del:hover { color: #ef4444; }
 
 .side {
   background: #1a1d26; border: 1px solid #2a2e3a;
@@ -138,10 +138,10 @@ main { padding: 16px 20px; }
   letter-spacing: .02em; transition: color .15s;
 }
 .side-tab:hover { color: #cbd5e1; }
-.side-tab.active { color: var(--primary); }
+.side-tab.active { color: #6366f1; }
 .side-tab.active::after {
   content: ""; position: absolute; bottom: -1px; left: 0; right: 0;
-  height: 2px; background: var(--primary);
+  height: 2px; background: #6366f1;
 }
 
 .side-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
@@ -178,17 +178,17 @@ main { padding: 16px 20px; }
   transition: all .15s;
 }
 .msg .helpful-btn:hover {
-  background: rgba(16,185,129,.15); border-color: var(--student);
-  color: var(--student);
+  background: rgba(16,185,129,.15); border-color: #10b981;
+  color: #10b981;
 }
 .msg .helpful-btn.done {
-  background: rgba(16,185,129,.15); border-color: var(--student);
-  color: var(--student); cursor: default;
+  background: rgba(16,185,129,.15); border-color: #10b981;
+  color: #10b981; cursor: default;
 }
 .jump-latest-btn {
   display: none; margin: 6px auto 0; padding: 5px 14px;
   font-size: 11px; border-radius: 14px; border: none;
-  background: var(--primary); color: #fff; cursor: pointer;
+  background: #6366f1; color: #fff; cursor: pointer;
   font-weight: 600;
 }
 .jump-latest-btn.show { display: block; }
@@ -221,12 +221,12 @@ main { padding: 16px 20px; }
 }
 .q-body { font-size: 13px; line-height: 1.6; color: #e5e7eb; white-space: pre-wrap; }
 .q-a {
-  background: rgba(16,185,129,.08); border-left: 3px solid var(--student);
+  background: rgba(16,185,129,.08); border-left: 3px solid #10b981;
   padding: 10px 12px; border-radius: 8px; margin-top: 10px;
   font-size: 12px; color: #d1fae5; white-space: pre-wrap;
 }
 .q-a .q-a-meta {
-  font-size: 10px; color: var(--student); margin-bottom: 4px;
+  font-size: 10px; color: #10b981; margin-bottom: 4px;
   font-weight: 700; letter-spacing: .03em;
 }
 .q-answer-input {
@@ -239,7 +239,7 @@ main { padding: 16px 20px; }
   background: transparent; color: #6b7280; border: none;
   cursor: pointer; font-size: 11px; padding: 2px 6px;
 }
-.q-delete:hover { color: var(--danger); }
+.q-delete:hover { color: #ef4444; }
 
 .member-grid { display: flex; flex-direction: column; gap: 8px; }
 .member-card {
@@ -247,7 +247,7 @@ main { padding: 16px 20px; }
   border-radius: 10px; padding: 12px 14px;
   display: flex; justify-content: space-between; align-items: center;
 }
-.member-card-teacher { border-left: 3px solid var(--teacher); }
+.member-card-teacher { border-left: 3px solid #f59e0b; }
 .member-card_name { font-size: 13px; font-weight: 700; color: #e5e7eb; }
 .member-card_role { font-size: 11px; color: #6b7280; margin-top: 2px; }
 .member-card .actions { display: flex; gap: 4px; }
@@ -256,9 +256,9 @@ main { padding: 16px 20px; }
   border: 1px solid #2a2e3a; background: #15171f; color: #9ca3af;
   cursor: pointer; font-weight: 600;
 }
-.member-card .actions button.kick:hover { color: var(--teacher); border-color: var(--teacher); }
-.member-card .actions button.ban:hover { color: var(--danger); border-color: var(--danger); }
-.member-card .actions button.unban:hover { color: var(--student); border-color: var(--student); }
+.member-card .actions button.kick:hover { color: #f59e0b; border-color: #f59e0b; }
+.member-card .actions button.ban:hover { color: #ef4444; border-color: #ef4444; }
+.member-card .actions button.unban:hover { color: #10b981; border-color: #10b981; }
 
 .t-ctrl {
   padding: 14px 20px; border-bottom: 1px solid #2a2e3a;
@@ -271,12 +271,12 @@ main { padding: 16px 20px; }
   font-size: 12px; font-weight: 600; transition: all .15s;
 }
 .t-ctrl button:hover { background: #2a2e3a; }
-.t-ctrl button.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
-.t-ctrl button.danger:hover { color: var(--danger); border-color: var(--danger); }
+.t-ctrl button.primary { background: #6366f1; border-color: #6366f1; color: #fff; }
+.t-ctrl button.danger:hover { color: #ef4444; border-color: #ef4444; }
 
 .drawer {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 100;
-  background: #1a1d26; border-top: 3px solid var(--primary);
+  background: #1a1d26; border-top: 3px solid #6366f1;
   padding: 20px; transform: translateY(110%);
   transition: transform .25s; max-height: 70vh; overflow-y: auto;
   box-shadow: 0 -12px 40px rgba(0,0,0,.6);
@@ -295,7 +295,7 @@ main { padding: 16px 20px; }
 
 .side-tab.has-unread::before {
   content: ""; position: absolute; top: 8px; right: 8px;
-  width: 6px; height: 6px; border-radius: 50%; background: var(--danger);
+  width: 6px; height: 6px; border-radius: 50%; background: #ef4444;
 }
 </style>
 
@@ -372,6 +372,10 @@ main { padding: 16px 20px; }
       <button id="btn-hand" class="primary" style="width:100%;">{{ T.raise_hand }}</button>
     </div>
     {% endif %}
+
+    <div class="t-ctrl">
+      <button id="btn-card-open">{{ T.create_card }}</button>
+    </div>
 
     <div class="side-tabs">
       <button class="side-tab active" data-tab="board">{{ T.blackboard }}</button>
@@ -459,6 +463,15 @@ main { padding: 16px 20px; }
   </div>
 </div>
 
+<div class="drawer" id="card-drawer">
+  <h3>{{ T.learning_card }}</h3>
+  <textarea id="card-textarea" placeholder="{{ T.card_placeholder }}"></textarea>
+  <div style="display:flex;gap:8px;margin-top:12px;">
+    <button id="card-save" class="btn green">{{ T.save }}</button>
+    <button id="card-cancel" class="btn ghost" style="background:#232733;color:#e5e7eb;border-color:#2a2e3a;">{{ T.cancel }}</button>
+  </div>
+</div>
+
 <script>
 window.I18N = {
   system: {{ T.system|tojson }},
@@ -489,18 +502,20 @@ window.I18N = {
   step_name_prompt: {{ T.step_name_prompt|tojson }},
   confirm_delete_step: {{ T.confirm_delete_step|tojson }},
   uploading: {{ T.uploading|tojson }},
-  reset_view: {{ T.reset_view|tojson }}
+  card_made: {{ T.card_made|tojson }}
 };
 window.CLASS_ID = {{ cls.id }};
 window.ROLE = {{ role|tojson }};
 window.USER_NAME = {{ user.name|tojson }};
+window.CLASS_TITLE = {{ cls.title|tojson }};
+window.CLASS_SUBJECT = {{ cls.subject|tojson }};
 window.INITIAL_BB = {{ (cls.blackboard or '')|tojson }};
 window.TEACHER_DISPLAY_NAME = {{ (cls.taught_by or T.teacher)|tojson }};
 window.STEPS = [
   {% for s in steps %}{id: {{ s.id }}, title: {{ s.title|tojson }}},{% endfor %}
 ];
 window.MEMBERS = [
-  {% for m in members %}{id: {{ m.user_id }}, name: {{ m.name|tojson }}, role: {{ m.role|tojson }}},{% endfor %}
+  {% for m in members %}{id: {{ m.user_id }}, name: {{ m.name|tojson }}, role: {{ m.role|tojson }}, skin: {{ (m.skin or 'default')|tojson }}},{% endfor %}
 ];
 window.INITIAL_QUESTIONS = [
   {% for q in questions %}{
@@ -902,6 +917,30 @@ window.INITIAL_MESSAGES = [
 
   const rv = document.getElementById("btn-reset-view");
   if (rv) rv.addEventListener("click", () => { window._resetCamera && window._resetCamera(); });
+
+  const cardDrawer = document.getElementById("card-drawer");
+  const cardTextarea = document.getElementById("card-textarea");
+  const cardOpen = document.getElementById("btn-card-open");
+  if (cardOpen) cardOpen.addEventListener("click", () => {
+    cardTextarea.value = "#VirtualClassroom\n" + (window.CLASS_TITLE || "") + " (" + (window.CLASS_SUBJECT || "") + ")\n\n";
+    cardDrawer.classList.add("open");
+  });
+  const cardCancel = document.getElementById("card-cancel");
+  if (cardCancel) cardCancel.addEventListener("click", () => cardDrawer.classList.remove("open"));
+  const cardSave = document.getElementById("card-save");
+  if (cardSave) cardSave.addEventListener("click", async () => {
+    const content = cardTextarea.value.trim();
+    if (!content) return;
+    const res = await fetch('/card/' + CLASS_ID, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content })
+    });
+    if (res.ok) {
+      cardDrawer.classList.remove("open");
+      statusEl.textContent = I18N.card_made;
+      setTimeout(() => { statusEl.textContent = ""; }, 2000);
+    }
+  });
 })();
 </script>
 
@@ -1206,7 +1245,42 @@ window.INITIAL_MESSAGES = [
       return sp;
     }
 
-    function createCharacter({ color, skin = 0xffd8b0, name = "", seated = false }) {
+    function addSkinAccessory(group, head, skinKey, seated) {
+      if (skinKey === "glasses") {
+        const gm = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4 });
+        [-0.11, 0.11].forEach(x => {
+          const lens = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.012, 8, 16), gm);
+          lens.position.set(x, head.position.y + 0.02, 0.29);
+          group.add(lens);
+        });
+      } else if (skinKey === "hat") {
+        const hm = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 });
+        const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.03, 24), hm);
+        brim.position.set(0, head.position.y + 0.28, 0);
+        const top = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.28, 0.22, 24), hm);
+        top.position.set(0, head.position.y + 0.4, 0);
+        group.add(brim, top);
+      } else if (skinKey === "robe") {
+        const rm = new THREE.MeshStandardMaterial({ color: 0x4c1d95, roughness: 0.6 });
+        const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.55, 0.95, 16), rm);
+        robe.position.y = seated ? 0.5 : 0.65;
+        robe.castShadow = true; group.add(robe);
+      } else if (skinKey === "crown") {
+        const cm = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.3, metalness: 0.6 });
+        const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.14, 8), cm);
+        crown.position.set(0, head.position.y + 0.36, 0);
+        group.add(crown);
+      } else if (skinKey === "aura") {
+        const aura = new THREE.Mesh(
+          new THREE.SphereGeometry(0.6, 16, 16),
+          new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.18 })
+        );
+        aura.position.y = seated ? 0.6 : 0.75;
+        group.add(aura);
+      }
+    }
+
+    function createCharacter({ color, skinColor = 0xffd8b0, name = "", seated = false, skinKey = "default" }) {
       const g = new THREE.Group();
       const body = new THREE.Mesh(
         new THREE.CylinderGeometry(0.28, 0.34, 0.6, 16),
@@ -1216,7 +1290,7 @@ window.INITIAL_MESSAGES = [
       body.castShadow = true; g.add(body);
       const head = new THREE.Mesh(
         new THREE.SphereGeometry(0.32, 24, 24),
-        new THREE.MeshStandardMaterial({ color: skin, roughness: 0.55 })
+        new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.55 })
       );
       head.position.y = seated ? 1.1 : 1.25;
       head.castShadow = true; g.add(head);
@@ -1226,12 +1300,16 @@ window.INITIAL_MESSAGES = [
       );
       hair.position.copy(head.position); hair.position.y += 0.02;
       g.add(hair);
+
+      addSkinAccessory(g, head, skinKey, seated);
+
       const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
       const eyeGeo = new THREE.SphereGeometry(0.05, 12, 12);
       const eyeY = head.position.y + 0.02;
       const lEye = new THREE.Mesh(eyeGeo, eyeMat); lEye.position.set(-0.11, eyeY, 0.28);
       const rEye = new THREE.Mesh(eyeGeo, eyeMat); rEye.position.set(0.11, eyeY, 0.28);
       g.add(lEye, rEye);
+
       const armMat = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
       const armGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.55, 8);
       const armY = seated ? 0.6 : 0.72;
@@ -1240,6 +1318,7 @@ window.INITIAL_MESSAGES = [
       const rArm = new THREE.Mesh(armGeo, armMat);
       rArm.position.set(0.36, armY, 0); rArm.rotation.z = -0.3; rArm.castShadow = true;
       g.add(lArm, rArm);
+
       if (!seated) {
         const legMat = new THREE.MeshStandardMaterial({ color: 0x333a4a, roughness: 0.8 });
         const legGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.42, 8);
@@ -1249,11 +1328,13 @@ window.INITIAL_MESSAGES = [
         rLeg.position.set(0.12, 0.21, 0); rLeg.castShadow = true;
         g.add(lLeg, rLeg);
       }
+
       if (name) {
         const sp = makeNameSprite(name);
         sp.position.y = seated ? 1.72 : 1.9;
         g.add(sp);
       }
+
       g.userData = {
         rArm, lArm, baseRotZ: { l: 0.3, r: -0.3 },
         handRaised: false, highlight: 0, baseY: g.position.y,
@@ -1261,7 +1342,16 @@ window.INITIAL_MESSAGES = [
       return g;
     }
 
-    const teacher = createCharacter({ color: 0x3b82f6, name: TEACHER_DISPLAY_NAME, seated: false });
+    const SKIN_COLORS = {
+      default: 0x3b82f6, glasses: 0x6366f1, hat: 0xf59e0b,
+      robe: 0x8b5cf6, crown: 0xfbbf24, aura: 0xef4444
+    };
+    const teacherMember = MEMBERS.find(m => m.role === "teacher");
+    const teacherSkin = (teacherMember && teacherMember.skin) || "default";
+    const teacherColor = SKIN_COLORS[teacherSkin] || 0x3b82f6;
+    const teacher = createCharacter({
+      color: teacherColor, name: TEACHER_DISPLAY_NAME, seated: false, skinKey: teacherSkin
+    });
     teacher.position.set(0, 0.15, -4.8);
     teacher.rotation.y = Math.PI;
     scene.add(teacher);
@@ -1317,9 +1407,9 @@ window.INITIAL_MESSAGES = [
       const p = positions[i];
       const desk = createDesk(); desk.position.set(p.x, 0.15, p.z); scene.add(desk);
       const chair = createChair(); chair.position.set(p.x, 0.15, p.z + 0.9); scene.add(chair);
+      const stuColor = SKIN_COLORS[m.skin] || studentColors[i % studentColors.length];
       const stu = createCharacter({
-        color: studentColors[i % studentColors.length],
-        name: m.name, seated: true
+        color: stuColor, name: m.name, seated: true, skinKey: m.skin || "default"
       });
       stu.position.set(p.x, 0.15, p.z + 0.9);
       scene.add(stu);
@@ -1360,6 +1450,7 @@ window.INITIAL_MESSAGES = [
       renderer.setSize(w, h);
     });
   } catch (e) {
+    console.error(e);
     container.innerHTML = '<div class="threed-fallback">' + I18N.threed_fallback + '</div>';
   }
 })();

@@ -30,6 +30,13 @@
     <label>{{ T.description }}</label>
     <textarea name="description" rows="3" placeholder="{{ T.ph_description }}"></textarea>
 
+    <label>{{ T.weekly_class }}</label>
+<select name="is_weekly">
+  <option value="0">通常クラス</option>
+  <option value="1">{{ T.make_weekly }}</option>
+</select>
+<input type="text" name="weekly_time" placeholder="{{ T.weekly_time }}">
+
     <label>{{ T.visibility_label }}</label>
     <select name="is_public">
       <option value="1">{{ T.public_yes }}</option>

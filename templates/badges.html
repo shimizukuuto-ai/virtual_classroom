@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}{{ T.badges }} - {{ T.app_title }}{% endblock %}
+{% block content %}
+<style>
+.rank-hero {
+  background: linear-gradient(135deg, {{ stats.rank[4] }}, {{ stats.rank[4] }}cc);
+  border-radius: var(--radius-lg); padding: 28px; color: #fff;
+  margin-bottom: 20px; position: relative; overflow: hidden;
+}
+.rank-hero::after {
+  content: ""; position: absolute; right: -80px; top: -80px;
+  width: 240px; height: 240px; border-radius: 50%; background: rgba(255,255,255,.12);
+}
+.rank-hero h1 { margin: 0 0 4px; font-size: 30px; font-weight: 800; letter-spacing: -.02em; }
+.rank-hero .xp { font-size: 14px; opacity: .9; }
+.xp-bar-lg { height: 8px; background: rgba(255,255,255,.25); border-radius: 4px; overflow: hidden; margin-top: 14px; max-width: 400px; }
+.xp-bar-lg > div { height: 100%; background: #fff; }
+
+.section-h {
+  font-size: 12px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .08em;
+  margin: 28px 0 12px;
+}
+.badges-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+.badge-card {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 16px 12px; text-align: center;
+  transition: all .15s;
+}
+.badge-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.badge-card.earned { border-color: var(--primary); background: var(--primary-soft); }
+.badge-card.locked { opacity: .55; }
+.badge-icon {
+  width: 48px; height: 48px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 8px; font-size: 20px;
+  background: var(--primary-soft); color: var(--primary);
+}
+.badge-card.earned .badge-icon { background: var(--primary); color: #fff; }
+.badge-card.locked .badge-icon { background: var(--surface-2); color: var(--text-soft); }
+.badge-name { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+.badge-desc { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+
+.skins-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+.skin-card {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 18px; text-align: center;
+  transition: all .15s;
+}
+.skin-card.equipped { border-color: var(--primary); background: var(--primary-soft); }
+.skin-card.locked { opacity: .55; }
+.skin-swatch {
+  width: 56px; height: 56px; border-radius: 50%;
+  margin: 0 auto 12px; box-shadow: 0 4px 12px rgba(0,0,0,.15);
+}
+.skin-name { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+.skin-req { font-size: 11px; color: var(--text-muted); }
+</style>
+
+<div class="rank-hero">
+  <h1>{{ stats.rank[2] if lang == 'ja' else stats.rank[3] }}</h1>
+  <div class="xp">{{ T.xp }}: {{ stats.xp }} / {{ stats.rank[1] }} XP
+    {% if stats.next_rank %}&nbsp;·&nbsp;{{ T.next_rank }}: {{ stats.next_rank[2] if lang == 'ja' else stats.next_rank[3] }}{% endif %}
+  </div>
+  {% if stats.next_rank %}
+    <div class="xp-bar-lg">
+      <div style="width: {{ ((stats.xp - stats.rank[1]) / (stats.next_rank[1] - stats.rank[1]) * 100)|round(1) }}%;"></div>
+    </div>
+  {% endif %}
+</div>
+
+<div class="section-h">{{ T.streak }}: {{ streak }}{{ T.streak_days }}</div>
+
+<h2 style="font-size:17px;font-weight:800;margin:24px 0 12px;">{{ T.badges_earned }}</h2>
+<div class="badges-grid">
+  {% for key, info in BADGES.items() %}
+    {% set earned = key in earned_keys %}
+    <div class="badge-card {{ 'earned' if earned else 'locked' }}">
+      <div class="badge-icon">
+        {% if earned %}★{% else %}☆{% endif %}
+      </div>
+      <div class="badge-name">{{ info[0] if lang == 'ja' else info[1] }}</div>
+      <div class="badge-desc">{{ info[2] if lang == 'ja' else info[3] }}</div>
+    </div>
+  {% endfor %}
+</div>
+
+<h2 style="font-size:17px;font-weight:800;margin:32px 0 12px;">{{ T.skins }}</h2>
+<div class="skins-grid">
+  {% for key, info in SKINS.items() %}
+    {% set unlocked = stats.xp >= info[2] %}
+    {% set equipped = user.skin == key %}
+    <div class="skin-card {{ 'equipped' if equipped else '' }} {{ 'locked' if not unlocked else '' }}">
+      <div class="skin-swatch" style="background: #{{ info[3][2:] }};"></div>
+      <div class="skin-name">{{ info[0] if lang == 'ja' else info[1] }}</div>
+      <div class="skin-req">
+        {% if equipped %}{{ T.skin_equipped }}
+        {% elif unlocked %}
+          <form method="post" action="/skin/{{ key }}" style="margin-top:6px;">
+            <button class="btn sm" type="submit">{{ T.skin_apply }}</button>
+          </form>
+        {% else %}
+          {{ T.skin_locked }} ({{ info[2] }} XP)
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

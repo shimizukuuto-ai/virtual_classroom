@@ -183,10 +183,11 @@ textarea { resize: vertical; min-height: 80px; }
     <span>{{ T.app_title }}</span>
   </a>
   <nav>
-    {% if user %}
+        {% if user %}
       <a href="/dashboard">{{ T.home }}</a>
       <a href="/classes">{{ T.join_class }}</a>
-      <a href="/u/{{ user.id }}" style="display:flex;align-items:center;">
+      <a href="/badges">{{ T.badges }}</a>
+      <a href="/u/{{ user.id }}" style="display:flex;align-items:center;gap:6px;">
         <span class="avatar">{{ user.name[0]|upper }}</span>
         <span>{{ user.name }}</span>
       </a>
