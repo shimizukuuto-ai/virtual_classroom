@@ -20,6 +20,7 @@ main { padding: 16px 20px; }
   box-shadow: 0 12px 40px rgba(0,0,0,.5);
   cursor: grab;
   background: linear-gradient(180deg, #7fb5e6 0%, #a8cfee 45%, #cfc3f4 80%, #e8f1f8 100%);
+  touch-action: none;
 }
 #canvas-container:active { cursor: grabbing; }
 .hud {
@@ -83,7 +84,6 @@ main { padding: 16px 20px; }
 }
 .stage-controls button:hover { background: #2a2e3a; color: #fff; }
 .stage-controls button.add { background: #6366f1; border-color: #6366f1; color: #fff; }
-.stage-controls button.add:hover { background: #4f46e5; }
 .stage-steps { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
 .stage-step {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
@@ -299,21 +299,16 @@ main { padding: 16px 20px; }
   .hud { padding: 8px 10px; font-size: 11px; max-width: 200px; top: 10px; left: 10px; }
   .hud h2 { font-size: 13px; }
   .hud .meta { font-size: 10px; }
-  .hud code { font-size: 10px; padding: 1px 5px; }
   .reset-view-btn { padding: 6px 10px; font-size: 11px; top: 10px; right: 10px; }
   .hint { font-size: 10px; padding: 4px 10px; bottom: 10px; }
   .stage-bar-dark { padding: 10px 12px; margin-top: 10px; }
   .stage-step { min-width: 60px; }
-  .stage-step .label { font-size: 9px; }
-  .stage-controls button { padding: 5px 9px; font-size: 11px; }
   .side { height: auto; min-height: 0; max-height: none; }
   .side-info { padding: 12px 16px; }
   .t-ctrl { padding: 10px 14px; }
   .side-tabs .side-tab { padding: 10px 6px; font-size: 11px; }
   .pane { padding: 12px 14px; }
   .bb-wrap { min-height: 160px; font-size: 13px; padding: 12px 14px; }
-  .drawer { padding: 14px; }
-  .drawer textarea { min-height: 180px; font-size: 13px; }
 }
 </style>
 
@@ -549,13 +544,6 @@ window.INITIAL_QUESTIONS = [
     answered_at: {{ (q.answered_at or '')|tojson }}
   },{% endfor %}
 ];
-window.INITIAL_MESSAGES = [
-  {% for m in messages %}{
-    id: {{ m.id }}, type: {{ m.sender_type|tojson }},
-    name: {{ m.sender_name|tojson }}, content: {{ m.content|tojson }},
-    helpful: {{ m.helpful_count or 0 }}
-  },{% endfor %}
-];
 </script>
 
 <script>
@@ -567,11 +555,13 @@ window.INITIAL_MESSAGES = [
   const HAND_RAISE_SENTINEL = "_HANDRAISE_";
   const statusEl = document.getElementById("status");
 
+  // ===== TABS =====
   document.querySelectorAll(".side-tab").forEach(tab => {
     tab.addEventListener("click", () => {
       const name = tab.dataset.tab;
       document.querySelectorAll(".side-tab").forEach(t => t.classList.toggle("active", t === tab));
       document.querySelectorAll(".pane").forEach(p => p.classList.toggle("active", p.dataset.pane === name));
+      if (name === "history") loadHistory();
       if (name === "chat") tab.classList.remove("has-unread");
     });
   });
@@ -611,10 +601,12 @@ window.INITIAL_MESSAGES = [
     }
   }
 
+  // ===== MESSAGES =====
   const messagesEl = document.getElementById("messages");
   const jumpBtn = document.getElementById("jump-latest");
   let lastMsgId = 0;
   let lastBlackboardSeen = window.INITIAL_BB;
+  const seenMsgIds = new Set();
 
   function makeMsgEl(m) {
     const div = document.createElement("div");
@@ -635,21 +627,25 @@ window.INITIAL_MESSAGES = [
     return div;
   }
 
-  (window.INITIAL_MESSAGES || []).forEach(m => {
+  function appendMessage(m) {
+    if (seenMsgIds.has(m.id)) return false;
+    seenMsgIds.add(m.id);
     messagesEl.appendChild(makeMsgEl(m));
     if (m.id > lastMsgId) lastMsgId = m.id;
-  });
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+    return true;
+  }
 
   messagesEl.addEventListener("click", async (e) => {
     const btn = e.target.closest(".helpful-btn");
     if (!btn || btn.classList.contains("done")) return;
     const mid = btn.dataset.mid;
-    const res = await fetch('/api/helpful/' + CLASS_ID + '/' + mid, { method: "POST" });
-    if (!res.ok) return;
-    const d = await res.json();
-    btn.querySelector(".hc").textContent = d.count;
-    btn.classList.add("done");
+    try {
+      const res = await fetch('/api/helpful/' + CLASS_ID + '/' + mid, { method: "POST" });
+      if (!res.ok) return;
+      const d = await res.json();
+      btn.querySelector(".hc").textContent = d.count;
+      btn.classList.add("done");
+    } catch (err) {}
   });
 
   function notifyChatBadge() {
@@ -662,6 +658,7 @@ window.INITIAL_MESSAGES = [
     jumpBtn.classList.remove("show");
   });
 
+  // ===== Q&A =====
   const qaList = document.getElementById("qa-list");
   function renderQuestions(items) {
     if (!qaList) return;
@@ -696,16 +693,17 @@ window.INITIAL_MESSAGES = [
     const anon = document.getElementById("qa-anon").checked;
     const content = input.value.trim();
     if (!content) return;
-    const res = await fetch('/api/questions/' + CLASS_ID, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content, anonymous: anon })
-    });
-    if (res.ok) { input.value = ""; await poll(); }
-    else {
-      const d = await res.json().catch(() => ({}));
-      statusEl.textContent = I18N.error + ": " + (d.error || res.status);
-    }
+    try {
+      const res = await fetch('/api/questions/' + CLASS_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, anonymous: anon })
+      });
+      if (res.ok) { input.value = ""; await pollNow(); }
+      else {
+        const d = await res.json().catch(() => ({}));
+        statusEl.textContent = I18N.error + ": " + (d.error || res.status);
+      }
+    } catch (err) {}
   });
 
   if (qaList) qaList.addEventListener("click", async (e) => {
@@ -714,19 +712,24 @@ window.INITIAL_MESSAGES = [
       const ta = qaList.querySelector('.qa-answer-input[data-qid="' + qid + '"]');
       const ans = ta.value.trim();
       if (!ans) return;
-      const res = await fetch('/api/questions/' + CLASS_ID + '/' + qid + '/answer', {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answer: ans })
-      });
-      if (res.ok) await poll();
+      try {
+        const res = await fetch('/api/questions/' + CLASS_ID + '/' + qid + '/answer', {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ answer: ans })
+        });
+        if (res.ok) await pollNow();
+      } catch (err) {}
     } else if (e.target.classList.contains("q-delete")) {
       if (!confirm(I18N.qa_confirm_delete)) return;
       const qid = e.target.dataset.qid;
-      const res = await fetch('/api/questions/' + CLASS_ID + '/' + qid + '/delete', { method: "POST" });
-      if (res.ok) await poll();
+      try {
+        const res = await fetch('/api/questions/' + CLASS_ID + '/' + qid + '/delete', { method: "POST" });
+        if (res.ok) await pollNow();
+      } catch (err) {}
     }
   });
 
+  // ===== MEMBERS kick/ban/unban =====
   document.addEventListener("click", async (e) => {
     const kick = e.target.closest("button.kick");
     const ban = e.target.closest("button.ban");
@@ -734,32 +737,42 @@ window.INITIAL_MESSAGES = [
     if (kick) {
       if (!confirm(I18N.confirm_kick)) return;
       const uid = kick.dataset.uid;
-      const res = await fetch('/api/kick/' + CLASS_ID + '/' + uid, { method: "POST" });
-      if (res.ok) location.reload();
+      try {
+        const res = await fetch('/api/kick/' + CLASS_ID + '/' + uid, { method: "POST" });
+        if (res.ok) location.reload();
+      } catch (err) {}
     } else if (ban) {
       if (!confirm(I18N.confirm_ban)) return;
       const uid = ban.dataset.uid;
       const reason = prompt(I18N.reason_label) || "";
-      const res = await fetch('/api/ban/' + CLASS_ID + '/' + uid, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason })
-      });
-      if (res.ok) location.reload();
+      try {
+        const res = await fetch('/api/ban/' + CLASS_ID + '/' + uid, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason })
+        });
+        if (res.ok) location.reload();
+      } catch (err) {}
     } else if (unban) {
       const uid = unban.dataset.uid;
-      const res = await fetch('/api/unban/' + CLASS_ID + '/' + uid, { method: "POST" });
-      if (res.ok) location.reload();
+      try {
+        const res = await fetch('/api/unban/' + CLASS_ID + '/' + uid, { method: "POST" });
+        if (res.ok) location.reload();
+      } catch (err) {}
     }
   });
 
+  // ===== POLLING (setTimeout chain + inFlight guard) =====
+  let pollTimer = null;
+  let pollInFlight = false;
   let lastQuestionsKey = "";
   function questionsKey(items) { return items.map(q => q.id + ":" + (q.answer || "").length).join(","); }
   lastQuestionsKey = questionsKey(window.INITIAL_QUESTIONS || []);
 
-  async function poll() {
+      async function pollNow() {
+    if (pollInFlight) return;
+    pollInFlight = true;
     try {
-      const res = await fetch('/api/poll/' + CLASS_ID, { method: "POST" });
-      if (!res.ok) return;
+      const res = await fetch('/api/poll/' + CLASS_ID + '?since_id=' + lastMsgId, { method: "POST" });
       const d = await res.json();
 
       if (d.blackboard !== lastBlackboardSeen) {
@@ -768,26 +781,14 @@ window.INITIAL_MESSAGES = [
         if (window._3d && window._3d.drawBlackboardText) window._3d.drawBlackboardText(d.blackboard);
       }
       if (typeof d.stage === "number") applyStage(d.stage);
-      if (Array.isArray(d.steps) && d.steps.length !== window.STEPS.length) { location.reload(); return; }
 
       let appended = false;
       for (const m of d.messages) {
-        if (m.id <= lastMsgId) continue;
-        lastMsgId = m.id;
-        appended = true;
+        if (seenMsgIds.has(m.id)) continue;
         if (m.name !== USER_NAME) notifyChatBadge();
-        messagesEl.appendChild(makeMsgEl(m));
-        const threeD = window._3d;
-        if (threeD) {
-          const c = threeD.characterMap[m.name];
-          if (c) {
-            c.userData.highlight = 1.5;
-            if (m.content === HAND_RAISE_SENTINEL) {
-              c.userData.handRaised = true;
-              setTimeout(() => { c.userData.handRaised = false; }, 4000);
-            }
-          }
-        }
+        appendMessage(m);
+        if (window._onMessageFor3D) window._onMessageFor3D(m.name, m.content);
+        appended = true;
       }
       if (appended) {
         const nearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 120;
@@ -799,68 +800,82 @@ window.INITIAL_MESSAGES = [
         const k = questionsKey(d.questions);
         if (k !== lastQuestionsKey) { lastQuestionsKey = k; renderQuestions(d.questions); }
       }
-      if (Array.isArray(d.members) && d.members.length !== (window.MEMBERS||[]).length) location.reload();
-    } catch (e) {}
+    } catch (e) {
+      console.error("poll error:", e);
+    } finally {
+      pollInFlight = false;
+    }
   }
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
-  setInterval(poll, 2500);
 
-  const form = document.getElementById("announce-form");
-  if (form) form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const input = document.getElementById("announce-input");
-    const text = input.value.trim();
-    if (!text) return;
-    input.value = "";
-    try {
-      const res = await fetch('/api/announce/' + CLASS_ID, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text })
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        statusEl.textContent = I18N.error + ": " + (data.error || res.status);
-        return;
-      }
-      await poll();
-    } catch (e) { statusEl.textContent = I18N.error + ": " + e; }
+  function scheduleNextPoll() {
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(async () => {
+      if (document.hidden) { scheduleNextPoll(); return; }
+      await pollNow();
+      scheduleNextPoll();
+    }, 4000);
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) pollNow();
   });
 
+  function scheduleNextPoll() {
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(async () => {
+      if (document.hidden) { scheduleNextPoll(); return; }
+      await pollNow();
+      scheduleNextPoll();
+    }, 4000);
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) pollNow();
+  });
+
+  // ===== BLACKBOARD =====
   const drawer = document.getElementById("bb-drawer");
   const bbTextarea = document.getElementById("bb-textarea");
   const bbOpen = document.getElementById("btn-bb-open");
   if (bbOpen) bbOpen.addEventListener("click", async () => {
-    const res = await fetch('/api/poll/' + CLASS_ID, { method: "POST" });
-    const data = await res.json();
-    bbTextarea.value = data.blackboard || "";
-    drawer.classList.add("open");
+    try {
+      const res = await fetch('/api/poll/' + CLASS_ID, { method: "POST" });
+      const data = await res.json();
+      bbTextarea.value = data.blackboard || "";
+      drawer.classList.add("open");
+    } catch (err) {}
   });
   const bbCancel = document.getElementById("bb-cancel");
   if (bbCancel) bbCancel.addEventListener("click", () => drawer.classList.remove("open"));
   const bbSave = document.getElementById("bb-save");
   if (bbSave) bbSave.addEventListener("click", async () => {
     statusEl.textContent = I18N.save + "...";
-    const res = await fetch('/api/blackboard/' + CLASS_ID, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: bbTextarea.value })
-    });
-    if (res.ok) {
-      lastBlackboardSeen = bbTextarea.value;
-      if (window._3d && window._3d.drawBlackboardText) window._3d.drawBlackboardText(bbTextarea.value);
-      setDirectBB(bbTextarea.value);
-      drawer.classList.remove("open");
-      statusEl.textContent = "";
-    } else statusEl.textContent = I18N.error;
+    try {
+      const res = await fetch('/api/blackboard/' + CLASS_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: bbTextarea.value })
+      });
+      if (res.ok) {
+        lastBlackboardSeen = bbTextarea.value;
+        if (window._3d && window._3d.drawBlackboardText) window._3d.drawBlackboardText(bbTextarea.value);
+        setDirectBB(bbTextarea.value);
+        drawer.classList.remove("open");
+        statusEl.textContent = "";
+      } else statusEl.textContent = I18N.error;
+    } catch (err) { statusEl.textContent = I18N.error; }
   });
   const bbClear = document.getElementById("btn-bb-clear");
   if (bbClear) bbClear.addEventListener("click", async () => {
     if (!confirm(I18N.confirm_clear_blackboard)) return;
-    await fetch('/api/blackboard/clear/' + CLASS_ID, { method: "POST" });
-    lastBlackboardSeen = "";
-    if (window._3d && window._3d.drawBlackboardText) window._3d.drawBlackboardText("");
-    setDirectBB("");
+    try {
+      await fetch('/api/blackboard/clear/' + CLASS_ID, { method: "POST" });
+      lastBlackboardSeen = "";
+      if (window._3d && window._3d.drawBlackboardText) window._3d.drawBlackboardText("");
+      setDirectBB("");
+    } catch (err) {}
   });
 
+  // ===== IMAGE UPLOAD =====
   const imgFile = document.getElementById("img-file");
   const imgBtn = document.getElementById("btn-img-upload");
   if (imgBtn && imgFile) {
@@ -873,44 +888,52 @@ window.INITIAL_MESSAGES = [
         imgFile.value = ""; return;
       }
       statusEl.textContent = I18N.uploading;
-      const fd = new FormData(); fd.append("file", file);
-      const res = await fetch('/api/upload/' + CLASS_ID, { method: "POST", body: fd });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok) { statusEl.textContent = I18N.error + ": " + (d.error || ""); return; }
-      const pollRes = await fetch('/api/poll/' + CLASS_ID, { method: "POST" });
-      const pollData = await pollRes.json();
-      const newBB = (pollData.blackboard || "") + "\n[img]" + d.url + "[/img]\n";
-      const saveRes = await fetch('/api/blackboard/' + CLASS_ID, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: newBB })
-      });
-      if (saveRes.ok) {
-        lastBlackboardSeen = newBB;
-        if (window._3d && window._3d.drawBlackboardText) window._3d.drawBlackboardText(newBB);
-        setDirectBB(newBB);
-        statusEl.textContent = "";
-      } else statusEl.textContent = I18N.error;
+      try {
+        const fd = new FormData(); fd.append("file", file);
+        const res = await fetch('/api/upload/' + CLASS_ID, { method: "POST", body: fd });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) { statusEl.textContent = I18N.error + ": " + (d.error || ""); return; }
+        const pollRes = await fetch('/api/poll/' + CLASS_ID, { method: "POST" });
+        const pollData = await pollRes.json();
+        const newBB = (pollData.blackboard || "") + "\n[img]" + d.url + "[/img]\n";
+        const saveRes = await fetch('/api/blackboard/' + CLASS_ID, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: newBB })
+        });
+        if (saveRes.ok) {
+          lastBlackboardSeen = newBB;
+          if (window._3d && window._3d.drawBlackboardText) window._3d.drawBlackboardText(newBB);
+          setDirectBB(newBB);
+          statusEl.textContent = "";
+        } else statusEl.textContent = I18N.error;
+      } catch (err) { statusEl.textContent = I18N.error; }
       imgFile.value = "";
     });
   }
 
+  // ===== HAND RAISE =====
   const handBtn = document.getElementById("btn-hand");
   if (handBtn) handBtn.addEventListener("click", async () => {
-    await fetch('/api/announce/' + CLASS_ID, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: HAND_RAISE_SENTINEL })
-    });
-    const threeD = window._3d;
-    const me = threeD && threeD.characterMap[USER_NAME];
-    if (me) { me.userData.handRaised = true; setTimeout(() => { me.userData.handRaised = false; }, 4000); }
-    await poll();
+    try {
+      await fetch('/api/announce/' + CLASS_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: HAND_RAISE_SENTINEL })
+      });
+      const threeD = window._3d;
+      const me = threeD && threeD.characterMap[USER_NAME];
+      if (me) { me.userData.handRaised = true; setTimeout(() => { me.userData.handRaised = false; }, 4000); }
+      await pollNow();
+    } catch (err) {}
   });
 
+  // ===== STAGE =====
   const stepPrev = document.getElementById("btn-stage-prev");
   const stepNext = document.getElementById("btn-stage-next");
   async function changeStage(action) {
-    await fetch('/api/step/' + CLASS_ID + '/' + action, { method: "POST" });
-    await poll();
+    try {
+      await fetch('/api/step/' + CLASS_ID + '/' + action, { method: "POST" });
+      await pollNow();
+    } catch (err) {}
   }
   if (stepPrev) stepPrev.addEventListener("click", () => changeStage("prev"));
   if (stepNext) stepNext.addEventListener("click", () => changeStage("next"));
@@ -919,11 +942,13 @@ window.INITIAL_MESSAGES = [
   if (stepAdd) stepAdd.addEventListener("click", async () => {
     const title = prompt(I18N.step_name_prompt);
     if (!title || !title.trim()) return;
-    await fetch('/api/steps/' + CLASS_ID, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: title.trim() })
-    });
-    location.reload();
+    try {
+      await fetch('/api/steps/' + CLASS_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: title.trim() })
+      });
+      location.reload();
+    } catch (err) {}
   });
 
   document.querySelectorAll(".step-del").forEach(btn => {
@@ -931,14 +956,17 @@ window.INITIAL_MESSAGES = [
       e.stopPropagation();
       if (!confirm(I18N.confirm_delete_step)) return;
       const sid = btn.dataset.stepId;
-      await fetch('/api/steps/' + CLASS_ID + '/' + sid + '/delete', { method: "POST" });
-      location.reload();
+      try {
+        await fetch('/api/steps/' + CLASS_ID + '/' + sid + '/delete', { method: "POST" });
+        location.reload();
+      } catch (err) {}
     });
   });
 
   const rv = document.getElementById("btn-reset-view");
   if (rv) rv.addEventListener("click", () => { window._resetCamera && window._resetCamera(); });
 
+  // ===== INVITE LINK =====
   const inviteBtn = document.getElementById("btn-invite");
   if (inviteBtn) inviteBtn.addEventListener("click", () => {
     const url = location.origin + "/invite/" + window.CLASS_JOIN_CODE;
@@ -950,6 +978,7 @@ window.INITIAL_MESSAGES = [
     });
   });
 
+  // ===== LEARNING CARD =====
   const cardDrawer = document.getElementById("card-drawer");
   const cardTextarea = document.getElementById("card-textarea");
   const cardOpen = document.getElementById("btn-card-open");
@@ -963,16 +992,21 @@ window.INITIAL_MESSAGES = [
   if (cardSave) cardSave.addEventListener("click", async () => {
     const content = cardTextarea.value.trim();
     if (!content) return;
-    const res = await fetch('/card/' + CLASS_ID, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content })
-    });
-    if (res.ok) {
-      cardDrawer.classList.remove("open");
-      statusEl.textContent = I18N.card_made;
-      setTimeout(() => { statusEl.textContent = ""; }, 2000);
-    }
+    try {
+      const res = await fetch('/card/' + CLASS_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content })
+      });
+      if (res.ok) {
+        cardDrawer.classList.remove("open");
+        statusEl.textContent = I18N.card_made;
+        setTimeout(() => { statusEl.textContent = ""; }, 2000);
+      }
+    } catch (err) {}
   });
+
+  // ===== INITIAL POLL + SCHEDULE =====
+  pollNow().then(() => scheduleNextPoll());
 })();
 </script>
 
@@ -991,7 +1025,6 @@ window.INITIAL_MESSAGES = [
   const I18N = window.I18N;
   const MEMBERS = window.MEMBERS;
   const TEACHER_DISPLAY_NAME = window.TEACHER_DISPLAY_NAME;
-  const USER_NAME = window.USER_NAME;
 
   let THREE, OrbitControls;
   try {
@@ -1003,267 +1036,277 @@ window.INITIAL_MESSAGES = [
   }
 
   try {
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(55, container.clientWidth / container.clientHeight, 0.1, 300);
-    const CAMERA_START = { pos: [0, 6, 14], target: [0, 1.5, -1] };
-    camera.position.set(...CAMERA_START.pos);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    // ===== RENDERER =====
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
 
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xdfe7f4);
+    scene.fog = new THREE.Fog(0xdfe7f4, 22, 42);
+
+    const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 100);
+    const CAM_START = { pos: [0, 3.2, 7.5], target: [0, 1.2, -1.5] };
+    camera.position.set(...CAM_START.pos);
+
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(...CAMERA_START.target);
+    controls.target.set(...CAM_START.target);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
-    controls.minDistance = 6;
-    controls.maxDistance = 30;
-    controls.maxPolarAngle = Math.PI / 2.2;
-    controls.zoomSpeed = 0.4;
-    controls.dollySpeed = 0.6;
-    controls.rotateSpeed = 0.7;
+    controls.dampingFactor = 0.1;
+    controls.minDistance = 4;
+    controls.maxDistance = 20;
+    controls.maxPolarAngle = Math.PI / 2.15;
+    controls.enablePan = false;
+    controls.zoomSpeed = 0.6;
+    controls.rotateSpeed = 0.6;
     controls.update();
 
     window._resetCamera = () => {
-      camera.position.set(...CAMERA_START.pos);
-      controls.target.set(...CAMERA_START.target);
+      camera.position.set(...CAM_START.pos);
+      controls.target.set(...CAM_START.target);
       controls.update();
     };
 
+    // ===== LIGHTS (compact) =====
     scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-    scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x6b8f3a, 0.7));
-    const sun = new THREE.DirectionalLight(0xfff6dd, 1.0);
-    sun.position.set(10, 20, 12);
+    const hemi = new THREE.HemisphereLight(0xcfe3ff, 0x8b6b4a, 0.55);
+    scene.add(hemi);
+    const sun = new THREE.DirectionalLight(0xfff3d6, 1.1);
+    sun.position.set(6, 12, 8);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.left = -20; sun.shadow.camera.right = 20;
-    sun.shadow.camera.top = 20; sun.shadow.camera.bottom = -20;
-    sun.shadow.bias = -0.0005;
+    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.camera.left = -12; sun.shadow.camera.right = 12;
+    sun.shadow.camera.top = 12; sun.shadow.camera.bottom = -12;
+    sun.shadow.bias = -0.0006;
     scene.add(sun);
 
-    const grassCanvas = document.createElement("canvas");
-    grassCanvas.width = 512; grassCanvas.height = 512;
-    const gctx = grassCanvas.getContext("2d");
-    gctx.fillStyle = "#7bb662"; gctx.fillRect(0, 0, 512, 512);
-    for (let i = 0; i < 3000; i++) {
-      gctx.fillStyle = 'rgba(' + (60+Math.random()*80) + ',' + (120+Math.random()*80) + ',' + (40+Math.random()*60) + ',0.5)';
-      gctx.fillRect(Math.random()*512, Math.random()*512, 2, 2);
-    }
-    const grassTex = new THREE.CanvasTexture(grassCanvas);
-    grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping;
-    grassTex.repeat.set(6, 6);
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(60, 60),
-      new THREE.MeshStandardMaterial({ map: grassTex, roughness: 0.9 })
-    );
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.01;
-    ground.receiveShadow = true;
-    scene.add(ground);
-
-    const floorCanvas = document.createElement("canvas");
-    floorCanvas.width = 512; floorCanvas.height = 512;
-    const fctx = floorCanvas.getContext("2d");
-    fctx.fillStyle = "#b58b5e"; fctx.fillRect(0, 0, 512, 512);
-    for (let i = 0; i < 60; i++) {
-      fctx.strokeStyle = 'rgba(80,50,20,' + (0.05+Math.random()*0.12) + ')';
-      fctx.lineWidth = 1 + Math.random()*2;
-      fctx.beginPath();
-      fctx.moveTo(0, Math.random()*512);
-      fctx.lineTo(512, Math.random()*512);
-      fctx.stroke();
-    }
-    const floorTex = new THREE.CanvasTexture(floorCanvas);
-    floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping;
-    floorTex.repeat.set(3, 3);
+    // ===== FLOOR =====
+    const floorTex = (() => {
+      const c = document.createElement("canvas");
+      c.width = c.height = 256;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#c9a17a"; ctx.fillRect(0, 0, 256, 256);
+      for (let i = 0; i < 40; i++) {
+        ctx.strokeStyle = `rgba(90,55,25,${0.06 + Math.random()*0.14})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, Math.random()*256);
+        ctx.lineTo(256, Math.random()*256);
+        ctx.stroke();
+      }
+      const t = new THREE.CanvasTexture(c);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(3, 3);
+      return t;
+    })();
     const deck = new THREE.Mesh(
       new THREE.BoxGeometry(16, 0.15, 12),
-      new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.85 })
+      new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.9 })
     );
     deck.position.y = 0.075;
     deck.receiveShadow = true;
     scene.add(deck);
 
-    const clockCanvas = document.createElement("canvas");
-    clockCanvas.width = 256; clockCanvas.height = 256;
-    const clockCtx = clockCanvas.getContext("2d");
-    const clockTex = new THREE.CanvasTexture(clockCanvas);
-    clockTex.colorSpace = THREE.SRGBColorSpace;
-
-    function drawClock() {
-      const W = 256, cx = W/2, cy = W/2, r = W/2 - 8;
-      clockCtx.fillStyle = "#f8fafc";
-      clockCtx.beginPath();
-      clockCtx.arc(cx, cy, r, 0, Math.PI*2);
-      clockCtx.fill();
-      clockCtx.strokeStyle = "#1e293b"; clockCtx.lineWidth = 8;
-      clockCtx.stroke();
-      for (let i = 0; i < 12; i++) {
-        const ang = (i / 12) * Math.PI * 2 - Math.PI/2;
-        const x1 = cx + Math.cos(ang) * (r - 20);
-        const y1 = cy + Math.sin(ang) * (r - 20);
-        const x2 = cx + Math.cos(ang) * (r - 8);
-        const y2 = cy + Math.sin(ang) * (r - 8);
-        clockCtx.strokeStyle = i % 3 === 0 ? "#1e293b" : "#94a3b8";
-        clockCtx.lineWidth = i % 3 === 0 ? 6 : 3;
-        clockCtx.beginPath();
-        clockCtx.moveTo(x1, y1); clockCtx.lineTo(x2, y2); clockCtx.stroke();
-      }
-      const now = new Date();
-      const h = now.getHours() % 12, m = now.getMinutes(), s = now.getSeconds();
-      const hAng = ((h + m/60) / 12) * Math.PI * 2 - Math.PI/2;
-      clockCtx.strokeStyle = "#1e293b"; clockCtx.lineWidth = 10;
-      clockCtx.beginPath();
-      clockCtx.moveTo(cx, cy);
-      clockCtx.lineTo(cx + Math.cos(hAng) * (r * 0.5), cy + Math.sin(hAng) * (r * 0.5));
-      clockCtx.stroke();
-      const mAng = ((m + s/60) / 60) * Math.PI * 2 - Math.PI/2;
-      clockCtx.strokeStyle = "#1e293b"; clockCtx.lineWidth = 6;
-      clockCtx.beginPath();
-      clockCtx.moveTo(cx, cy);
-      clockCtx.lineTo(cx + Math.cos(mAng) * (r * 0.75), cy + Math.sin(mAng) * (r * 0.75));
-      clockCtx.stroke();
-      const sAng = s/60*Math.PI*2 - Math.PI/2;
-      clockCtx.strokeStyle = "#dc2626"; clockCtx.lineWidth = 3;
-      clockCtx.beginPath();
-      clockCtx.moveTo(cx, cy);
-      clockCtx.lineTo(cx + Math.cos(sAng) * (r * 0.85), cy + Math.sin(sAng) * (r * 0.85));
-      clockCtx.stroke();
-      clockCtx.fillStyle = "#1e293b";
-      clockCtx.beginPath();
-      clockCtx.arc(cx, cy, 6, 0, Math.PI*2);
-      clockCtx.fill();
-      clockTex.needsUpdate = true;
-    }
-    drawClock();
-    setInterval(drawClock, 1000);
-
-    const clockMesh = new THREE.Mesh(
-      new THREE.CircleGeometry(0.8, 32),
-      new THREE.MeshStandardMaterial({ map: clockTex, roughness: 0.8 })
+    const grass = new THREE.Mesh(
+      new THREE.PlaneGeometry(60, 60),
+      new THREE.MeshStandardMaterial({ color: 0x8cc86c, roughness: 0.95 })
     );
-    clockMesh.position.set(-7.5, 5, -5.9);
-    clockMesh.rotation.y = Math.PI/2;
-    scene.add(clockMesh);
+    grass.rotation.x = -Math.PI / 2;
+    grass.position.y = -0.01;
+    grass.receiveShadow = true;
+    scene.add(grass);
 
-    const attCanvas = document.createElement("canvas");
-    attCanvas.width = 512; attCanvas.height = 256;
-    const attCtx = attCanvas.getContext("2d");
-    const attTex = new THREE.CanvasTexture(attCanvas);
-    attTex.colorSpace = THREE.SRGBColorSpace;
-    (function drawAttendance() {
-      const W = 512, H = 256;
-      const grad = attCtx.createLinearGradient(0, 0, 0, H);
-      grad.addColorStop(0, "#1e3a5f"); grad.addColorStop(1, "#0f2038");
-      attCtx.fillStyle = grad; attCtx.fillRect(0, 0, W, H);
-      attCtx.strokeStyle = "#60a5fa"; attCtx.lineWidth = 4;
-      attCtx.strokeRect(8, 8, W-16, H-16);
-      attCtx.fillStyle = "#93c5fd"; attCtx.font = "bold 28px sans-serif";
-      attCtx.textAlign = "center";
-      attCtx.fillText("ATTENDANCE", W/2, 60);
-      attCtx.fillStyle = "#fff"; attCtx.font = "bold 90px sans-serif";
-      attCtx.fillText(String(MEMBERS.length), W/2, 170);
-      attCtx.fillStyle = "#93c5fd"; attCtx.font = "20px sans-serif";
-      attCtx.fillText("members in room", W/2, 210);
-      attTex.needsUpdate = true;
-    })();
+    // ===== WALLS =====
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xf0efe9, roughness: 0.95 });
+    const backWall = new THREE.Mesh(new THREE.PlaneGeometry(16, 8), wallMat);
+    backWall.position.set(0, 4, -6.5);
+    backWall.receiveShadow = true;
+    scene.add(backWall);
+    const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(12, 8), wallMat);
+    leftWall.position.set(-8, 4, 0); leftWall.rotation.y = Math.PI / 2;
+    scene.add(leftWall);
+    const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(12, 8), wallMat);
+    rightWall.position.set(8, 4, 0); rightWall.rotation.y = -Math.PI / 2;
+    scene.add(rightWall);
 
-    const attMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(3.5, 1.75),
-      new THREE.MeshStandardMaterial({ map: attTex, roughness: 0.8 })
-    );
-    attMesh.position.set(7.9, 3.5, -1);
-    attMesh.rotation.y = -Math.PI/2;
-    scene.add(attMesh);
-
+    // ===== BLACKBOARD =====
     const bbCanvas = document.createElement("canvas");
-    bbCanvas.width = 2048; bbCanvas.height = 1024;
+    bbCanvas.width = 1024; bbCanvas.height = 512;
     const bbCtx = bbCanvas.getContext("2d");
     const bbTexture = new THREE.CanvasTexture(bbCanvas);
     bbTexture.colorSpace = THREE.SRGBColorSpace;
-
     function drawBlackboardText(text) {
       const W = bbCanvas.width, H = bbCanvas.height;
       const grad = bbCtx.createLinearGradient(0, 0, 0, H);
       grad.addColorStop(0, "#22402f"); grad.addColorStop(1, "#152a1d");
       bbCtx.fillStyle = grad; bbCtx.fillRect(0, 0, W, H);
-      for (let i = 0; i < 200; i++) {
+      for (let i = 0; i < 120; i++) {
         bbCtx.fillStyle = "rgba(255,255,255,0.03)";
         bbCtx.fillRect(Math.random()*W, Math.random()*H, 2, 2);
       }
-      bbCtx.strokeStyle = "#0a1a12"; bbCtx.lineWidth = 12;
-      bbCtx.strokeRect(6, 6, W-12, H-12);
+      bbCtx.strokeStyle = "#0a1a12"; bbCtx.lineWidth = 8;
+      bbCtx.strokeRect(4, 4, W-8, H-8);
       bbCtx.fillStyle = "#f5f5e8";
-      bbCtx.font = "46px 'Hiragino Mincho ProN', 'Yu Mincho', serif";
+      bbCtx.font = "26px 'Hiragino Mincho ProN', 'Yu Mincho', serif";
       bbCtx.textBaseline = "top";
-      const maxWidth = W - 120, lineHeight = 60, x0 = 60;
-      let y = 60;
-      let raw = text || "";
-      raw = raw.replace(/\[img\][^\[]+\[\/img\]/g, "[image]");
+      const mw = W - 80, lh = 34, x0 = 40;
+      let y = 40;
+      let raw = (text || "").replace(/\[img\][^\[]+\[\/img\]/g, "[image]");
       if (!raw) { bbTexture.needsUpdate = true; return; }
       for (const para of raw.split("\n")) {
         let line = "";
         for (const ch of para.split("")) {
           const test = line + ch;
-          if (bbCtx.measureText(test).width > maxWidth) {
+          if (bbCtx.measureText(test).width > mw) {
             bbCtx.fillText(line, x0, y);
-            y += lineHeight; line = ch;
-            if (y > H - 80) break;
+            y += lh; line = ch;
+            if (y > H - 40) break;
           } else line = test;
         }
-        if (line) { bbCtx.fillText(line, x0, y); y += lineHeight; }
-        if (y > H - 80) break;
+        if (line) { bbCtx.fillText(line, x0, y); y += lh; }
+        if (y > H - 40) break;
       }
       bbTexture.needsUpdate = true;
     }
-
     const blackboard = new THREE.Mesh(
       new THREE.PlaneGeometry(9, 4.5),
       new THREE.MeshStandardMaterial({ map: bbTexture, roughness: 0.95 })
     );
     blackboard.position.set(0, 2.6, -6.2);
     scene.add(blackboard);
-
     const bbframe = new THREE.Mesh(
       new THREE.BoxGeometry(9.6, 5.1, 0.25),
-      new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.75 })
+      new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.8 })
     );
     bbframe.position.set(0, 2.6, -6.35);
     scene.add(bbframe);
-
     const legMat = new THREE.MeshStandardMaterial({ color: 0x4a3320, roughness: 0.85 });
     [-4.4, 4.4].forEach(x => {
       const leg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 5.4, 0.2), legMat);
-      leg.position.set(x, 2.7, -6.3); leg.castShadow = true; scene.add(leg);
+      leg.position.set(x, 2.7, -6.3);
+      leg.castShadow = true;
+      scene.add(leg);
     });
-
-    const chalkTray = new THREE.Mesh(
-      new THREE.BoxGeometry(9.6, 0.15, 0.4),
-      new THREE.MeshStandardMaterial({ color: 0x8a6a44, roughness: 0.8 })
-    );
-    chalkTray.position.set(0, 0.05, -6.0);
-    chalkTray.castShadow = true;
-    scene.add(chalkTray);
     drawBlackboardText(window.INITIAL_BB);
 
-    function roundRect(ctx, x, y, w, h, r) {
-      ctx.beginPath();
-      ctx.moveTo(x+r, y); ctx.lineTo(x+w-r, y);
-      ctx.quadraticCurveTo(x+w, y, x+w, y+r); ctx.lineTo(x+w, y+h-r);
-      ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h); ctx.lineTo(x+r, y+h);
-      ctx.quadraticCurveTo(x, y+h, x, y+h-r); ctx.lineTo(x, y+r);
-      ctx.quadraticCurveTo(x, y, x+r, y); ctx.closePath();
+    // ===== CLOCK (only redrawn when needed) =====
+    const clockCanvas = document.createElement("canvas");
+    clockCanvas.width = clockCanvas.height = 128;
+    const clockCtx = clockCanvas.getContext("2d");
+    const clockTex = new THREE.CanvasTexture(clockCanvas);
+    clockTex.colorSpace = THREE.SRGBColorSpace;
+    let lastClockMinute = -1;
+    function drawClock() {
+      const n = new Date();
+      const minute = n.getMinutes();
+      if (minute === lastClockMinute) return;
+      lastClockMinute = minute;
+      const W = 128, cx = 64, cy = 64, r = 60;
+      clockCtx.fillStyle = "#f8fafc";
+      clockCtx.beginPath(); clockCtx.arc(cx, cy, r, 0, Math.PI*2); clockCtx.fill();
+      clockCtx.strokeStyle = "#1e293b"; clockCtx.lineWidth = 4; clockCtx.stroke();
+      for (let i = 0; i < 12; i++) {
+        const a = (i/12)*Math.PI*2 - Math.PI/2;
+        const x1 = cx + Math.cos(a)*(r-10), y1 = cy + Math.sin(a)*(r-10);
+        const x2 = cx + Math.cos(a)*(r-4), y2 = cy + Math.sin(a)*(r-4);
+        clockCtx.strokeStyle = i%3===0 ? "#1e293b" : "#94a3b8";
+        clockCtx.lineWidth = i%3===0 ? 3 : 1.5;
+        clockCtx.beginPath(); clockCtx.moveTo(x1,y1); clockCtx.lineTo(x2,y2); clockCtx.stroke();
+      }
+      const h = n.getHours()%12, m = n.getMinutes();
+      const ha = ((h+m/60)/12)*Math.PI*2 - Math.PI/2;
+      clockCtx.strokeStyle = "#1e293b"; clockCtx.lineWidth = 5;
+      clockCtx.beginPath(); clockCtx.moveTo(cx, cy);
+      clockCtx.lineTo(cx + Math.cos(ha)*(r*0.5), cy + Math.sin(ha)*(r*0.5)); clockCtx.stroke();
+      const ma = (m/60)*Math.PI*2 - Math.PI/2;
+      clockCtx.strokeStyle = "#1e293b"; clockCtx.lineWidth = 3;
+      clockCtx.beginPath(); clockCtx.moveTo(cx, cy);
+      clockCtx.lineTo(cx + Math.cos(ma)*(r*0.75), cy + Math.sin(ma)*(r*0.75)); clockCtx.stroke();
+      clockCtx.fillStyle = "#1e293b"; clockCtx.beginPath(); clockCtx.arc(cx, cy, 3, 0, Math.PI*2); clockCtx.fill();
+      clockTex.needsUpdate = true;
     }
-    function makeNameSprite(name) {
+    drawClock();
+    setInterval(drawClock, 30000);
+    const clockMesh = new THREE.Mesh(
+      new THREE.CircleGeometry(0.8, 24),
+      new THREE.MeshStandardMaterial({ map: clockTex, roughness: 0.8 })
+    );
+    clockMesh.position.set(-7.4, 5, -6.49);
+    scene.add(clockMesh);
+
+    // ===== ATTENDANCE =====
+    const attCanvas = document.createElement("canvas");
+    attCanvas.width = 256; attCanvas.height = 128;
+    const attCtx = attCanvas.getContext("2d");
+    const attTex = new THREE.CanvasTexture(attCanvas);
+    attTex.colorSpace = THREE.SRGBColorSpace;
+    (function drawAttendance() {
+      const W = 256, H = 128;
+      const grad = attCtx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, "#1e3a5f"); grad.addColorStop(1, "#0f2038");
+      attCtx.fillStyle = grad; attCtx.fillRect(0, 0, W, H);
+      attCtx.strokeStyle = "#60a5fa"; attCtx.lineWidth = 3;
+      attCtx.strokeRect(5, 5, W-10, H-10);
+      attCtx.fillStyle = "#93c5fd"; attCtx.font = "bold 16px sans-serif";
+      attCtx.textAlign = "center";
+      attCtx.fillText("ATTENDANCE", W/2, 30);
+      attCtx.fillStyle = "#fff"; attCtx.font = "bold 48px sans-serif";
+      attCtx.fillText(String(MEMBERS.length), W/2, 85);
+      attCtx.fillStyle = "#93c5fd"; attCtx.font = "12px sans-serif";
+      attCtx.fillText("members", W/2, 108);
+      attTex.needsUpdate = true;
+    })();
+    const attMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.5, 1.75),
+      new THREE.MeshStandardMaterial({ map: attTex, roughness: 0.8 })
+    );
+    attMesh.position.set(7.9, 3.5, -1); attMesh.rotation.y = -Math.PI/2;
+    scene.add(attMesh);
+
+    // ===== AVATAR SYSTEM =====
+    function hashName(name) {
+      let h = 0;
+      for (let i = 0; i < name.length; i++) h = ((h<<5)-h + name.charCodeAt(i)) | 0;
+      return Math.abs(h);
+    }
+    const SKIN_TONES = [0xffe0bd, 0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffd8b0];
+    const HAIR_COLORS = [0x1a1a1a, 0x2a1a0a, 0x3b2314, 0x5a3825, 0x8b4513, 0xd4a574, 0x1e293b];
+    const SHIRT_COLORS = [0x3b82f6, 0xef4444, 0x10b981, 0xf59e0b, 0x8b5cf6, 0xec4899, 0x14b8a6, 0xf97316, 0x6366f1, 0x0ea5e9];
+    const PANTS_COLORS = [0x1e293b, 0x334155, 0x475569, 0x1e3a8a, 0x365314, 0x7c2d12, 0x4c1d95];
+    const HAIR_STYLES = ["short", "long", "spiky", "ponytail", "bun"];
+
+    function paletteFor(name) {
+      const h = hashName(name);
+      return {
+        skin: SKIN_TONES[h % SKIN_TONES.length],
+        hair: HAIR_COLORS[(h>>3) % HAIR_COLORS.length],
+        shirt: SHIRT_COLORS[(h>>6) % SHIRT_COLORS.length],
+        pants: PANTS_COLORS[(h>>9) % PANTS_COLORS.length],
+        style: HAIR_STYLES[(h>>12) % HAIR_STYLES.length],
+      };
+    }
+
+    function makeNameSprite(name, isTeacher) {
       const c = document.createElement("canvas");
       c.width = 256; c.height = 64;
       const ctx = c.getContext("2d");
-      ctx.fillStyle = "rgba(15,23,42,0.9)";
-      roundRect(ctx, 8, 8, 240, 48, 24); ctx.fill();
+      const bg = isTeacher ? "rgba(245,158,11,0.95)" : "rgba(15,23,42,0.92)";
+      const r = 22;
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.moveTo(8+r, 8); ctx.lineTo(248-r, 8);
+      ctx.quadraticCurveTo(248, 8, 248, 8+r);
+      ctx.lineTo(248, 56-r);
+      ctx.quadraticCurveTo(248, 56, 248-r, 56);
+      ctx.lineTo(8+r, 56);
+      ctx.quadraticCurveTo(8, 56, 8, 56-r);
+      ctx.lineTo(8, 8+r);
+      ctx.quadraticCurveTo(8, 8, 8+r, 8);
+      ctx.closePath(); ctx.fill();
       ctx.fillStyle = "#fff";
       ctx.font = "bold 26px 'Hiragino Sans', sans-serif";
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -1277,203 +1320,414 @@ window.INITIAL_MESSAGES = [
       return sp;
     }
 
+    // Low-poly shared geometries (reused across all avatars)
+    const HEAD_GEO = new THREE.SphereGeometry(0.48, 20, 16);
+    const TORSO_GEO = new THREE.CapsuleGeometry(0.40, 0.30, 6, 14);
+    const UPPER_ARM_GEO = new THREE.CapsuleGeometry(0.11, 0.14, 4, 10);
+    const LOWER_ARM_GEO = new THREE.CapsuleGeometry(0.10, 0.14, 4, 10);
+    const HAND_GEO = new THREE.SphereGeometry(0.115, 10, 8);
+    const LEG_GEO = new THREE.CapsuleGeometry(0.16, 0.14, 4, 10);
+    const SHOE_GEO = new THREE.SphereGeometry(0.13, 10, 8);
+    const EAR_GEO = new THREE.SphereGeometry(0.08, 8, 6);
+    const NECK_GEO = new THREE.CylinderGeometry(0.14, 0.15, 0.12, 10);
+    const EYE_WHITE_GEO = new THREE.SphereGeometry(0.095, 10, 8);
+    const EYE_PUPIL_GEO = new THREE.SphereGeometry(0.055, 8, 8);
+    const EYE_HIGHLIGHT_GEO = new THREE.SphereGeometry(0.022, 6, 6);
+    const BROW_GEO = new THREE.BoxGeometry(0.11, 0.018, 0.025);
+    const MOUTH_GEO = new THREE.SphereGeometry(0.05, 10, 8);
+    const BLUSH_GEO = new THREE.CircleGeometry(0.06, 10);
+
+    // Shared materials
+    const EYE_WHITE_MAT = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const EYE_PUPIL_MAT = new THREE.MeshBasicMaterial({ color: 0x111111 });
+    const EYE_HIGHLIGHT_MAT = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const MOUTH_MAT = new THREE.MeshBasicMaterial({ color: 0x7a2a2a });
+    const BLUSH_MAT = new THREE.MeshBasicMaterial({ color: 0xff9ca3, transparent: true, opacity: 0.5 });
+    const SHOE_MAT = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.6 });
+
+    function buildHair(group, head, style, hairColor) {
+      const hm = new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.78 });
+      const hy = head.position.y;
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.44, 18, 14, 0, Math.PI*2, 0, Math.PI/1.75), hm);
+      cap.position.y = hy + 0.03;
+      group.add(cap);
+      if (style === "long") {
+        const back = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.6, 0.2), hm);
+        back.position.set(0, hy - 0.2, -0.3);
+        group.add(back);
+      } else if (style === "spiky") {
+        const cone = new THREE.ConeGeometry(0.09, 0.24, 6);
+        for (let i = 0; i < 6; i++) {
+          const spike = new THREE.Mesh(cone, hm);
+          const a = (i/6)*Math.PI*2;
+          spike.position.set(Math.cos(a)*0.26, hy + 0.44, Math.sin(a)*0.26);
+          spike.rotation.z = -Math.cos(a)*0.35;
+          spike.rotation.x = Math.sin(a)*0.35;
+          group.add(spike);
+        }
+      } else if (style === "ponytail") {
+        const pony = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.45, 4, 8), hm);
+        pony.position.set(0, hy - 0.05, -0.48);
+        pony.rotation.x = 0.35;
+        group.add(pony);
+      } else if (style === "bun") {
+        const bun = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), hm);
+        bun.position.set(0, hy + 0.46, -0.15);
+        group.add(bun);
+      }
+    }
+
     function addSkinAccessory(group, head, skinKey, seated) {
       if (skinKey === "glasses") {
-        const gm = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4 });
-        [-0.11, 0.11].forEach(x => {
-          const lens = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.012, 8, 16), gm);
-          lens.position.set(x, head.position.y + 0.02, 0.29);
+        const gm = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4, metalness: 0.3 });
+        const torusGeo = new THREE.TorusGeometry(0.10, 0.018, 6, 16);
+        [-0.15, 0.15].forEach(x => {
+          const lens = new THREE.Mesh(torusGeo, gm);
+          lens.position.set(x, head.position.y + 0.03, 0.38);
           group.add(lens);
         });
+        const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.018, 0.018), gm);
+        bridge.position.set(0, head.position.y + 0.03, 0.38);
+        group.add(bridge);
       } else if (skinKey === "hat") {
         const hm = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 });
-        const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.03, 24), hm);
-        brim.position.set(0, head.position.y + 0.28, 0);
-        const top = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.28, 0.22, 24), hm);
-        top.position.set(0, head.position.y + 0.4, 0);
+        const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.045, 16), hm);
+        brim.position.set(0, head.position.y + 0.36, 0);
+        const top = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.38, 0.3, 16), hm);
+        top.position.set(0, head.position.y + 0.52, 0);
         group.add(brim, top);
       } else if (skinKey === "robe") {
         const rm = new THREE.MeshStandardMaterial({ color: 0x4c1d95, roughness: 0.6 });
-        const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.55, 0.95, 16), rm);
-        robe.position.y = seated ? 0.5 : 0.65;
-        robe.castShadow = true; group.add(robe);
+        const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.72, 1.1, 14), rm);
+        robe.position.y = seated ? 0.55 : 0.72;
+        robe.castShadow = true;
+        group.add(robe);
       } else if (skinKey === "crown") {
-        const cm = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.3, metalness: 0.6 });
-        const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.14, 8), cm);
-        crown.position.set(0, head.position.y + 0.36, 0);
-        group.add(crown);
+        const cm = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.3, metalness: 0.7 });
+        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.14, 12), cm);
+        ring.position.set(0, head.position.y + 0.44, 0);
+        group.add(ring);
+        const coneGeo = new THREE.ConeGeometry(0.06, 0.18, 6);
+        for (let i = 0; i < 5; i++) {
+          const spike = new THREE.Mesh(coneGeo, cm);
+          const a = (i/5)*Math.PI*2 - Math.PI/2;
+          spike.position.set(Math.cos(a)*0.4, head.position.y + 0.6, Math.sin(a)*0.4);
+          group.add(spike);
+        }
       } else if (skinKey === "aura") {
         const aura = new THREE.Mesh(
-          new THREE.SphereGeometry(0.6, 16, 16),
-          new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.18 })
+          new THREE.SphereGeometry(0.9, 12, 10),
+          new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.14, side: THREE.DoubleSide })
         );
-        aura.position.y = seated ? 0.6 : 0.75;
+        aura.position.y = seated ? 0.7 : 0.85;
         group.add(aura);
       }
     }
 
-    function createCharacter({ color, skinColor = 0xffd8b0, name = "", seated = false, skinKey = "default" }) {
+    function createChibiAvatar({ name, seated = false, skinKey = "default", isTeacher = false }) {
       const g = new THREE.Group();
-      const body = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.28, 0.34, 0.6, 16),
-        new THREE.MeshStandardMaterial({ color, roughness: 0.7 })
-      );
-      body.position.y = seated ? 0.55 : 0.7;
-      body.castShadow = true; g.add(body);
-      const head = new THREE.Mesh(
-        new THREE.SphereGeometry(0.32, 24, 24),
-        new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.55 })
-      );
-      head.position.y = seated ? 1.1 : 1.25;
-      head.castShadow = true; g.add(head);
-      const hair = new THREE.Mesh(
-        new THREE.SphereGeometry(0.335, 24, 24, 0, Math.PI*2, 0, Math.PI/1.75),
-        new THREE.MeshStandardMaterial({ color: 0x2a1a0a, roughness: 0.8 })
-      );
-      hair.position.copy(head.position); hair.position.y += 0.02;
-      g.add(hair);
+      const pal = paletteFor(name);
+      const skinColors = { default: 0x3b82f6, glasses: 0x6366f1, hat: 0xf59e0b, robe: 0x8b5cf6, crown: 0xfbbf24, aura: 0xef4444 };
+      const shirtColor = (skinKey !== "default" && skinColors[skinKey]) || pal.shirt;
+
+      const headY = seated ? 1.20 : 1.40;
+      const bodyY = seated ? 0.68 : 0.85;
+
+      const legMat = new THREE.MeshStandardMaterial({ color: pal.pants, roughness: 0.85 });
+      const lLeg = new THREE.Mesh(LEG_GEO, legMat);
+      lLeg.position.set(-0.17, 0.22, 0);
+      lLeg.castShadow = true;
+      const rLeg = new THREE.Mesh(LEG_GEO, legMat);
+      rLeg.position.set(0.17, 0.22, 0);
+      rLeg.castShadow = true;
+      g.add(lLeg, rLeg);
+
+      const lShoe = new THREE.Mesh(SHOE_GEO, SHOE_MAT);
+      lShoe.position.set(-0.17, 0.07, 0.04);
+      lShoe.scale.set(1, 0.7, 1.3);
+      lShoe.castShadow = true;
+      const rShoe = new THREE.Mesh(SHOE_GEO, SHOE_MAT);
+      rShoe.position.set(0.17, 0.07, 0.04);
+      rShoe.scale.set(1, 0.7, 1.3);
+      rShoe.castShadow = true;
+      g.add(lShoe, rShoe);
+
+      const torsoMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.78 });
+      const torso = new THREE.Mesh(TORSO_GEO, torsoMat);
+      torso.position.y = bodyY;
+      torso.castShadow = true;
+      g.add(torso);
+
+      const collarMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7 });
+      const collar = new THREE.Mesh(new THREE.RingGeometry(0.14, 0.20, 12, 1, 0, Math.PI), collarMat);
+      collar.position.set(0, bodyY + 0.34, 0.30);
+      collar.rotation.x = -Math.PI/6;
+      g.add(collar);
+
+      const armMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.78 });
+      const handMat = new THREE.MeshStandardMaterial({ color: pal.skin, roughness: 0.6 });
+      const armY = bodyY + 0.04;
+
+      const lUpper = new THREE.Mesh(UPPER_ARM_GEO, armMat);
+      lUpper.position.set(-0.42, armY - 0.06, 0);
+      lUpper.rotation.z = 0.28;
+      lUpper.castShadow = true;
+      const lLower = new THREE.Mesh(LOWER_ARM_GEO, armMat);
+      lLower.position.set(-0.52, armY - 0.32, 0.02);
+      lLower.rotation.z = 0.15;
+      lLower.castShadow = true;
+      const lHand = new THREE.Mesh(HAND_GEO, handMat);
+      lHand.position.set(-0.56, armY - 0.5, 0.03);
+      g.add(lUpper, lLower, lHand);
+
+      const rArmGroup = new THREE.Group();
+      rArmGroup.position.set(0.42, armY - 0.06, 0);
+      const rUpper = new THREE.Mesh(UPPER_ARM_GEO, armMat);
+      rUpper.castShadow = true;
+      const rLower = new THREE.Mesh(LOWER_ARM_GEO, armMat);
+      rLower.position.set(0.10, -0.26, 0.02);
+      rLower.castShadow = true;
+      const rHand = new THREE.Mesh(HAND_GEO, handMat);
+      rHand.position.set(0.14, -0.44, 0.03);
+      rArmGroup.add(rUpper, rLower, rHand);
+      g.add(rArmGroup);
+
+      const headMat = new THREE.MeshStandardMaterial({ color: pal.skin, roughness: 0.55 });
+      const head = new THREE.Mesh(HEAD_GEO, headMat);
+      head.scale.set(1, 1.05, 0.96);
+      head.position.y = headY;
+      head.castShadow = true;
+      g.add(head);
+
+      const neck = new THREE.Mesh(NECK_GEO, headMat);
+      neck.position.y = headY - 0.42;
+      g.add(neck);
+
+      [-0.46, 0.46].forEach(x => {
+        const ear = new THREE.Mesh(EAR_GEO, headMat);
+        ear.position.set(x, headY, 0);
+        g.add(ear);
+      });
+
+      buildHair(g, head, pal.style, pal.hair);
+
+      const eyeY = headY + 0.02;
+      const eyeZ = 0.43;
+      const eyeOffset = 0.16;
+      const eyeGroups = [];
+      [-1, 1].forEach(side => {
+        const grp = new THREE.Group();
+        const white = new THREE.Mesh(EYE_WHITE_GEO, EYE_WHITE_MAT);
+        white.scale.set(1, 1, 0.55);
+        const pupil = new THREE.Mesh(EYE_PUPIL_GEO, EYE_PUPIL_MAT);
+        pupil.position.set(0, 0, 0.055);
+        const highlight = new THREE.Mesh(EYE_HIGHLIGHT_GEO, EYE_HIGHLIGHT_MAT);
+        highlight.position.set(0.022, 0.028, 0.08);
+        grp.add(white, pupil, highlight);
+        grp.position.set(side * eyeOffset, eyeY, eyeZ);
+        g.add(grp);
+        eyeGroups.push(grp);
+      });
+
+      const browMat = new THREE.MeshBasicMaterial({ color: pal.hair });
+      [-1, 1].forEach(side => {
+        const b = new THREE.Mesh(BROW_GEO, browMat);
+        b.position.set(side * eyeOffset, eyeY + 0.12, eyeZ);
+        b.rotation.z = side * 0.1;
+        g.add(b);
+      });
+
+      const mouth = new THREE.Mesh(MOUTH_GEO, MOUTH_MAT);
+      mouth.position.set(0, headY - 0.18, eyeZ + 0.02);
+      mouth.scale.set(1.4, 0.35, 0.6);
+      g.add(mouth);
+
+      [-1, 1].forEach(side => {
+        const blush = new THREE.Mesh(BLUSH_GEO, BLUSH_MAT);
+        blush.position.set(side * 0.32, headY - 0.1, 0.36);
+        blush.rotation.y = side * 0.3;
+        g.add(blush);
+      });
 
       addSkinAccessory(g, head, skinKey, seated);
 
-      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
-      const eyeGeo = new THREE.SphereGeometry(0.05, 12, 12);
-      const eyeY = head.position.y + 0.02;
-      const lEye = new THREE.Mesh(eyeGeo, eyeMat); lEye.position.set(-0.11, eyeY, 0.28);
-      const rEye = new THREE.Mesh(eyeGeo, eyeMat); rEye.position.set(0.11, eyeY, 0.28);
-      g.add(lEye, rEye);
-
-      const armMat = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
-      const armGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.55, 8);
-      const armY = seated ? 0.6 : 0.72;
-      const lArm = new THREE.Mesh(armGeo, armMat);
-      lArm.position.set(-0.36, armY, 0); lArm.rotation.z = 0.3; lArm.castShadow = true;
-      const rArm = new THREE.Mesh(armGeo, armMat);
-      rArm.position.set(0.36, armY, 0); rArm.rotation.z = -0.3; rArm.castShadow = true;
-      g.add(lArm, rArm);
-
-      if (!seated) {
-        const legMat = new THREE.MeshStandardMaterial({ color: 0x333a4a, roughness: 0.8 });
-        const legGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.42, 8);
-        const lLeg = new THREE.Mesh(legGeo, legMat);
-        lLeg.position.set(-0.12, 0.21, 0); lLeg.castShadow = true;
-        const rLeg = new THREE.Mesh(legGeo, legMat);
-        rLeg.position.set(0.12, 0.21, 0); rLeg.castShadow = true;
-        g.add(lLeg, rLeg);
-      }
-
       if (name) {
-        const sp = makeNameSprite(name);
-        sp.position.y = seated ? 1.72 : 1.9;
+        const sp = makeNameSprite(name, isTeacher);
+        sp.position.y = seated ? 1.95 : 2.20;
         g.add(sp);
       }
 
       g.userData = {
-        rArm, lArm, baseRotZ: { l: 0.3, r: -0.3 },
-        handRaised: false, highlight: 0, baseY: g.position.y,
+        rArmGroup, head, torso, mouth,
+        eyeL: eyeGroups[0], eyeR: eyeGroups[1],
+        baseY: g.position.y,
+        handRaised: false,
+        highlight: 0,
+        talkUntil: 0,
+        nextBlink: performance.now() + 2000 + Math.random() * 3000,
+        blinkUntil: 0,
+        breathingOffset: Math.random() * Math.PI * 2,
+        lookOffset: Math.random() * Math.PI * 2,
+        swayPhase: Math.random() * Math.PI * 2,
       };
       return g;
     }
 
-    const SKIN_COLORS = {
-      default: 0x3b82f6, glasses: 0x6366f1, hat: 0xf59e0b,
-      robe: 0x8b5cf6, crown: 0xfbbf24, aura: 0xef4444
-    };
-    const teacherMember = MEMBERS.find(m => m.role === "teacher");
-    const teacherSkin = (teacherMember && teacherMember.skin) || "default";
-    const teacherColor = SKIN_COLORS[teacherSkin] || 0x3b82f6;
-    const teacher = createCharacter({
-      color: teacherColor, name: TEACHER_DISPLAY_NAME, seated: false, skinKey: teacherSkin
-    });
-    teacher.position.set(0, 0.15, -4.8);
-    teacher.rotation.y = Math.PI;
-    scene.add(teacher);
+    // ===== DESK / CHAIR =====
+    const DESK_TOP_GEO = new THREE.BoxGeometry(1.4, 0.09, 0.8);
+    const DESK_LEG_GEO = new THREE.BoxGeometry(0.09, 0.7, 0.09);
+    const CHAIR_SEAT_GEO = new THREE.BoxGeometry(0.6, 0.08, 0.6);
+    const CHAIR_BACK_GEO = new THREE.BoxGeometry(0.6, 0.6, 0.08);
+    const CHAIR_LEG_GEO = new THREE.BoxGeometry(0.07, 0.45, 0.07);
+    const DESK_TOP_MAT = new THREE.MeshStandardMaterial({ color: 0xe0b88a, roughness: 0.75 });
+    const DESK_LEG_MAT = new THREE.MeshStandardMaterial({ color: 0x5a4530, roughness: 0.85 });
+    const CHAIR_MAT = new THREE.MeshStandardMaterial({ color: 0x4a6fa5, roughness: 0.78 });
+    const CHAIR_LEG_MAT = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.85 });
 
     function createDesk() {
       const g = new THREE.Group();
-      const top = new THREE.Mesh(
-        new THREE.BoxGeometry(1.3, 0.08, 0.75),
-        new THREE.MeshStandardMaterial({ color: 0xd9b78a, roughness: 0.7 })
-      );
-      top.position.y = 0.75; top.castShadow = true; top.receiveShadow = true; g.add(top);
-      const lm = new THREE.MeshStandardMaterial({ color: 0x5a4530, roughness: 0.8 });
-      const lg = new THREE.BoxGeometry(0.08, 0.75, 0.08);
-      [[-0.55, -0.3], [0.55, -0.3], [-0.55, 0.3], [0.55, 0.3]].forEach(([x, z]) => {
-        const leg = new THREE.Mesh(lg, lm);
-        leg.position.set(x, 0.375, z); leg.castShadow = true; g.add(leg);
+      const top = new THREE.Mesh(DESK_TOP_GEO, DESK_TOP_MAT);
+      top.position.y = 0.7;
+      top.castShadow = true;
+      top.receiveShadow = true;
+      g.add(top);
+      [[-0.6, -0.32], [0.6, -0.32], [-0.6, 0.32], [0.6, 0.32]].forEach(([x, z]) => {
+        const leg = new THREE.Mesh(DESK_LEG_GEO, DESK_LEG_MAT);
+        leg.position.set(x, 0.35, z);
+        leg.castShadow = true;
+        g.add(leg);
       });
       return g;
     }
     function createChair() {
       const g = new THREE.Group();
-      const seat = new THREE.Mesh(
-        new THREE.BoxGeometry(0.55, 0.06, 0.55),
-        new THREE.MeshStandardMaterial({ color: 0x4a6fa5, roughness: 0.7 })
-      );
-      seat.position.y = 0.48; seat.castShadow = true; g.add(seat);
-      const back = new THREE.Mesh(
-        new THREE.BoxGeometry(0.55, 0.55, 0.06),
-        new THREE.MeshStandardMaterial({ color: 0x4a6fa5, roughness: 0.7 })
-      );
-      back.position.set(0, 0.75, -0.25); back.castShadow = true; g.add(back);
-      const lm = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 });
-      const lg = new THREE.BoxGeometry(0.06, 0.48, 0.06);
-      [[-0.24, -0.24], [0.24, -0.24], [-0.24, 0.24], [0.24, 0.24]].forEach(([x, z]) => {
-        const leg = new THREE.Mesh(lg, lm);
-        leg.position.set(x, 0.24, z); g.add(leg);
+      const seat = new THREE.Mesh(CHAIR_SEAT_GEO, CHAIR_MAT);
+      seat.position.y = 0.45;
+      seat.castShadow = true;
+      g.add(seat);
+      const back = new THREE.Mesh(CHAIR_BACK_GEO, CHAIR_MAT);
+      back.position.set(0, 0.75, -0.28);
+      back.castShadow = true;
+      g.add(back);
+      [[-0.26, -0.26], [0.26, -0.26], [-0.26, 0.26], [0.26, 0.26]].forEach(([x, z]) => {
+        const leg = new THREE.Mesh(CHAIR_LEG_GEO, CHAIR_LEG_MAT);
+        leg.position.set(x, 0.22, z);
+        g.add(leg);
       });
       return g;
     }
 
+    // ===== TEACHER =====
+    const teacherMember = MEMBERS.find(m => m.role === "teacher");
+    const teacherSkin = (teacherMember && teacherMember.skin) || "default";
+    const teacher = createChibiAvatar({
+      name: TEACHER_DISPLAY_NAME, seated: false, skinKey: teacherSkin, isTeacher: true,
+    });
+    teacher.position.set(0, 0.15, -4.2);
+    teacher.rotation.y = Math.PI;
+    scene.add(teacher);
+
+    // ===== STUDENTS =====
     const studentMembers = MEMBERS.filter(m => m.role === "student");
     const positions = [];
     const cols = 4;
     const rows = Math.min(2, Math.max(1, Math.ceil(studentMembers.length / cols)));
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-      positions.push({ x: -3.6 + c * 2.4, z: -0.6 + r * 2.4 });
+      positions.push({ x: -3.3 + c * 2.2, z: -0.4 + r * 2.3 });
     }
 
-    const studentColors = [0xea580c, 0xdc2626, 0x9333ea, 0x0891b2, 0xd9488a, 0xdb2777, 0x5b21b6, 0xf59e0b];
     const characterMap = { [TEACHER_DISPLAY_NAME]: teacher };
     studentMembers.forEach((m, i) => {
       if (i >= positions.length) return;
       const p = positions[i];
-      const desk = createDesk(); desk.position.set(p.x, 0.15, p.z); scene.add(desk);
-      const chair = createChair(); chair.position.set(p.x, 0.15, p.z + 0.9); scene.add(chair);
-      const stuColor = SKIN_COLORS[m.skin] || studentColors[i % studentColors.length];
-      const stu = createCharacter({
-        color: stuColor, name: m.name, seated: true, skinKey: m.skin || "default"
+      const desk = createDesk();
+      desk.position.set(p.x, 0.15, p.z);
+      scene.add(desk);
+      const chair = createChair();
+      chair.position.set(p.x, 0.15, p.z + 0.9);
+      scene.add(chair);
+      const stu = createChibiAvatar({
+        name: m.name, seated: true, skinKey: m.skin || "default", isTeacher: false,
       });
       stu.position.set(p.x, 0.15, p.z + 0.9);
       scene.add(stu);
       characterMap[m.name] = stu;
     });
-    const overflowCount = studentMembers.length - positions.length;
-    if (overflowCount > 0) {
-      const sp = makeNameSprite('+' + overflowCount);
-      sp.position.set(0, 2.4, 2.6);
-      scene.add(sp);
-    }
 
     window._3d = { characterMap, drawBlackboardText };
 
-    let t = 0;
+    // ===== ANIMATION (throttled) =====
+    let lastFrame = performance.now();
+    let frameSkip = 0;
     function animate() {
       requestAnimationFrame(animate);
-      t += 0.016;
+      const now = performance.now();
+      const delta = (now - lastFrame) / 1000;
+      lastFrame = now;
+      // skip every other frame if device is slow
+      frameSkip = (frameSkip + 1) % 2;
+      if (frameSkip === 0 && delta < 0.05) {
+        // still allow controls update on every other frame
+      }
+      const t = now / 1000;
+
       for (const name in characterMap) {
         const c = characterMap[name];
         const d = c.userData;
-        const targetR = d.handRaised ? -2.6 : d.baseRotZ.r;
-        d.rArm.rotation.z += (targetR - d.rArm.rotation.z) * 0.15;
+
+        if (d.torso) {
+          const s = 1 + Math.sin(t * 2 + d.breathingOffset) * 0.02;
+          d.torso.scale.y = s;
+          d.torso.scale.x = 1 + Math.sin(t * 2 + d.breathingOffset) * 0.01;
+        }
+
+        c.rotation.z = Math.sin(t * 0.8 + d.swayPhase) * 0.015;
+
+        if (d.head) {
+          d.head.rotation.y = Math.sin(t * 0.4 + d.lookOffset) * 0.12;
+          d.head.rotation.x = Math.sin(t * 0.6 + d.breathingOffset) * 0.03;
+        }
+
+        if (now > d.nextBlink && d.blinkUntil === 0) {
+          d.blinkUntil = now + 130;
+          d.nextBlink = now + 2200 + Math.random() * 3500;
+        }
+        const blinkScale = (now < d.blinkUntil) ? 0.1 : 1;
+        if (d.eyeL) d.eyeL.scale.y = blinkScale;
+        if (d.eyeR) d.eyeR.scale.y = blinkScale;
+
+        const targetRotZ = d.handRaised ? -2.55 : 0;
+        if (d.rArmGroup) {
+          d.rArmGroup.rotation.z += (targetRotZ - d.rArmGroup.rotation.z) * 0.15;
+        }
+
         if (d.highlight > 0) {
-          c.position.y = d.baseY + Math.sin(t * 12) * 0.05;
-          d.highlight -= 0.016;
-        } else c.position.y = d.baseY;
+          c.position.y = d.baseY + Math.sin(t * 14) * 0.06;
+          d.highlight -= delta;
+        } else {
+          c.position.y = d.baseY;
+        }
+
+        if (d.mouth && d.talkUntil > now) {
+          const open = 1 + Math.abs(Math.sin(t * 22)) * 1.4;
+          d.mouth.scale.y = 0.35 * open;
+        } else if (d.mouth) {
+          d.mouth.scale.y = 0.35;
+        }
       }
+
       controls.update();
       renderer.render(scene, camera);
     }
     animate();
+
+    // hook: talking + highlight when message arrives
+    window._onMessageFor3D = function (msgName, content) {
+      const c = characterMap[msgName];
+      if (!c) return;
+      c.userData.highlight = 1.2;
+      c.userData.talkUntil = performance.now() + 2000;
+    };
 
     window.addEventListener("resize", () => {
       const w = container.clientWidth, h = container.clientHeight;
