@@ -8,15 +8,17 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
-from db import init_pool, close_pool
 
 from db import (
-    init_db, create_user, get_user_by_name, get_user_by_id, set_user_lang,
+    init_pool, close_pool,
+    create_user, get_user_by_name, get_user_by_id, set_user_lang,
     update_user_profile, set_user_skin, user_stats, calc_streak,
     list_classes_taught_by, list_weekly_classes,
     create_class, get_class_by_code, get_class_by_id, join_class,
-    list_classes_for_user, list_public_classes, list_members, get_role,
-    add_message, get_messages, get_message, mark_helpful, set_blackboard, set_stage,
+    list_classes_for_user, list_public_classes, list_subjects,
+    list_members, get_role,
+    add_message, get_messages, get_message, mark_helpful,
+    set_blackboard, set_stage,
     create_join_request, list_pending_requests_for_teacher, get_request_by_id,
     set_request_status, count_pending_for_teacher, list_my_requests,
     count_students, list_all_users, delete_user,
@@ -26,7 +28,8 @@ from db import (
     create_question, list_questions, get_question, answer_question, delete_question,
     list_questions_answered_by,
     create_card, list_user_cards,
-    list_user_badges, count_badges, check_badges, record_attendance, list_subjects,
+    list_user_badges, count_badges, check_badges, record_attendance,
+    add_bonus_xp, reset_bonus_xp,poll_data,    get_class_bundle,
     BADGES, SKINS, RANKS,
 )
 from i18n import all_t, default_steps
@@ -67,7 +70,6 @@ def ctx(request, user, **extra):
         "user": user,
         "T": all_t(lang),
         "lang": lang,
-        # テンプレート側で参照されても落ちないようにデフォルトを入れる
         "flash": None,
         "pending_count": 0,
         "pending": [],
@@ -75,8 +77,12 @@ def ctx(request, user, **extra):
         "my_requests": [],
         "results": [],
         "q": "",
+        "subject": "",
+        "subjects": [],
         "my_classes": set(),
         "error": None,
+        "mode": "email",
+        "email": "",
         "steps": [],
         "members": [],
         "messages": [],
@@ -99,6 +105,8 @@ def ctx(request, user, **extra):
         "SKINS": SKINS,
         "RANKS": RANKS,
         "cards": [],
+        "invite_cls": None,
+        "join_code": "",
     }
     base.update(extra)
     return base
@@ -119,7 +127,9 @@ def index(request: Request):
     return RedirectResponse("/dashboard" if current_user(request) else "/login")
 
 
-# ---- auth ----
+# ============================================================
+# auth
+# ============================================================
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     return templates.TemplateResponse(request, "login.html", ctx(request, None))
@@ -155,7 +165,9 @@ def switch_lang(request: Request, code: str):
     return RedirectResponse(request.headers.get("referer") or "/dashboard")
 
 
-# ---- profile ----
+# ============================================================
+# profile
+# ============================================================
 @app.get("/u/{uid}", response_class=HTMLResponse)
 def profile_page(request: Request, uid: int):
     me = current_user(request)
@@ -184,7 +196,9 @@ def profile_edit(request: Request, uid: int, title: str = Form(""), bio: str = F
     return RedirectResponse(f"/u/{uid}", status_code=303)
 
 
-# ---- dashboard ----
+# ============================================================
+# dashboard
+# ============================================================
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
     user = current_user(request)
@@ -210,7 +224,9 @@ def dashboard(request: Request):
     )
 
 
-# ---- browse ----
+# ============================================================
+# browse
+# ============================================================
 @app.get("/classes", response_class=HTMLResponse)
 def browse_classes(request: Request, q: str = "", subject: str = ""):
     user = current_user(request)
@@ -268,7 +284,9 @@ def handle_request(request: Request, rid: int, action: str):
     return RedirectResponse("/dashboard", status_code=303)
 
 
-# ---- create / join ----
+# ============================================================
+# create / join
+# ============================================================
 @app.get("/create_class", response_class=HTMLResponse)
 def create_class_page(request: Request):
     user = current_user(request)
@@ -352,27 +370,29 @@ def join_class_submit(request: Request, join_code: str = Form(...)):
     return RedirectResponse(f"/class/{cls['id']}", status_code=303)
 
 
-# ---- class room ----
+# ============================================================
+# class room
+# ============================================================
 @app.get("/class/{class_id}", response_class=HTMLResponse)
 def class_room(request: Request, class_id: int):
     user = current_user(request)
     if not user:
         return RedirectResponse("/login")
-    cls = get_class_by_id(class_id)
-    if not cls:
+    # 4つの情報を1クエリでまとめて取得
+    bundle = get_class_bundle(class_id, user["id"])
+    if not bundle:
         return HTMLResponse("Class not found", status_code=404)
-    if is_banned(class_id, user["id"]):
+    if bundle["is_banned"]:
         return HTMLResponse("You are banned from this class.", status_code=403)
-    role = get_role(class_id, user["id"])
-    if not role:
+    if not bundle["is_member"]:
         return HTMLResponse("Not a member", status_code=403)
-    record_attendance(user["id"], class_id)
-    check_badges(user["id"])
-    members = list_members(class_id)
-    messages = get_messages(class_id, limit=80)
-    steps = list_steps(class_id)
-    questions = list_questions(class_id, limit=100)
-    bans = list_bans(class_id) if role == "teacher" else []
+    role = bundle["role"]
+    cls = bundle["cls"]
+    members = bundle["members"]
+    messages = bundle["messages"]
+    steps = bundle["steps"]
+    questions = bundle["questions"]
+    bans = bundle["bans"]
     return templates.TemplateResponse(
         request, "class_room.html",
         ctx(request, user, cls=cls, role=role, members=members,
@@ -380,42 +400,24 @@ def class_room(request: Request, class_id: int):
     )
 
 
-# ---- poll ----
+# ============================================================
+# poll
+# ============================================================
 @app.post("/api/poll/{class_id}")
-async def api_poll(request: Request, class_id: int):
+async def api_poll(request: Request, class_id: int, since_id: int = 0):
     user = current_user(request)
     if not user:
         return JSONResponse({"error": "not logged in"}, status_code=401)
-    if is_banned(class_id, user["id"]):
-        return JSONResponse({"error": "banned"}, status_code=403)
-    cls = get_class_by_id(class_id)
-    if not cls:
-        return JSONResponse({"error": "not found"}, status_code=404)
-    msg = get_messages(class_id, limit=80)
-    steps = list_steps(class_id)
-    questions = list_questions(class_id, limit=100)
-    members = list_members(class_id)
-    return JSONResponse({
-        "blackboard": cls["blackboard"] or "",
-        "stage": cls["stage"] if "stage" in cls.keys() else 0,
-        "steps": [{"id": s["id"], "title": s["title"]} for s in steps],
-        "members": [{"id": m["user_id"], "name": m["name"], "role": m["role"], "skin": m["skin"] or "default"} for m in members],
-        "messages": [
-            {"id": m["id"], "type": m["sender_type"], "name": m["sender_name"],
-             "content": m["content"], "helpful": m["helpful_count"] or 0}
-            for m in msg
-        ],
-        "questions": [
-            {"id": q["id"], "content": q["content"], "answer": q["answer"],
-             "is_anonymous": q["is_anonymous"],
-             "asker": q["asker_name"], "answerer": q["answerer_name"],
-             "answered_at": q["answered_at"], "created_at": q["created_at"]}
-            for q in questions
-        ],
-    })
+    data, err = poll_data(class_id, user["id"], since_msg_id=since_id)
+    if err == "not_found":
+        return JSONResponse({"error": err}, status_code=404)
+    if err in ("banned", "not_member"):
+        return JSONResponse({"error": err}, status_code=403)
+    return JSONResponse(data)
 
-
-# ---- blackboard ----
+# ============================================================
+# blackboard
+# ============================================================
 @app.post("/api/blackboard/{class_id}")
 async def api_blackboard(request: Request, class_id: int):
     user = current_user(request)
@@ -442,7 +444,9 @@ async def api_blackboard_clear(request: Request, class_id: int):
     return JSONResponse({"ok": True})
 
 
-# ---- upload ----
+# ============================================================
+# upload
+# ============================================================
 @app.post("/api/upload/{class_id}")
 async def api_upload(request: Request, class_id: int, file: UploadFile = File(...)):
     user = current_user(request)
@@ -461,7 +465,9 @@ async def api_upload(request: Request, class_id: int, file: UploadFile = File(..
     return JSONResponse({"ok": True, "url": url})
 
 
-# ---- steps ----
+# ============================================================
+# steps
+# ============================================================
 @app.post("/api/step/{class_id}/{action}")
 async def api_step(request: Request, class_id: int, action: str):
     user = current_user(request)
@@ -509,7 +515,9 @@ async def api_steps_delete(request: Request, class_id: int, step_id: int):
     return JSONResponse({"ok": True})
 
 
-# ---- announce ----
+# ============================================================
+# announce
+# ============================================================
 @app.post("/api/announce/{class_id}")
 async def api_announce(request: Request, class_id: int):
     user = current_user(request)
@@ -528,7 +536,9 @@ async def api_announce(request: Request, class_id: int):
     return JSONResponse({"ok": True})
 
 
-# ---- helpful ----
+# ============================================================
+# helpful
+# ============================================================
 @app.post("/api/helpful/{class_id}/{message_id}")
 async def api_helpful(request: Request, class_id: int, message_id: int):
     user = current_user(request)
@@ -545,7 +555,9 @@ async def api_helpful(request: Request, class_id: int, message_id: int):
     return JSONResponse({"ok": True, "count": count, "new": ok})
 
 
-# ---- kick / ban ----
+# ============================================================
+# kick / ban
+# ============================================================
 @app.post("/api/kick/{class_id}/{user_id}")
 async def api_kick(request: Request, class_id: int, user_id: int):
     user = current_user(request)
@@ -589,7 +601,9 @@ async def api_unban(request: Request, class_id: int, user_id: int):
     return JSONResponse({"ok": True})
 
 
-# ---- questions (Q&A) ----
+# ============================================================
+# questions (Q&A)
+# ============================================================
 @app.post("/api/questions/{class_id}")
 async def api_question_create(request: Request, class_id: int):
     user = current_user(request)
@@ -640,7 +654,9 @@ async def api_question_delete(request: Request, class_id: int, qid: int):
     return JSONResponse({"ok": True})
 
 
-# ---- history ----
+# ============================================================
+# history
+# ============================================================
 @app.get("/api/history/{class_id}")
 async def api_history(request: Request, class_id: int):
     user = current_user(request)
@@ -673,7 +689,9 @@ async def api_history_restore(request: Request, class_id: int, hid: int):
     return JSONResponse({"ok": True, "content": r["content"] or ""})
 
 
-# ---- badges / skins ----
+# ============================================================
+# badges / skins
+# ============================================================
 @app.get("/badges", response_class=HTMLResponse)
 def badges_page(request: Request):
     user = current_user(request)
@@ -714,7 +732,9 @@ def api_stats(request: Request, uid: int):
     })
 
 
-# ---- learning card ----
+# ============================================================
+# learning card
+# ============================================================
 @app.post("/card/{class_id}")
 async def make_card(request: Request, class_id: int):
     user = current_user(request)
@@ -740,7 +760,10 @@ def cards_page(request: Request):
         request, "cards.html", ctx(request, user, cards=cards)
     )
 
-# ---- invite (magic link) ----
+
+# ============================================================
+# invite (magic link)
+# ============================================================
 @app.get("/invite/{join_code}", response_class=HTMLResponse)
 def invite_page(request: Request, join_code: str):
     cls = get_class_by_code(join_code.strip().lower())
@@ -776,7 +799,9 @@ def invite_join(request: Request, join_code: str, name: str = Form(...)):
     return RedirectResponse(f"/class/{cls['id']}", status_code=303)
 
 
-# ---- dev (ENABLE_DEV=1 のみ) ----
+# ============================================================
+# dev (ENABLE_DEV=1 のみ)
+# ============================================================
 if os.environ.get("ENABLE_DEV") == "1":
     @app.get("/dev/users", response_class=HTMLResponse)
     def dev_users(request: Request):
@@ -810,3 +835,19 @@ if os.environ.get("ENABLE_DEV") == "1":
     def dev_delete(request: Request, uid: int):
         delete_user(uid)
         return RedirectResponse("/dev/users", status_code=303)
+
+    @app.post("/dev/xp/add/{amount}")
+    def dev_xp_add(request: Request, amount: int):
+        user = current_user(request)
+        if not user:
+            return RedirectResponse("/login")
+        add_bonus_xp(user["id"], amount)
+        return RedirectResponse(request.headers.get("referer") or "/badges", status_code=303)
+
+    @app.post("/dev/xp/reset")
+    def dev_xp_reset(request: Request):
+        user = current_user(request)
+        if not user:
+            return RedirectResponse("/login")
+        reset_bonus_xp(user["id"])
+        return RedirectResponse(request.headers.get("referer") or "/badges", status_code=303)

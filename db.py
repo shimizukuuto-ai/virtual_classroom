@@ -18,8 +18,8 @@ def get_pool():
     if _pool is None:
         _pool = ConnectionPool(
             DATABASE_URL,
-            min_size=2,
-            max_size=8,
+            min_size=3,
+            max_size=10,
             open=True,
             timeout=10,
         )
@@ -27,7 +27,6 @@ def get_pool():
 
 
 def get_conn():
-    """接続を借りる。with 文で使うと自動で返却される。"""
     return get_pool().connection()
 
 
@@ -427,7 +426,8 @@ def user_stats(uid):
             """, (name, name, uid, uid, uid, uid, uid))
             row = c.fetchone()
     bonus = user["bonus_xp"] if "bonus_xp" in user.keys() and user["bonus_xp"] is not None else 0
-    xp = row["helpful"] * 5 + row["answers"] * 20 + row["taught"] * 50 + row["weekly_hosted"] * 30 + row["students_total"] * 2 + bonus
+    xp = (row["helpful"] * 5 + row["answers"] * 20 + row["taught"] * 50
+          + row["weekly_hosted"] * 30 + row["students_total"] * 2 + bonus)
     return {
         "helpful": row["helpful"],
         "messages": row["msg_count"],
@@ -484,13 +484,10 @@ def record_attendance(uid, class_id):
                     (uid, class_id, today()),
                 )
                 conn.commit()
-                newly = True
+                return True
             except psycopg.errors.UniqueViolation:
                 conn.rollback()
-                newly = False
-    if newly:
-        check_badges(uid)
-    return newly
+                return False
 
 
 # ============================================================
@@ -1092,3 +1089,117 @@ def list_questions_answered_by(uid, limit=20):
                 (uid, limit),
             )
             return c.fetchall()
+
+
+# ============================================================
+# poll_data (for /api/poll)
+# ============================================================
+def poll_data(class_id, user_id, since_msg_id=0):
+    """ポーリング用に必要なデータを1接続でまとめて取得。"""
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("""
+                SELECT c.blackboard, c.stage,
+                       EXISTS(SELECT 1 FROM enrollments WHERE class_id = c.id AND user_id = %s) AS is_member,
+                       EXISTS(SELECT 1 FROM class_bans WHERE class_id = c.id AND user_id = %s) AS is_banned
+                FROM classes c WHERE c.id = %s
+            """, (user_id, user_id, class_id))
+            cls = c.fetchone()
+            if not cls:
+                return None, "not_found"
+            if cls["is_banned"]:
+                return None, "banned"
+            if not cls["is_member"]:
+                return None, "not_member"
+
+            c.execute("""
+                SELECT id, sender_type AS type, sender_name AS name,
+                       content, helpful_count AS helpful
+                FROM messages
+                WHERE class_id = %s AND id > %s
+                ORDER BY id ASC LIMIT 100
+            """, (class_id, since_msg_id))
+            msgs = c.fetchall()
+
+            c.execute("""
+                SELECT q.id, q.content, q.answer, q.is_anonymous,
+                       u.name AS asker, t.name AS answerer,
+                       q.created_at, q.answered_at
+                FROM questions q
+                LEFT JOIN users u ON u.id = q.asked_by
+                LEFT JOIN users t ON t.id = q.answered_by
+                WHERE q.class_id = %s
+                ORDER BY (q.answer IS NULL) DESC, q.id DESC LIMIT 100
+            """, (class_id,))
+            questions = c.fetchall()
+
+    return {
+        "blackboard": cls["blackboard"] or "",
+        "stage": cls["stage"] or 0,
+        "messages": [dict(m) for m in msgs],
+        "questions": [dict(q) for q in questions],
+    }, None
+
+def get_class_bundle(class_id, user_id):
+    """教室ページ用：1接続で必要なデータをまとめて取得。"""
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("SELECT * FROM classes WHERE id = %s", (class_id,))
+            cls = c.fetchone()
+            if not cls:
+                return None
+            c.execute(
+                "SELECT role FROM enrollments WHERE class_id = %s AND user_id = %s",
+                (class_id, user_id),
+            )
+            role_row = c.fetchone()
+            role = role_row["role"] if role_row else None
+            c.execute(
+                "SELECT 1 FROM class_bans WHERE class_id = %s AND user_id = %s",
+                (class_id, user_id),
+            )
+            is_banned = bool(c.fetchone())
+            if is_banned or not role:
+                return {"cls": cls, "role": role, "is_banned": is_banned, "is_member": bool(role),
+                        "members": [], "messages": [], "steps": [], "questions": [], "bans": []}
+            c.execute(
+                """SELECT u.id AS user_id, u.name, u.skin, e.role FROM enrollments e
+                JOIN users u ON u.id = e.user_id WHERE e.class_id = %s ORDER BY e.joined_at""",
+                (class_id,),
+            )
+            members = c.fetchall()
+            c.execute(
+                "SELECT * FROM messages WHERE class_id = %s ORDER BY id ASC LIMIT 80",
+                (class_id,),
+            )
+            messages = c.fetchall()
+            c.execute(
+                "SELECT * FROM class_steps WHERE class_id = %s ORDER BY position ASC, id ASC",
+                (class_id,),
+            )
+            steps = c.fetchall()
+            c.execute(
+                """SELECT q.*, u.name AS asker_name, t.name AS answerer_name
+                FROM questions q
+                LEFT JOIN users u ON u.id = q.asked_by
+                LEFT JOIN users t ON t.id = q.answered_by
+                WHERE q.class_id = %s
+                ORDER BY (q.answer IS NULL) DESC, q.id DESC LIMIT 100""",
+                (class_id,),
+            )
+            questions = c.fetchall()
+            if role == "teacher":
+                c.execute(
+                    """SELECT b.*, u.name AS user_name FROM class_bans b
+                    JOIN users u ON u.id = b.user_id
+                    WHERE b.class_id = %s ORDER BY b.created_at DESC""",
+                    (class_id,),
+                )
+                bans = c.fetchall()
+            else:
+                bans = []
+    return {
+        "cls": cls, "role": role, "is_banned": is_banned, "is_member": True,
+        "members": members, "messages": messages, "steps": steps,
+        "questions": questions, "bans": bans,
+    }
