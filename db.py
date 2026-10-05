@@ -204,6 +204,16 @@ def init_db():
                 size INTEGER DEFAULT 0, kind TEXT DEFAULT 'image', created_at TEXT NOT NULL
             );""")
             c.execute("""
+            CREATE TABLE IF NOT EXISTS teacher_ratings (
+                id SERIAL PRIMARY KEY,
+                teacher_id INTEGER NOT NULL,
+                student_id INTEGER NOT NULL,
+                class_id INTEGER NOT NULL,
+                value INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(teacher_id, student_id, class_id)
+            );""")
+            c.execute("""
             CREATE TABLE IF NOT EXISTS magic_tokens (
                 id SERIAL PRIMARY KEY, token_hash TEXT NOT NULL UNIQUE, email TEXT NOT NULL,
                 expires_at TEXT NOT NULL, used_at TEXT, created_at TEXT NOT NULL
@@ -228,6 +238,10 @@ def init_db():
                 "ALTER TABLE classes ADD COLUMN board_theme TEXT DEFAULT 'default'",
                 "ALTER TABLE messages ADD COLUMN helpful_count INTEGER DEFAULT 0",
                 "ALTER TABLE messages ADD COLUMN like_count INTEGER DEFAULT 0",
+                                "ALTER TABLE users ADD COLUMN custom_hair INTEGER DEFAULT -1",
+                "ALTER TABLE users ADD COLUMN custom_skin INTEGER DEFAULT -1",
+                "ALTER TABLE users ADD COLUMN custom_shirt INTEGER DEFAULT -1",
+                "ALTER TABLE users ADD COLUMN custom_style TEXT DEFAULT ''",
             ]:
                 try:
                     c.execute(ddl)
@@ -1038,4 +1052,93 @@ def get_upload(upload_id):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
             c.execute("SELECT * FROM uploads WHERE id=%s", (upload_id,))
+            return c.fetchone()
+        
+        # ===== avatar customization =====
+UNLOCK_TIERS = {
+    # tier: (min_classes_taught, min_helpful, min_students_taught)
+    "hair": [
+        (0, 0, 0),      # tier 0: unlocked by default (5 colors)
+        (3, 5, 5),      # tier 1: +4 colors (total 9)
+        (10, 50, 30),   # tier 2: +4 colors (total 13)
+        (30, 200, 100), # tier 3: all colors
+    ],
+    "skin": [
+        (0, 0, 0),      # tier 0: 6 tones
+        (10, 50, 30),   # tier 1: +2 special tones
+    ],
+    "shirt": [
+        (0, 0, 0),      # tier 0: 6 colors
+        (3, 5, 5),      # tier 1: +4 (total 10)
+        (10, 50, 30),   # tier 2: +4 (total 14)
+    ],
+    "style": [
+        (0, 0, 0),      # tier 0: 5 styles
+        (5, 20, 15),    # tier 1: +1 (total 6)
+    ],
+}
+
+
+def get_unlock_tier(uid, kind):
+    """現在の解放ティアを返す。"""
+    s = user_stats(uid)
+    if not s:
+        return 0
+    tiers = UNLOCK_TIERS.get(kind, [(0,0,0)])
+    result = 0
+    for i, (mc, mh, mst) in enumerate(tiers):
+        if s["taught"] >= mc and s["helpful"] >= mh and s["students_total"] >= mst:
+            result = i
+    return result
+
+
+def set_user_customization(uid, hair=None, skin=None, shirt=None, style=None):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            if hair is not None:
+                c.execute("UPDATE users SET custom_hair=%s WHERE id=%s", (int(hair), uid))
+            if skin is not None:
+                c.execute("UPDATE users SET custom_skin=%s WHERE id=%s", (int(skin), uid))
+            if shirt is not None:
+                c.execute("UPDATE users SET custom_shirt=%s WHERE id=%s", (int(shirt), uid))
+            if style is not None:
+                c.execute("UPDATE users SET custom_style=%s WHERE id=%s", (str(style), uid))
+        conn.commit()
+
+
+# ===== teacher ratings =====
+def rate_teacher(teacher_id, student_id, class_id, value):
+    """value: +1 (good) or -1 (bad)"""
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            try:
+                c.execute("""INSERT INTO teacher_ratings (teacher_id, student_id, class_id, value, created_at)
+                    VALUES (%s,%s,%s,%s,%s)""",
+                    (teacher_id, student_id, class_id, value, now()))
+                conn.commit()
+            except psycopg.errors.UniqueViolation:
+                conn.rollback()
+                c.execute("""UPDATE teacher_ratings SET value=%s, created_at=%s
+                    WHERE teacher_id=%s AND student_id=%s AND class_id=%s""",
+                    (value, now(), teacher_id, student_id, class_id))
+                conn.commit()
+
+
+def get_teacher_rating(teacher_id):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("""SELECT
+                COALESCE(SUM(CASE WHEN value>0 THEN 1 ELSE 0 END),0) AS good,
+                COALESCE(SUM(CASE WHEN value<0 THEN 1 ELSE 0 END),0) AS bad,
+                COUNT(*) AS total
+                FROM teacher_ratings WHERE teacher_id=%s""", (teacher_id,))
+            return c.fetchone()
+
+
+def get_my_rating(teacher_id, student_id, class_id):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("""SELECT value FROM teacher_ratings
+                WHERE teacher_id=%s AND student_id=%s AND class_id=%s""",
+                (teacher_id, student_id, class_id))
             return c.fetchone()

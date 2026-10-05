@@ -533,6 +533,10 @@ main { padding: 16px 20px; }
       <button id="btn-hand" class="primary" style="flex:2;">✋ {{ T.raise_hand }}</button>
       <button id="btn-like" class="red" style="flex:1;">👍 {{ T.like }}</button>
     </div>
+        <div class="t-ctrl" id="rate-teacher-row">
+      <button id="btn-rate-good" class="green" style="flex:1;">👍 {{ T.rate_good }}</button>
+      <button id="btn-rate-bad" class="red" style="flex:1;">👎 {{ T.rate_bad }}</button>
+    </div>
     <div class="t-ctrl" id="audio-listen-row" style="display:none;">
       <button id="btn-audio-listen" class="green" style="width:100%;">
         🔊 {{ T.audio_listening }}
@@ -813,6 +817,12 @@ window.I18N = {
   group_remove_member: {{ T.group_remove_member|tojson }},
   group_you_belong: {{ T.group_you_belong|tojson }},
   group_board: {{ T.group_board|tojson }}
+    rate_good: {{ T.rate_good|tojson }},
+  rate_bad: {{ T.rate_bad|tojson }},
+  rate_good_thanks: {{ T.rate_good_thanks|tojson }},
+  rate_bad_thanks: {{ T.rate_bad_thanks|tojson }},
+  rate_you_rated_good: {{ T.rate_you_rated_good|tojson }},
+  rate_you_rated_bad: {{ T.rate_you_rated_bad|tojson }},
 };
 window.CLASS_ID = {{ cls.id }};
 window.CLASS_JOIN_CODE = {{ cls.join_code|tojson }};
@@ -823,6 +833,7 @@ window.CLASS_SUBJECT = {{ cls.subject|tojson }};
 window.ALLOW_ANONYMOUS = {{ (1 if allow_anonymous else 0)|tojson }};
 window.INITIAL_BB = {{ (cls.blackboard or '')|tojson }};
 window.TEACHER_DISPLAY_NAME = {{ (cls.taught_by or T.teacher)|tojson }};
+window.TEACHER_ID = {{ (members|selectattr('role','equalto','teacher')|map(attribute='user_id')|list|first) if members else 0 }};
 window.STEPS = [
   {% for s in steps %}{id: {{ s.id }}, title: {{ s.title|tojson }}},{% endfor %}
 ];
@@ -1933,6 +1944,29 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
     });
   });
 
+    // ===== TEACHER RATING (student only) =====
+  const rateGood = document.getElementById("btn-rate-good");
+  const rateBad = document.getElementById("btn-rate-bad");
+  const rateRow = document.getElementById("rate-teacher-row");
+  if (rateRow && ROLE === "teacher") {
+    rateRow.style.display = "none";
+  }
+  async function sendRating(value) {
+    if (!window.TEACHER_ID) return;
+    try {
+      const res = await fetch('/api/rate/' + CLASS_ID + '/' + window.TEACHER_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value })
+      });
+      if (res.ok) {
+        statusEl.textContent = value > 0 ? I18N.rate_good_thanks : I18N.rate_bad_thanks;
+        setTimeout(() => { statusEl.textContent = ""; }, 2000);
+      }
+    } catch (err) {}
+  }
+  if (rateGood) rateGood.addEventListener("click", () => sendRating(1));
+  if (rateBad) rateBad.addEventListener("click", () => sendRating(-1));
+
   // ===== INITIAL POLL + SCHEDULE =====
   pollNow().then(() => scheduleNextPoll());
 })();
@@ -2485,18 +2519,49 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
     const PANTS_COLORS = [0x1e293b, 0x334155, 0x475569, 0x1e3a8a, 0x365314, 0x7c2d12, 0x4c1d95, 0x0f172a];
     const HAIR_STYLES = ["short", "long", "spiky", "ponytail", "bun"];
 
+        // ---- custom fields from server (per member) ----
+    const CUSTOM_HANDLES = {};
+    window.MEMBERS.forEach(m => {
+      CUSTOM_HANDLES[m.name] = {
+        hair: (m.custom_hair !== undefined && m.custom_hair !== null) ? m.custom_hair : -1,
+        skin: (m.custom_skin !== undefined && m.custom_skin !== null) ? m.custom_skin : -1,
+        shirt: (m.custom_shirt !== undefined && m.custom_shirt !== null) ? m.custom_shirt : -1,
+        style: m.custom_style || "",
+      };
+    });
+
+    const HAIR_PALETTE = [
+      0x1a1a1a, 0x2a1a0a, 0x3b2314, 0x5a3825, 0x8b4513,
+      0xd4a574, 0x1e293b, 0x6b3410, 0xa0522d,
+      0xdc2626, 0xfbbf24, 0xa855f7, 0x0ea5e9,
+    ];
+    const SKIN_PALETTE = [
+      0xffe0bd, 0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffd8b0,
+      0xa0e0d0, 0xe0b0d0,
+    ];
+    const SHIRT_PALETTE = [
+      0x3b82f6, 0xef4444, 0x10b981, 0xf59e0b, 0x8b5cf6, 0xec4899,
+      0x14b8a6, 0xf97316, 0x6366f1, 0x0ea5e9,
+      0x84cc16, 0x06b6d4, 0xa855f7, 0xdc2626,
+    ];
+
     function paletteFor(name) {
       const h = hashName(name);
-      return {
+      const custom = CUSTOM_HANDLES[name] || { hair: -1, skin: -1, shirt: -1, style: "" };
+      const base = {
         skin: SKIN_TONES[h % SKIN_TONES.length],
         hair: HAIR_COLORS[(h>>3) % HAIR_COLORS.length],
         shirt: SHIRT_COLORS[(h>>6) % SHIRT_COLORS.length],
         pants: PANTS_COLORS[(h>>9) % PANTS_COLORS.length],
         style: HAIR_STYLES[(h>>12) % HAIR_STYLES.length],
-        // small offsets
         headTilt: ((h>>15) % 10) / 200 - 0.025,
         bodyScale: 0.95 + (((h>>18) % 10) / 100),
       };
+      if (custom.hair >= 0 && custom.hair < HAIR_PALETTE.length) base.hair = HAIR_PALETTE[custom.hair];
+      if (custom.skin >= 0 && custom.skin < SKIN_PALETTE.length) base.skin = SKIN_PALETTE[custom.skin];
+      if (custom.shirt >= 0 && custom.shirt < SHIRT_PALETTE.length) base.shirt = SHIRT_PALETTE[custom.shirt];
+      if (custom.style) base.style = custom.style;
+      return base;
     }
 
     function makeNameSprite(name, isTeacher) {

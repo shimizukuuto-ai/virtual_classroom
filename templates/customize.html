@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}{{ T.customize }} - {{ T.app_title }}{% endblock %}
+{% block content %}
+<style>
+.cust-head { margin-bottom: 24px; }
+.cust-head h1 { font-size: 24px; font-weight: 800; margin: 0 0 6px; letter-spacing: -.02em; }
+.cust-head p { color: var(--text-muted); margin: 0; font-size: 14px; }
+
+.cust-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+.cust-section h2 { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
+.cust-section .hint { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; }
+.cust-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.cust-swatch {
+  width: 44px; height: 44px; border-radius: 10px; border: 2px solid var(--border);
+  cursor: pointer; transition: all .15s; position: relative;
+}
+.cust-swatch:hover { transform: scale(1.08); }
+.cust-swatch.active { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,.25); }
+.cust-swatch.locked { opacity: .3; cursor: not-allowed; }
+.cust-swatch.locked::after { content: "🔒"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; background: rgba(0,0,0,.4); border-radius: 8px; }
+.cust-style {
+  padding: 8px 14px; border-radius: 10px; border: 2px solid var(--border);
+  background: var(--surface-2); cursor: pointer; font-size: 12px; font-weight: 600;
+  color: var(--text); transition: all .15s;
+}
+.cust-style.active { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
+.cust-style.locked { opacity: .4; cursor: not-allowed; }
+.cust-preview { display: flex; gap: 20px; align-items: center; margin-bottom: 20px; }
+.cust-preview-box { width: 120px; height: 120px; border-radius: 20px; background: linear-gradient(135deg, #eef2ff, #f5f3ff); display: flex; align-items: center; justify-content: center; font-size: 60px; }
+.unlock-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; background: var(--primary-soft); color: var(--primary); font-size: 11px; font-weight: 700; margin-left: 8px; }
+</style>
+
+<div class="cust-head">
+  <h1>{{ T.customize }}</h1>
+  <p>{{ T.customize_desc }}</p>
+</div>
+
+<div class="cust-preview">
+  <div class="cust-preview-box">🎨</div>
+  <div>
+    <div style="font-size:13px;font-weight:700;color:var(--text);">{{ user.name }}</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">
+      {{ T.stat_taught }}: {{ stats.taught }} · {{ T.stat_helpful }}: {{ stats.helpful }} · {{ T.stat_joined }}: {{ stats.joined }}
+    </div>
+    <div style="font-size:11px;color:var(--text-soft);margin-top:8px;">
+      {{ T.customize_unlock_hint }}
+    </div>
+  </div>
+</div>
+
+<form method="post" action="/customize">
+  <!-- HAIR -->
+  <div class="cust-section">
+    <h2>{{ T.customize_hair }}</h2>
+    <div class="hint">{{ T.customize_desc }}</div>
+    <div class="cust-grid">
+      {% set hairColors = ["#1a1a1a", "#2a1a0a", "#3b2314", "#5a3825", "#8b4513"] %}
+      {% set hairColorsT1 = ["#d4a574", "#1e293b", "#6b3410", "#a0522d"] %}
+      {% set hairColorsT2 = ["#dc2626", "#fbbf24", "#a855f7", "#0ea5e9"] %}
+      {% for c in hairColors %}
+      <label class="cust-swatch" style="background:{{ c }};">
+        <input type="radio" name="hair" value="{{ loop.index0 }}" {% if user.custom_hair == loop.index0 %}checked{% endif %} style="display:none;">
+      </label>
+      {% endfor %}
+      {% for c in hairColorsT1 %}
+      <label class="cust-swatch {% if tiers.hair < 1 %}locked{% endif %}" style="background:{{ c }};">
+        {% if tiers.hair >= 1 %}<input type="radio" name="hair" value="{{ 5 + loop.index0 }}" {% if user.custom_hair == 5 + loop.index0 %}checked{% endif %} style="display:none;">{% endif %}
+      </label>
+      {% endfor %}
+      {% for c in hairColorsT2 %}
+      <label class="cust-swatch {% if tiers.hair < 2 %}locked{% endif %}" style="background:{{ c }};">
+        {% if tiers.hair >= 2 %}<input type="radio" name="hair" value="{{ 9 + loop.index0 }}" {% if user.custom_hair == 9 + loop.index0 %}checked{% endif %} style="display:none;">{% endif %}
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- SKIN -->
+  <div class="cust-section">
+    <h2>{{ T.customize_skin }}</h2>
+    <div class="cust-grid">
+      {% set skinTones = ["#ffe0bd", "#f1c27d", "#e0ac69", "#c68642", "#8d5524", "#ffd8b0"] %}
+      {% set skinTonesT1 = ["#a0e0d0", "#e0b0d0"] %}
+      {% for c in skinTones %}
+      <label class="cust-swatch" style="background:{{ c }};">
+        <input type="radio" name="skin" value="{{ loop.index0 }}" {% if user.custom_skin == loop.index0 %}checked{% endif %} style="display:none;">
+      </label>
+      {% endfor %}
+      {% for c in skinTonesT1 %}
+      <label class="cust-swatch {% if tiers.skin < 1 %}locked{% endif %}" style="background:{{ c }};">
+        {% if tiers.skin >= 1 %}<input type="radio" name="skin" value="{{ 6 + loop.index0 }}" {% if user.custom_skin == 6 + loop.index0 %}checked{% endif %} style="display:none;">{% endif %}
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- SHIRT -->
+  <div class="cust-section">
+    <h2>{{ T.customize_shirt }}</h2>
+    <div class="cust-grid">
+      {% set shirtColors = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899"] %}
+      {% set shirtColorsT1 = ["#14b8a6", "#f97316", "#6366f1", "#0ea5e9"] %}
+      {% set shirtColorsT2 = ["#84cc16", "#06b6d4", "#a855f7", "#dc2626"] %}
+      {% for c in shirtColors %}
+      <label class="cust-swatch" style="background:{{ c }};">
+        <input type="radio" name="shirt" value="{{ loop.index0 }}" {% if user.custom_shirt == loop.index0 %}checked{% endif %} style="display:none;">
+      </label>
+      {% endfor %}
+      {% for c in shirtColorsT1 %}
+      <label class="cust-swatch {% if tiers.shirt < 1 %}locked{% endif %}" style="background:{{ c }};">
+        {% if tiers.shirt >= 1 %}<input type="radio" name="shirt" value="{{ 6 + loop.index0 }}" {% if user.custom_shirt == 6 + loop.index0 %}checked{% endif %} style="display:none;">{% endif %}
+      </label>
+      {% endfor %}
+      {% for c in shirtColorsT2 %}
+      <label class="cust-swatch {% if tiers.shirt < 2 %}locked{% endif %}" style="background:{{ c }};">
+        {% if tiers.shirt >= 2 %}<input type="radio" name="shirt" value="{{ 10 + loop.index0 }}" {% if user.custom_shirt == 10 + loop.index0 %}checked{% endif %} style="display:none;">{% endif %}
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- STYLE -->
+  <div class="cust-section">
+    <h2>{{ T.customize_style }}</h2>
+    <div class="cust-grid">
+      {% set styles = [("short","Short"),("long","Long"),("spiky","Spiky"),("ponytail","Ponytail"),("bun","Bun")] %}
+      {% for key, label in styles %}
+      <label class="cust-style {% if user.custom_style == key %}active{% endif %}">
+        <input type="radio" name="style" value="{{ key }}" {% if user.custom_style == key %}checked{% endif %} style="display:none;">
+        {{ label }}
+      </label>
+      {% endfor %}
+      <label class="cust-style {% if tiers.style < 1 %}locked{% endif %}">
+        {% if tiers.style >= 1 %}
+        <input type="radio" name="style" value="mohawk" {% if user.custom_style == 'mohawk' %}checked{% endif %} style="display:none;">
+        {% endif %}
+        Mohawk
+      </label>
+    </div>
+  </div>
+
+  <button type="submit" class="btn lg" style="width:100%;">{{ T.customize_save }}</button>
+</form>
+
+<script>
+// radio クリックで active クラス付け替え
+document.querySelectorAll(".cust-swatch, .cust-style").forEach(el => {
+  el.addEventListener("click", () => {
+    if (el.classList.contains("locked")) return;
+    const name = el.querySelector("input")?.name;
+    if (!name) return;
+    document.querySelectorAll(`.cust-swatch input[name="${name}"], .cust-style input[name="${name}"]`).forEach(inp => {
+      inp.closest("label").classList.toggle("active", inp.checked);
+    });
+  });
+});
+</script>
+{% endblock %}

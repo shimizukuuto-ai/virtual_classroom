@@ -89,6 +89,25 @@
   <div class="stat"><div class="n">{{ stats.joined }}</div><div class="l">{{ T.stat_joined }}</div></div>
 </div>
 
+<div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
+  <div class="stat" style="background:linear-gradient(135deg,#ecfdf5,#d1fae5);border-color:#86efac;">
+    <div class="n" id="rating-good">0</div>
+    <div class="l">👍 {{ T.rating_good }}</div>
+  </div>
+  <div class="stat" style="background:linear-gradient(135deg,#fef2f2,#fee2e2);border-color:#fca5a5;">
+    <div class="n" id="rating-bad">0</div>
+    <div class="l">👎 {{ T.rating_bad }}</div>
+  </div>
+</div>
+<script>
+fetch('/api/rating/{{ profile_user.id }}')
+  .then(r => r.json())
+  .then(d => {
+    document.getElementById("rating-good").textContent = d.good || 0;
+    document.getElementById("rating-bad").textContent = d.bad || 0;
+  }).catch(() => {});
+</script>
+
 {% if is_me %}
 <details class="edit-box">
   <summary>{{ T.edit_profile }}</summary>

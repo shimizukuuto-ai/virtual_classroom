@@ -35,7 +35,8 @@ from db import (
     create_group, list_groups, delete_group, add_member_to_group,
     remove_member_from_group, get_user_group, set_group_board,
     add_student_note, list_student_notes, delete_student_note,
-    save_upload, get_upload,
+    save_upload, get_upload,    set_user_customization, get_unlock_tier, UNLOCK_TIERS,
+    rate_teacher, get_teacher_rating, get_my_rating,
     BADGES, SKINS, RANKS,
 )
 from i18n import all_t, default_steps
@@ -1125,6 +1126,75 @@ async def audio_ws(websocket: WebSocket, class_id: int):
             if not audio_rooms[class_id]:
                 del audio_rooms[class_id]
 
+# ============================================================
+# customization
+# ============================================================
+@app.get("/customize", response_class=HTMLResponse)
+def customize_page(request: Request):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    stats = user_stats(user["id"])
+    tiers = {k: get_unlock_tier(user["id"], k) for k in UNLOCK_TIERS.keys()}
+    return templates.TemplateResponse(
+        request, "customize.html",
+        ctx(request, user, stats=stats, tiers=tiers),
+    )
+
+
+@app.post("/customize")
+def customize_submit(
+    request: Request,
+    hair: str = Form(...),
+    skin: str = Form(...),
+    shirt: str = Form(...),
+    style: str = Form(""),
+):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    try:
+        set_user_customization(
+            user["id"],
+            hair=int(hair) if hair != "" else -1,
+            skin=int(skin) if skin != "" else -1,
+            shirt=int(shirt) if shirt != "" else -1,
+            style=style or "",
+        )
+    except (ValueError, TypeError):
+        pass
+    return RedirectResponse("/customize", status_code=303)
+
+
+# ============================================================
+# teacher ratings
+# ============================================================
+@app.post("/api/rate/{class_id}/{teacher_id}")
+async def api_rate(request: Request, class_id: int, teacher_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    role = get_role(class_id, user["id"])
+    if not role:
+        return JSONResponse({"error": "not member"}, status_code=403)
+    if int(user["id"]) == int(teacher_id):
+        return JSONResponse({"error": "cannot rate yourself"}, status_code=400)
+    data = await request.json()
+    value = int(data.get("value", 0))
+    if value not in (1, -1):
+        return JSONResponse({"error": "invalid value"}, status_code=400)
+    rate_teacher(teacher_id, user["id"], class_id, value)
+    return JSONResponse({"ok": True})
+
+
+@app.get("/api/rating/{teacher_id}")
+def api_rating(request: Request, teacher_id: int):
+    r = get_teacher_rating(teacher_id)
+    return JSONResponse({
+        "good": r["good"] if r else 0,
+        "bad": r["bad"] if r else 0,
+        "total": r["total"] if r else 0,
+    })
 
 # ============================================================
 # dev
