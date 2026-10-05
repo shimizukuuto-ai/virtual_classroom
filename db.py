@@ -194,22 +194,14 @@ def init_db():
                 content TEXT DEFAULT '', updated_at TEXT NOT NULL
             );""")
             c.execute("""
-            CREATE TABLE IF NOT EXISTS uploads (
-                id SERIAL PRIMARY KEY,
-                data TEXT NOT NULL,
-                mime TEXT NOT NULL DEFAULT 'image/png',
-                size INTEGER DEFAULT 0,
-                kind TEXT DEFAULT 'image',
-                created_at TEXT NOT NULL
+            CREATE TABLE IF NOT EXISTS student_notes (
+                id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, class_id INTEGER NOT NULL,
+                title TEXT DEFAULT '', content TEXT NOT NULL, created_at TEXT NOT NULL
             );""")
             c.execute("""
-            CREATE TABLE IF NOT EXISTS student_notes (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                class_id INTEGER NOT NULL,
-                title TEXT DEFAULT '',
-                content TEXT NOT NULL,
-                created_at TEXT NOT NULL
+            CREATE TABLE IF NOT EXISTS uploads (
+                id SERIAL PRIMARY KEY, data TEXT NOT NULL, mime TEXT NOT NULL DEFAULT 'image/png',
+                size INTEGER DEFAULT 0, kind TEXT DEFAULT 'image', created_at TEXT NOT NULL
             );""")
             c.execute("""
             CREATE TABLE IF NOT EXISTS magic_tokens (
@@ -217,9 +209,10 @@ def init_db():
                 expires_at TEXT NOT NULL, used_at TEXT, created_at TEXT NOT NULL
             );""")
 
-            # ==== 既存DBへの後付け（重要） ====
+            # ===== 既存DBへの追加カラム（重要） =====
+            conn.commit()
             for ddl in [
-                "ALTER TABLE users ADD COLUMN email TEXT UNIQUE",
+                "ALTER TABLE users ADD COLUMN email TEXT",
                 "ALTER TABLE users ADD COLUMN lang TEXT DEFAULT 'en'",
                 "ALTER TABLE users ADD COLUMN title TEXT DEFAULT ''",
                 "ALTER TABLE users ADD COLUMN bio TEXT DEFAULT ''",
@@ -238,13 +231,12 @@ def init_db():
             ]:
                 try:
                     c.execute(ddl)
+                    conn.commit()
                 except psycopg.errors.DuplicateColumn:
                     conn.rollback()
-                except psycopg.errors.UndefinedTable:
+                except Exception as e:
                     conn.rollback()
-                except Exception:
-                    conn.rollback()
-        conn.commit()
+                    print(f"[init_db] ALTER skipped: {e}")
 
 
 # ===== users =====
