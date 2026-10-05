@@ -414,10 +414,10 @@ main { padding: 16px 20px; }
       <div class="pane" data-pane="chat">
         <div id="messages"></div>
         <button id="jump-latest" class="jump-latest-btn" type="button">{{ T.jump_to_latest }}</button>
-        <form id="announce-form" class="chat-form">
-          <input type="text" id="announce-input" placeholder="{{ T.send }}">
-          <button class="btn sm" type="submit">{{ T.send }}</button>
-        </form>
+        <form id="announce-form" class="chat-form" onsubmit="return false;">
+  <input type="text" id="announce-input" placeholder="{{ T.send }}">
+  <button class="btn sm" type="button" id="announce-submit">{{ T.send }}</button>
+</form>
       </div>
 
       <div class="pane" data-pane="qa">
