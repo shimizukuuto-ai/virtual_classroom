@@ -3,12 +3,11 @@ import random
 import string
 import shutil
 
-
+from fastapi import FastAPI, Request, Form, UploadFile, File, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
-from fastapi import FastAPI, Request, Form, UploadFile, File, WebSocket, WebSocketDisconnect
 
 from db import (
     init_pool, close_pool,
@@ -18,8 +17,8 @@ from db import (
     create_class, get_class_by_code, get_class_by_id, join_class,
     list_classes_for_user, list_public_classes, list_subjects,
     list_members, get_role,
-    add_message, get_messages, get_message, mark_helpful,
-    set_blackboard, set_stage,
+    add_message, get_messages, get_message, mark_helpful, mark_like,
+    set_blackboard, set_stage, set_allow_anonymous,
     create_join_request, list_pending_requests_for_teacher, get_request_by_id,
     set_request_status, count_pending_for_teacher, list_my_requests,
     count_students, list_all_users, delete_user,
@@ -30,7 +29,10 @@ from db import (
     list_questions_answered_by,
     create_card, list_user_cards,
     list_user_badges, count_badges, check_badges, record_attendance,
-    add_bonus_xp, reset_bonus_xp,poll_data,    get_class_bundle,
+    add_bonus_xp, reset_bonus_xp,
+    add_class_file, list_class_files,
+    create_group, list_groups, delete_group, add_member_to_group,
+    remove_member_from_group, get_user_group, set_group_board,
     BADGES, SKINS, RANKS,
 )
 from i18n import all_t, default_steps
@@ -89,6 +91,8 @@ def ctx(request, user, **extra):
         "messages": [],
         "questions": [],
         "bans": [],
+        "files": [],
+        "groups": [],
         "profile_user": None,
         "stats": None,
         "taught": [],
@@ -108,6 +112,7 @@ def ctx(request, user, **extra):
         "cards": [],
         "invite_cls": None,
         "join_code": "",
+        "allow_anonymous": False,
     }
     base.update(extra)
     return base
@@ -261,6 +266,7 @@ def request_join(request: Request, class_id: int):
     request.session["flash"] = "Join request sent"
     return RedirectResponse("/classes", status_code=303)
 
+
 @app.get("/classes/{class_id}/open")
 def open_class(request: Request, class_id: int):
     user = current_user(request)
@@ -308,7 +314,7 @@ def create_class_page(request: Request):
     user = current_user(request)
     if not user:
         return RedirectResponse("/login")
-    lang = (user["lang"] or "ja")
+    lang = (user["lang"] or "en")
     return templates.TemplateResponse(
         request, "create_class.html",
         ctx(request, user, default_steps=default_steps(lang)),
@@ -326,6 +332,7 @@ def create_class_submit(
     is_weekly: str = Form("0"),
     weekly_time: str = Form(""),
     next_session: str = Form(""),
+    allow_anonymous: str = Form("0"),
 ):
     user = current_user(request)
     if not user:
@@ -337,11 +344,12 @@ def create_class_submit(
     for _ in range(5):
         cid = create_class(
             title, subject, description, user["id"], gen_code(),
-                        is_public=int(is_public) if is_public in ("0", "1", "2") else 1,
+            is_public=int(is_public) if is_public in ("0", "1", "2") else 1,
             taught_by=user["name"],
             is_weekly=1 if is_weekly == "1" else 0,
             weekly_time=weekly_time.strip(),
             next_session=next_session.strip(),
+            allow_anonymous=1 if allow_anonymous == "1" else 0,
         )
         if cid:
             break
@@ -394,25 +402,28 @@ def class_room(request: Request, class_id: int):
     user = current_user(request)
     if not user:
         return RedirectResponse("/login")
-    # 4つの情報を1クエリでまとめて取得
-    bundle = get_class_bundle(class_id, user["id"])
-    if not bundle:
+    cls = get_class_by_id(class_id)
+    if not cls:
         return HTMLResponse("Class not found", status_code=404)
-    if bundle["is_banned"]:
+    if is_banned(class_id, user["id"]):
         return HTMLResponse("You are banned from this class.", status_code=403)
-    if not bundle["is_member"]:
+    role = get_role(class_id, user["id"])
+    if not role:
         return HTMLResponse("Not a member", status_code=403)
-    role = bundle["role"]
-    cls = bundle["cls"]
-    members = bundle["members"]
-    messages = bundle["messages"]
-    steps = bundle["steps"]
-    questions = bundle["questions"]
-    bans = bundle["bans"]
+    members = list_members(class_id)
+    messages = get_messages(class_id, limit=80)
+    steps = list_steps(class_id)
+    questions = list_questions(class_id, limit=100)
+    bans = list_bans(class_id) if role == "teacher" else []
+    files = list_class_files(class_id, limit=30)
+    groups = list_groups(class_id)
+    my_group = get_user_group(class_id, user["id"]) if role == "student" else None
     return templates.TemplateResponse(
         request, "class_room.html",
         ctx(request, user, cls=cls, role=role, members=members,
-            messages=messages, steps=steps, questions=questions, bans=bans),
+            messages=messages, steps=steps, questions=questions, bans=bans,
+            files=files, groups=groups, my_group=my_group,
+            allow_anonymous=bool(cls.get("allow_anonymous") or 0)),
     )
 
 
@@ -424,12 +435,48 @@ async def api_poll(request: Request, class_id: int, since_id: int = 0):
     user = current_user(request)
     if not user:
         return JSONResponse({"error": "not logged in"}, status_code=401)
-    data, err = poll_data(class_id, user["id"], since_msg_id=since_id)
-    if err == "not_found":
-        return JSONResponse({"error": err}, status_code=404)
-    if err in ("banned", "not_member"):
-        return JSONResponse({"error": err}, status_code=403)
-    return JSONResponse(data)
+    if is_banned(class_id, user["id"]):
+        return JSONResponse({"error": "banned"}, status_code=403)
+    cls = get_class_by_id(class_id)
+    if not cls:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    role = get_role(class_id, user["id"])
+    if not role:
+        return JSONResponse({"error": "not member"}, status_code=403)
+    msg = get_messages(class_id, limit=80)
+    steps = list_steps(class_id)
+    questions = list_questions(class_id, limit=100)
+    members = list_members(class_id)
+    files = list_class_files(class_id, limit=30)
+    groups = list_groups(class_id)
+    my_group = get_user_group(class_id, user["id"]) if role == "student" else None
+    return JSONResponse({
+        "blackboard": cls["blackboard"] or "",
+        "stage": cls["stage"] or 0,
+        "allow_anonymous": bool(cls.get("allow_anonymous") or 0),
+        "steps": [{"id": s["id"], "title": s["title"]} for s in steps],
+        "members": [{"id": m["user_id"], "name": m["name"], "role": m["role"], "skin": m["skin"] or "default"} for m in members],
+        "messages": [
+            {"id": m["id"], "type": m["sender_type"], "name": m["sender_name"],
+             "content": m["content"], "helpful": m["helpful_count"] or 0,
+             "like": m["like_count"] or 0}
+            for m in msg
+        ],
+        "questions": [
+            {"id": q["id"], "content": q["content"], "answer": q["answer"],
+             "is_anonymous": q["is_anonymous"],
+             "asker": q["asker_name"], "answerer": q["answerer_name"],
+             "answered_at": q["answered_at"], "created_at": q["created_at"]}
+            for q in questions
+        ],
+        "files": [
+            {"id": f["id"], "filename": f["filename"], "url": f["url"]}
+            for f in files
+        ],
+        "groups": groups,
+        "my_group": dict(my_group) if my_group else None,
+    })
+
 
 # ============================================================
 # blackboard
@@ -461,7 +508,7 @@ async def api_blackboard_clear(request: Request, class_id: int):
 
 
 # ============================================================
-# upload
+# upload (image, pdf)
 # ============================================================
 @app.post("/api/upload/{class_id}")
 async def api_upload(request: Request, class_id: int, file: UploadFile = File(...)):
@@ -478,22 +525,48 @@ async def api_upload(request: Request, class_id: int, file: UploadFile = File(..
     with open(path, "wb") as f:
         shutil.copyfileobj(file.file, f)
     url = f"/static/uploads/{safe_name}"
-    return JSONResponse({"ok": True, "url": url})
+    return JSONResponse({"ok": True, "url": url, "ext": ext})
 
-@app.post("/api/upload_audio/{class_id}")
-async def api_upload_audio(request: Request, class_id: int, file: UploadFile = File(...)):
+
+@app.post("/api/upload_pdf/{class_id}")
+async def api_upload_pdf(request: Request, class_id: int, file: UploadFile = File(...)):
     user = current_user(request)
     if not user:
         return JSONResponse({"error": "not logged in"}, status_code=401)
     if get_role(class_id, user["id"]) != "teacher":
         return JSONResponse({"error": "teachers only"}, status_code=403)
     ext = os.path.splitext(file.filename or "")[1].lower().lstrip(".")
-    if ext not in ("webm", "mp3", "m4a", "ogg", "wav"):
-        return JSONResponse({"error": "unsupported audio type"}, status_code=400)
-    safe_name = f"a{class_id}_{random.randint(10000, 99999)}.{ext}"
+    if ext != "pdf":
+        return JSONResponse({"error": "pdf only"}, status_code=400)
+    safe_name = f"p{class_id}_{random.randint(10000, 99999)}.pdf"
     path = os.path.join("static", "uploads", safe_name)
     with open(path, "wb") as f:
         shutil.copyfileobj(file.file, f)
+    url = f"/static/uploads/{safe_name}"
+    original = file.filename or safe_name
+    add_class_file(class_id, original, url, "application/pdf", user["id"])
+    return JSONResponse({"ok": True, "url": url, "name": original})
+
+@app.post("/api/upload_draw/{class_id}")
+async def api_upload_draw(request: Request, class_id: int):
+    import base64
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if get_role(class_id, user["id"]) != "teacher":
+        return JSONResponse({"error": "teachers only"}, status_code=403)
+    data = await request.json()
+    data_url = data.get("data", "")
+    if not data_url.startswith("data:image/png;base64,"):
+        return JSONResponse({"error": "invalid data"}, status_code=400)
+    b64 = data_url.split(",", 1)[1]
+    raw = base64.b64decode(b64)
+    if len(raw) > 3 * 1024 * 1024:
+        return JSONResponse({"error": "too large"}, status_code=400)
+    safe_name = f"d{class_id}_{random.randint(10000, 99999)}.png"
+    path = os.path.join("static", "uploads", safe_name)
+    with open(path, "wb") as f:
+        f.write(raw)
     url = f"/static/uploads/{safe_name}"
     return JSONResponse({"ok": True, "url": url})
 
@@ -570,7 +643,7 @@ async def api_announce(request: Request, class_id: int):
 
 
 # ============================================================
-# helpful
+# helpful / like
 # ============================================================
 @app.post("/api/helpful/{class_id}/{message_id}")
 async def api_helpful(request: Request, class_id: int, message_id: int):
@@ -585,6 +658,20 @@ async def api_helpful(request: Request, class_id: int, message_id: int):
     if m["sender_name"] == user["name"]:
         return JSONResponse({"error": "cannot mark your own"}, status_code=400)
     ok, count = mark_helpful(message_id, user["id"])
+    return JSONResponse({"ok": True, "count": count, "new": ok})
+
+
+@app.post("/api/like/{class_id}/{message_id}")
+async def api_like(request: Request, class_id: int, message_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if not get_role(class_id, user["id"]):
+        return JSONResponse({"error": "not member"}, status_code=403)
+    m = get_message(message_id)
+    if not m or m["class_id"] != class_id:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    ok, count = mark_like(message_id, user["id"])
     return JSONResponse({"ok": True, "count": count, "new": ok})
 
 
@@ -635,7 +722,7 @@ async def api_unban(request: Request, class_id: int, user_id: int):
 
 
 # ============================================================
-# questions (Q&A)
+# questions
 # ============================================================
 @app.post("/api/questions/{class_id}")
 async def api_question_create(request: Request, class_id: int):
@@ -646,11 +733,13 @@ async def api_question_create(request: Request, class_id: int):
         return JSONResponse({"error": "banned"}, status_code=403)
     if not get_role(class_id, user["id"]):
         return JSONResponse({"error": "not member"}, status_code=403)
+    cls = get_class_by_id(class_id)
     data = await request.json()
     content = (data.get("content") or "").strip()
     if not content:
         return JSONResponse({"error": "empty"}, status_code=400)
-    is_anon = bool(data.get("anonymous", True))
+    allow = bool(cls and cls.get("allow_anonymous"))
+    is_anon = bool(data.get("anonymous", False)) and allow
     create_question(class_id, content, is_anon, user["id"])
     return JSONResponse({"ok": True})
 
@@ -685,6 +774,19 @@ async def api_question_delete(request: Request, class_id: int, qid: int):
         return JSONResponse({"error": "not found"}, status_code=404)
     delete_question(qid)
     return JSONResponse({"ok": True})
+
+
+@app.post("/api/class/{class_id}/allow_anonymous")
+async def api_set_allow_anonymous(request: Request, class_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if get_role(class_id, user["id"]) != "teacher":
+        return JSONResponse({"error": "teachers only"}, status_code=403)
+    data = await request.json()
+    allow = bool(data.get("allow", False))
+    set_allow_anonymous(class_id, 1 if allow else 0)
+    return JSONResponse({"ok": True, "allow": allow})
 
 
 # ============================================================
@@ -723,6 +825,77 @@ async def api_history_restore(request: Request, class_id: int, hid: int):
 
 
 # ============================================================
+# groups (Phase 3)
+# ============================================================
+@app.post("/api/groups/{class_id}")
+async def api_group_create(request: Request, class_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if get_role(class_id, user["id"]) != "teacher":
+        return JSONResponse({"error": "teachers only"}, status_code=403)
+    data = await request.json()
+    name = (data.get("name") or "").strip()
+    if not name:
+        return JSONResponse({"error": "empty"}, status_code=400)
+    gid = create_group(class_id, name)
+    return JSONResponse({"ok": True, "id": gid})
+
+
+@app.post("/api/groups/{class_id}/{gid}/delete")
+async def api_group_delete(request: Request, class_id: int, gid: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if get_role(class_id, user["id"]) != "teacher":
+        return JSONResponse({"error": "teachers only"}, status_code=403)
+    delete_group(gid)
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/groups/{class_id}/{gid}/members/{uid}")
+async def api_group_add_member(request: Request, class_id: int, gid: int, uid: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if get_role(class_id, user["id"]) != "teacher":
+        return JSONResponse({"error": "teachers only"}, status_code=403)
+    remove_member_from_group(gid, uid)
+    add_member_to_group(gid, uid)
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/groups/{class_id}/{gid}/members/{uid}/remove")
+async def api_group_remove_member(request: Request, class_id: int, gid: int, uid: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if get_role(class_id, user["id"]) != "teacher":
+        return JSONResponse({"error": "teachers only"}, status_code=403)
+    remove_member_from_group(gid, uid)
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/groups/{class_id}/{gid}/board")
+async def api_group_board(request: Request, class_id: int, gid: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    role = get_role(class_id, user["id"])
+    if not role:
+        return JSONResponse({"error": "not member"}, status_code=403)
+    # 先生 or そのグループのメンバーだけ編集可
+    if role != "teacher":
+        grp = get_user_group(class_id, user["id"])
+        if not grp or grp["id"] != gid:
+            return JSONResponse({"error": "not your group"}, status_code=403)
+    data = await request.json()
+    content = data.get("content", "")
+    set_group_board(gid, content)
+    return JSONResponse({"ok": True})
+
+
+# ============================================================
 # badges / skins
 # ============================================================
 @app.get("/badges", response_class=HTMLResponse)
@@ -755,18 +928,14 @@ def api_stats(request: Request, uid: int):
     s = user_stats(uid)
     if not s:
         return JSONResponse({"error": "not found"}, status_code=404)
-    streak = calc_streak(uid)
     return JSONResponse({
-        "xp": s["xp"],
-        "rank": s["rank"][0],
-        "rank_name": s["rank"][2],
-        "badges": count_badges(uid),
-        "streak": streak,
+        "xp": s["xp"], "rank": s["rank"][0], "rank_name": s["rank"][2],
+        "badges": count_badges(uid), "streak": calc_streak(uid),
     })
 
 
 # ============================================================
-# learning card
+# cards
 # ============================================================
 @app.post("/card/{class_id}")
 async def make_card(request: Request, class_id: int):
@@ -795,7 +964,7 @@ def cards_page(request: Request):
 
 
 # ============================================================
-# invite (magic link)
+# invite
 # ============================================================
 @app.get("/invite/{join_code}", response_class=HTMLResponse)
 def invite_page(request: Request, join_code: str):
@@ -831,8 +1000,9 @@ def invite_join(request: Request, join_code: str, name: str = Form(...)):
     join_class(cls["id"], user["id"], role="student")
     return RedirectResponse(f"/class/{cls['id']}", status_code=303)
 
+
 # ============================================================
-# 音声配信 (WebSocket)
+# audio websocket
 # ============================================================
 audio_rooms: dict = {}
 
@@ -893,8 +1063,9 @@ async def audio_ws(websocket: WebSocket, class_id: int):
             if not audio_rooms[class_id]:
                 del audio_rooms[class_id]
 
+
 # ============================================================
-# dev (ENABLE_DEV=1 のみ)
+# dev
 # ============================================================
 if os.environ.get("ENABLE_DEV") == "1":
     @app.get("/dev/users", response_class=HTMLResponse)

@@ -30,12 +30,19 @@
     <label>{{ T.description }}</label>
     <textarea name="description" rows="3" placeholder="{{ T.ph_description }}"></textarea>
 
-        <label>{{ T.visibility_label }}</label>
+    <label>{{ T.visibility_label }}</label>
     <select name="is_public">
       <option value="2">{{ T.vis_public_open }}</option>
-      <option value="1">{{ T.vis_public_request }}</option>
+      <option value="1" selected>{{ T.vis_public_request }}</option>
       <option value="0">{{ T.vis_private }}</option>
     </select>
+
+    <label>Q&A</label>
+    <select name="allow_anonymous">
+      <option value="0" selected>実名のみ / Real name only</option>
+      <option value="1">匿名を許可 / Allow anonymous</option>
+    </select>
+    <div class="hint">匿名を許可しない場合、Q&Aは実名で投稿されます。</div>
 
     <label>{{ T.weekly_class }}</label>
     <select name="is_weekly">
