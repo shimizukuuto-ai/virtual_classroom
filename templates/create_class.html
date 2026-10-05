@@ -30,10 +30,11 @@
     <label>{{ T.description }}</label>
     <textarea name="description" rows="3" placeholder="{{ T.ph_description }}"></textarea>
 
-    <label>{{ T.visibility_label }}</label>
+        <label>{{ T.visibility_label }}</label>
     <select name="is_public">
-      <option value="1">{{ T.public_yes }}</option>
-      <option value="0">{{ T.public_no }}</option>
+      <option value="2">{{ T.vis_public_open }}</option>
+      <option value="1">{{ T.vis_public_request }}</option>
+      <option value="0">{{ T.vis_private }}</option>
     </select>
 
     <label>{{ T.weekly_class }}</label>

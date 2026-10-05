@@ -375,6 +375,7 @@ main { padding: 16px 20px; }
     <div class="t-ctrl">
       <button id="btn-bb-open" class="primary">{{ T.write_blackboard }}</button>
       <button id="btn-img-upload">{{ T.upload_image }}</button>
+            <button id="btn-audio" style="background:#10b981;border-color:#10b981;color:#fff;">{{ T.audio_start }}</button>
       <button id="btn-bb-clear" class="danger">{{ T.clear_blackboard }}</button>
       <button id="btn-invite">{{ T.invite_link }}</button>
       <input type="file" id="img-file" accept="image/*" style="display:none;">
@@ -384,6 +385,11 @@ main { padding: 16px 20px; }
     {% if role == 'student' %}
     <div class="t-ctrl">
       <button id="btn-hand" class="primary" style="width:100%;">{{ T.raise_hand }}</button>
+          <div class="t-ctrl" id="audio-listen-row" style="display:none;">
+      <button id="btn-audio-listen" style="width:100%;background:#10b981;border-color:#10b981;color:#fff;">
+        {{ T.audio_listening }}
+      </button>
+    </div>
     </div>
     {% endif %}
 
@@ -517,7 +523,15 @@ window.I18N = {
   confirm_delete_step: {{ T.confirm_delete_step|tojson }},
   uploading: {{ T.uploading|tojson }},
   card_made: {{ T.card_made|tojson }},
-  invite_link_copied: {{ T.invite_link_copied|tojson }}
+  invite_link_copied: {{ T.invite_link_copied|tojson }},
+  audio_start: {{ T.audio_start|tojson }},
+  audio_stop: {{ T.audio_stop|tojson }},
+  audio_live: {{ T.audio_live|tojson }},
+  audio_listening: {{ T.audio_listening|tojson }},
+  audio_mic_error: {{ T.audio_mic_error|tojson }},
+  audio_connecting: {{ T.audio_connecting|tojson }},
+  audio_off: {{ T.audio_off|tojson }},
+  audio_perm_denied: {{ T.audio_perm_denied|tojson }}
 };
 window.CLASS_ID = {{ cls.id }};
 window.CLASS_JOIN_CODE = {{ cls.join_code|tojson }};
@@ -1003,6 +1017,153 @@ window.INITIAL_QUESTIONS = [
         setTimeout(() => { statusEl.textContent = ""; }, 2000);
       }
     } catch (err) {}
+  });
+
+    // ===== LIVE AUDIO (WebSocket) =====
+  let audioWs = null;
+  let audioCtx = null;
+  let micStream = null;
+  let scriptProcessor = null;
+  let audioSending = false;
+  let reconnectTimer = null;
+
+  const audioBtn = document.getElementById("btn-audio");
+  const listenRow = document.getElementById("audio-listen-row");
+
+  function isSecureContext() {
+    return location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1";
+  }
+
+  function buildWsUrl() {
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    return proto + "//" + location.host + "/ws/audio/" + CLASS_ID;
+  }
+
+  function connectAudioWs() {
+    if (audioWs && (audioWs.readyState === WebSocket.OPEN || audioWs.readyState === WebSocket.CONNECTING)) return;
+    audioWs = new WebSocket(buildWsUrl());
+    audioWs.binaryType = "arraybuffer";
+    audioWs.onopen = () => {};
+    audioWs.onmessage = (e) => {
+      if (typeof e.data === "string") return;
+      if (ROLE === "teacher") return;
+      playPCM(e.data);
+    };
+    audioWs.onclose = () => {
+      audioWs = null;
+      if (audioSending) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(connectAudioWs, 1500);
+      }
+    };
+    audioWs.onerror = () => {};
+  }
+
+  function playPCM(arrayBuffer) {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    }
+    const pcm = new Int16Array(arrayBuffer);
+    const buffer = audioCtx.createBuffer(1, pcm.length, 16000);
+    const ch = buffer.getChannelData(0);
+    for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32767;
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(audioCtx.destination);
+    try { src.start(); } catch (e) {}
+    if (listenRow) listenRow.style.display = "";
+  }
+
+  async function startAudioSending() {
+    if (!isSecureContext()) {
+      alert("HTTPSでないとマイクが使えません");
+      return;
+    }
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      });
+    } catch (err) {
+      alert(I18N.audio_perm_denied);
+      return;
+    }
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    }
+    if (audioCtx.state === "suspended") await audioCtx.resume();
+
+    const source = audioCtx.createMediaStreamSource(micStream);
+    scriptProcessor = audioCtx.createScriptProcessor(2048, 1, 1);
+
+    scriptProcessor.onaudioprocess = (e) => {
+      if (!audioWs || audioWs.readyState !== WebSocket.OPEN) return;
+      const input = e.inputBuffer.getChannelData(0);
+      const pcm = new Int16Array(input.length);
+      for (let i = 0; i < input.length; i++) {
+        const s = Math.max(-1, Math.min(1, input[i]));
+        pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      }
+      try { audioWs.send(pcm.buffer); } catch (err) {}
+    };
+
+    source.connect(scriptProcessor);
+    scriptProcessor.connect(audioCtx.destination);
+    audioSending = true;
+  }
+
+  function stopAudioSending() {
+    audioSending = false;
+    if (scriptProcessor) {
+      try { scriptProcessor.disconnect(); } catch (e) {}
+      scriptProcessor = null;
+    }
+    if (micStream) {
+      micStream.getTracks().forEach(t => t.stop());
+      micStream = null;
+    }
+  }
+
+  if (audioBtn && ROLE === "teacher") {
+    audioBtn.addEventListener("click", async () => {
+      if (audioSending) {
+        stopAudioSending();
+        audioBtn.textContent = I18N.audio_start;
+        audioBtn.style.background = "#10b981";
+        audioBtn.style.borderColor = "#10b981";
+        statusEl.textContent = I18N.audio_off;
+        setTimeout(() => { statusEl.textContent = ""; }, 1500);
+      } else {
+        connectAudioWs();
+        statusEl.textContent = I18N.audio_connecting;
+        setTimeout(async () => {
+          await startAudioSending();
+          if (audioSending) {
+            audioBtn.textContent = "● " + I18N.audio_stop;
+            audioBtn.style.background = "#ef4444";
+            audioBtn.style.borderColor = "#ef4444";
+            statusEl.textContent = I18N.audio_live;
+          } else {
+            statusEl.textContent = I18N.audio_mic_error;
+          }
+        }, 300);
+      }
+    });
+  }
+
+  if (ROLE === "student") {
+    connectAudioWs();
+    setInterval(() => {
+      if (audioWs && audioWs.readyState === WebSocket.OPEN) {
+        try { audioWs.send("ping"); } catch (e) {}
+      } else if (!audioWs) {
+        connectAudioWs();
+      }
+    }, 25000);
+  }
+
+  window.addEventListener("beforeunload", () => {
+    stopAudioSending();
+    if (audioWs) try { audioWs.close(); } catch (e) {}
   });
 
   // ===== INITIAL POLL + SCHEDULE =====

@@ -626,7 +626,7 @@ def get_class_by_id(cid):
 def list_public_classes(query="", subject=""):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
-            where = ["c.is_public = 1"]
+            where = ["c.is_public IN (1, 2)"]
             params = []
             if query:
                 like = f"%{query}%"

@@ -3,11 +3,12 @@ import random
 import string
 import shutil
 
-from fastapi import FastAPI, Request, Form, UploadFile, File
+
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from fastapi import FastAPI, Request, Form, UploadFile, File, WebSocket, WebSocketDisconnect
 
 from db import (
     init_pool, close_pool,
@@ -260,6 +261,21 @@ def request_join(request: Request, class_id: int):
     request.session["flash"] = "Join request sent"
     return RedirectResponse("/classes", status_code=303)
 
+@app.get("/classes/{class_id}/open")
+def open_class(request: Request, class_id: int):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    cls = get_class_by_id(class_id)
+    if not cls:
+        return RedirectResponse("/classes", status_code=303)
+    if cls["is_public"] != 2:
+        return RedirectResponse("/classes", status_code=303)
+    if is_banned(class_id, user["id"]):
+        return RedirectResponse("/classes", status_code=303)
+    join_class(class_id, user["id"], role="student")
+    return RedirectResponse(f"/class/{class_id}", status_code=303)
+
 
 @app.post("/requests/{rid}/{action}")
 def handle_request(request: Request, rid: int, action: str):
@@ -321,7 +337,7 @@ def create_class_submit(
     for _ in range(5):
         cid = create_class(
             title, subject, description, user["id"], gen_code(),
-            is_public=1 if is_public == "1" else 0,
+                        is_public=int(is_public) if is_public in ("0", "1", "2") else 1,
             taught_by=user["name"],
             is_weekly=1 if is_weekly == "1" else 0,
             weekly_time=weekly_time.strip(),
@@ -458,6 +474,23 @@ async def api_upload(request: Request, class_id: int, file: UploadFile = File(..
     if ext not in ("png", "jpg", "jpeg", "gif", "webp"):
         return JSONResponse({"error": "unsupported file type"}, status_code=400)
     safe_name = f"c{class_id}_{random.randint(10000, 99999)}.{ext}"
+    path = os.path.join("static", "uploads", safe_name)
+    with open(path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+    url = f"/static/uploads/{safe_name}"
+    return JSONResponse({"ok": True, "url": url})
+
+@app.post("/api/upload_audio/{class_id}")
+async def api_upload_audio(request: Request, class_id: int, file: UploadFile = File(...)):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if get_role(class_id, user["id"]) != "teacher":
+        return JSONResponse({"error": "teachers only"}, status_code=403)
+    ext = os.path.splitext(file.filename or "")[1].lower().lstrip(".")
+    if ext not in ("webm", "mp3", "m4a", "ogg", "wav"):
+        return JSONResponse({"error": "unsupported audio type"}, status_code=400)
+    safe_name = f"a{class_id}_{random.randint(10000, 99999)}.{ext}"
     path = os.path.join("static", "uploads", safe_name)
     with open(path, "wb") as f:
         shutil.copyfileobj(file.file, f)
@@ -798,6 +831,67 @@ def invite_join(request: Request, join_code: str, name: str = Form(...)):
     join_class(cls["id"], user["id"], role="student")
     return RedirectResponse(f"/class/{cls['id']}", status_code=303)
 
+# ============================================================
+# 音声配信 (WebSocket)
+# ============================================================
+audio_rooms: dict = {}
+
+
+@app.websocket("/ws/audio/{class_id}")
+async def audio_ws(websocket: WebSocket, class_id: int):
+    session = websocket.session
+    uid = session.get("user_id")
+    if not uid:
+        await websocket.close(code=1008)
+        return
+    user = get_user_by_id(int(uid))
+    if not user:
+        await websocket.close(code=1008)
+        return
+    cls = get_class_by_id(class_id)
+    if not cls:
+        await websocket.close(code=1008)
+        return
+    role = get_role(class_id, user["id"])
+    if not role:
+        await websocket.close(code=1008)
+        return
+    if is_banned(class_id, user["id"]):
+        await websocket.close(code=1008)
+        return
+
+    await websocket.accept()
+    audio_rooms.setdefault(class_id, [])
+    audio_rooms[class_id].append(websocket)
+
+    try:
+        while True:
+            data = await websocket.receive()
+            if "bytes" in data and data["bytes"] is not None:
+                if role != "teacher":
+                    continue
+                payload = data["bytes"]
+                for ws in list(audio_rooms.get(class_id, [])):
+                    if ws is websocket:
+                        continue
+                    try:
+                        await ws.send_bytes(payload)
+                    except Exception:
+                        pass
+            elif "text" in data and data["text"] == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        if class_id in audio_rooms:
+            try:
+                audio_rooms[class_id].remove(websocket)
+            except ValueError:
+                pass
+            if not audio_rooms[class_id]:
+                del audio_rooms[class_id]
 
 # ============================================================
 # dev (ENABLE_DEV=1 のみ)
