@@ -2,9 +2,10 @@ import os
 import random
 import string
 import shutil
+import base64
 
 from fastapi import FastAPI, Request, Form, UploadFile, File, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -32,7 +33,9 @@ from db import (
     add_bonus_xp, reset_bonus_xp,
     add_class_file, list_class_files,
     create_group, list_groups, delete_group, add_member_to_group,
-    remove_member_from_group, get_user_group, set_group_board,add_student_note, list_student_notes, delete_student_note,
+    remove_member_from_group, get_user_group, set_group_board,
+    add_student_note, list_student_notes, delete_student_note,
+    save_upload, get_upload,
     BADGES, SKINS, RANKS,
 )
 from i18n import all_t, default_steps
@@ -113,6 +116,7 @@ def ctx(request, user, **extra):
         "invite_cls": None,
         "join_code": "",
         "allow_anonymous": False,
+        "notes": [],
     }
     base.update(extra)
     return base
@@ -508,7 +512,19 @@ async def api_blackboard_clear(request: Request, class_id: int):
 
 
 # ============================================================
-# upload (image, pdf)
+# image serving (persistent, DB-backed)
+# ============================================================
+@app.get("/api/image/{upload_id}")
+def serve_image(upload_id: int):
+    row = get_upload(upload_id)
+    if not row:
+        return Response(status_code=404)
+    raw = base64.b64decode(row["data"])
+    return Response(content=raw, media_type=row["mime"])
+
+
+# ============================================================
+# upload (image / pdf / draw) — all DB-backed
 # ============================================================
 @app.post("/api/upload/{class_id}")
 async def api_upload(request: Request, class_id: int, file: UploadFile = File(...)):
@@ -520,11 +536,16 @@ async def api_upload(request: Request, class_id: int, file: UploadFile = File(..
     ext = os.path.splitext(file.filename or "")[1].lower().lstrip(".")
     if ext not in ("png", "jpg", "jpeg", "gif", "webp"):
         return JSONResponse({"error": "unsupported file type"}, status_code=400)
-    safe_name = f"c{class_id}_{random.randint(10000, 99999)}.{ext}"
-    path = os.path.join("static", "uploads", safe_name)
-    with open(path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-    url = f"/static/uploads/{safe_name}"
+    raw = await file.read()
+    if len(raw) > 5 * 1024 * 1024:
+        return JSONResponse({"error": "too large"}, status_code=400)
+    mime = {
+        "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+        "gif": "image/gif", "webp": "image/webp",
+    }[ext]
+    b64 = base64.b64encode(raw).decode("ascii")
+    uid = save_upload(b64, mime, len(raw), kind="image")
+    url = f"/api/image/{uid}"
     return JSONResponse({"ok": True, "url": url, "ext": ext})
 
 
@@ -538,18 +559,19 @@ async def api_upload_pdf(request: Request, class_id: int, file: UploadFile = Fil
     ext = os.path.splitext(file.filename or "")[1].lower().lstrip(".")
     if ext != "pdf":
         return JSONResponse({"error": "pdf only"}, status_code=400)
-    safe_name = f"p{class_id}_{random.randint(10000, 99999)}.pdf"
-    path = os.path.join("static", "uploads", safe_name)
-    with open(path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-    url = f"/static/uploads/{safe_name}"
-    original = file.filename or safe_name
+    raw = await file.read()
+    if len(raw) > 10 * 1024 * 1024:
+        return JSONResponse({"error": "too large (max 10MB)"}, status_code=400)
+    b64 = base64.b64encode(raw).decode("ascii")
+    uid = save_upload(b64, "application/pdf", len(raw), kind="pdf")
+    url = f"/api/image/{uid}"
+    original = file.filename or "file.pdf"
     add_class_file(class_id, original, url, "application/pdf", user["id"])
     return JSONResponse({"ok": True, "url": url, "name": original})
 
+
 @app.post("/api/upload_draw/{class_id}")
 async def api_upload_draw(request: Request, class_id: int):
-    import base64
     user = current_user(request)
     if not user:
         return JSONResponse({"error": "not logged in"}, status_code=401)
@@ -563,11 +585,8 @@ async def api_upload_draw(request: Request, class_id: int):
     raw = base64.b64decode(b64)
     if len(raw) > 3 * 1024 * 1024:
         return JSONResponse({"error": "too large"}, status_code=400)
-    safe_name = f"d{class_id}_{random.randint(10000, 99999)}.png"
-    path = os.path.join("static", "uploads", safe_name)
-    with open(path, "wb") as f:
-        f.write(raw)
-    url = f"/static/uploads/{safe_name}"
+    uid = save_upload(b64, "image/png", len(raw), kind="draw")
+    url = f"/api/image/{uid}"
     return JSONResponse({"ok": True, "url": url})
 
 
@@ -825,7 +844,7 @@ async def api_history_restore(request: Request, class_id: int, hid: int):
 
 
 # ============================================================
-# groups (Phase 3)
+# groups
 # ============================================================
 @app.post("/api/groups/{class_id}")
 async def api_group_create(request: Request, class_id: int):
@@ -884,7 +903,6 @@ async def api_group_board(request: Request, class_id: int, gid: int):
     role = get_role(class_id, user["id"])
     if not role:
         return JSONResponse({"error": "not member"}, status_code=403)
-    # 先生 or そのグループのメンバーだけ編集可
     if role != "teacher":
         grp = get_user_group(class_id, user["id"])
         if not grp or grp["id"] != gid:
@@ -892,6 +910,50 @@ async def api_group_board(request: Request, class_id: int, gid: int):
     data = await request.json()
     content = data.get("content", "")
     set_group_board(gid, content)
+    return JSONResponse({"ok": True})
+
+
+# ============================================================
+# student notes
+# ============================================================
+@app.post("/api/notes/{class_id}")
+async def api_note_create(request: Request, class_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if not get_role(class_id, user["id"]):
+        return JSONResponse({"error": "not member"}, status_code=403)
+    data = await request.json()
+    content = (data.get("content") or "").strip()
+    title = (data.get("title") or "").strip()
+    if not content:
+        return JSONResponse({"error": "empty"}, status_code=400)
+    add_student_note(user["id"], class_id, content, title)
+    return JSONResponse({"ok": True})
+
+
+@app.get("/api/notes/{class_id}")
+async def api_note_list(request: Request, class_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if not get_role(class_id, user["id"]):
+        return JSONResponse({"error": "not member"}, status_code=403)
+    rows = list_student_notes(user["id"], class_id, limit=50)
+    return JSONResponse({
+        "items": [
+            {"id": r["id"], "title": r["title"] or "", "content": r["content"], "created_at": r["created_at"]}
+            for r in rows
+        ]
+    })
+
+
+@app.post("/api/notes/{class_id}/{nid}/delete")
+async def api_note_delete(request: Request, class_id: int, nid: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    delete_student_note(nid, user["id"])
     return JSONResponse({"ok": True})
 
 
@@ -1063,48 +1125,6 @@ async def audio_ws(websocket: WebSocket, class_id: int):
             if not audio_rooms[class_id]:
                 del audio_rooms[class_id]
 
-# ============================================================
-# student notes
-# ============================================================
-@app.post("/api/notes/{class_id}")
-async def api_note_create(request: Request, class_id: int):
-    user = current_user(request)
-    if not user:
-        return JSONResponse({"error": "not logged in"}, status_code=401)
-    if not get_role(class_id, user["id"]):
-        return JSONResponse({"error": "not member"}, status_code=403)
-    data = await request.json()
-    content = (data.get("content") or "").strip()
-    title = (data.get("title") or "").strip()
-    if not content:
-        return JSONResponse({"error": "empty"}, status_code=400)
-    add_student_note(user["id"], class_id, content, title)
-    return JSONResponse({"ok": True})
-
-
-@app.get("/api/notes/{class_id}")
-async def api_note_list(request: Request, class_id: int):
-    user = current_user(request)
-    if not user:
-        return JSONResponse({"error": "not logged in"}, status_code=401)
-    if not get_role(class_id, user["id"]):
-        return JSONResponse({"error": "not member"}, status_code=403)
-    rows = list_student_notes(user["id"], class_id, limit=50)
-    return JSONResponse({
-        "items": [
-            {"id": r["id"], "title": r["title"] or "", "content": r["content"], "created_at": r["created_at"]}
-            for r in rows
-        ]
-    })
-
-
-@app.post("/api/notes/{class_id}/{nid}/delete")
-async def api_note_delete(request: Request, class_id: int, nid: int):
-    user = current_user(request)
-    if not user:
-        return JSONResponse({"error": "not logged in"}, status_code=401)
-    delete_student_note(nid, user["id"])
-    return JSONResponse({"ok": True})
 
 # ============================================================
 # dev

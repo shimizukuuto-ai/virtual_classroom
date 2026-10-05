@@ -194,6 +194,15 @@ def init_db():
                 content TEXT DEFAULT '', updated_at TEXT NOT NULL
             );""")
             c.execute("""
+            CREATE TABLE IF NOT EXISTS uploads (
+                id SERIAL PRIMARY KEY,
+                data TEXT NOT NULL,
+                mime TEXT NOT NULL DEFAULT 'image/png',
+                size INTEGER DEFAULT 0,
+                kind TEXT DEFAULT 'image',
+                created_at TEXT NOT NULL
+            );""")
+            c.execute("""
             CREATE TABLE IF NOT EXISTS student_notes (
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER NOT NULL,
@@ -1020,3 +1029,21 @@ def delete_student_note(nid, user_id):
         with conn.cursor() as c:
             c.execute("DELETE FROM student_notes WHERE id=%s AND user_id=%s", (nid, user_id))
         conn.commit()
+
+        # ===== uploads (persistent, stored as base64) =====
+def save_upload(data_b64, mime, size=0, kind="image"):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("""INSERT INTO uploads (data, mime, size, kind, created_at)
+                VALUES (%s,%s,%s,%s,%s) RETURNING id""",
+                (data_b64, mime, size, kind, now()))
+            uid = c.fetchone()["id"]
+        conn.commit()
+    return uid
+
+
+def get_upload(upload_id):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("SELECT * FROM uploads WHERE id=%s", (upload_id,))
+            return c.fetchone()
