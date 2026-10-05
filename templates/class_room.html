@@ -848,7 +848,7 @@ window.STEPS = [
   {% for s in steps %}{id: {{ s.id }}, title: {{ s.title|tojson }}},{% endfor %}
 ];
 window.MEMBERS = [
-  {% for m in members %}{id: {{ m.user_id }}, name: {{ m.name|tojson }}, role: {{ m.role|tojson }}, skin: {{ (m.skin or 'default')|tojson }}},{% endfor %}
+  {% for m in members %}{id: {{ m.user_id }}, name: {{ m.name|tojson }}, role: {{ m.role|tojson }}, skin: {{ (m.skin or 'default')|tojson }}, custom_hair: {{ m.custom_hair if m.custom_hair is not none else -1 }}, custom_skin: {{ m.custom_skin if m.custom_skin is not none else -1 }}, custom_shirt: {{ m.custom_shirt if m.custom_shirt is not none else -1 }}, custom_style: {{ (m.custom_style or '')|tojson }}},{% endfor %}
 ];
 window.INITIAL_QUESTIONS = [
   {% for q in questions %}{

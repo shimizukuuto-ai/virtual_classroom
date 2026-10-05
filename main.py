@@ -460,7 +460,14 @@ async def api_poll(request: Request, class_id: int, since_id: int = 0):
         "stage": cls["stage"] or 0,
         "allow_anonymous": bool(cls.get("allow_anonymous") or 0),
         "steps": [{"id": s["id"], "title": s["title"]} for s in steps],
-        "members": [{"id": m["user_id"], "name": m["name"], "role": m["role"], "skin": m["skin"] or "default"} for m in members],
+                "members": [{
+            "id": m["user_id"], "name": m["name"], "role": m["role"],
+            "skin": m["skin"] or "default",
+            "custom_hair": m["custom_hair"] if m.get("custom_hair") is not None else -1,
+            "custom_skin": m["custom_skin"] if m.get("custom_skin") is not None else -1,
+            "custom_shirt": m["custom_shirt"] if m.get("custom_shirt") is not None else -1,
+            "custom_style": m.get("custom_style") or "",
+        } for m in members],
         "messages": [
             {"id": m["id"], "type": m["sender_type"], "name": m["sender_name"],
              "content": m["content"], "helpful": m["helpful_count"] or 0,

@@ -600,8 +600,15 @@ def list_classes_for_user(user_id):
 def list_members(class_id):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
-            c.execute("""SELECT u.id AS user_id, u.name, u.skin, e.role FROM enrollments e
-                JOIN users u ON u.id=e.user_id WHERE e.class_id=%s ORDER BY e.joined_at""", (class_id,))
+            c.execute(
+                """SELECT u.id AS user_id, u.name, u.skin,
+                   u.custom_hair, u.custom_skin, u.custom_shirt, u.custom_style,
+                   e.role FROM enrollments e
+                   JOIN users u ON u.id = e.user_id
+                   WHERE e.class_id = %s
+                   ORDER BY e.joined_at""",
+                (class_id,),
+            )
             return c.fetchall()
 
 
