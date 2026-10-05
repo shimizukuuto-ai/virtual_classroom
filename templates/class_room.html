@@ -170,6 +170,7 @@ main { padding: 16px 20px; }
 .msg.system { background: transparent; color: #6b7280; font-size: 11px; text-align: center; padding: 4px 10px; }
 .msg .who { font-size: 11px; color: #9ca3af; margin-bottom: 4px; font-weight: 700; letter-spacing: .01em; }
 .msg .body { padding-right: 60px; }
+.msg audio { display: block; max-width: 100%; margin-top: 6px; }
 .msg .helpful-btn {
   position: absolute; right: 10px; bottom: 8px;
   background: #15171f; border: 1px solid #2a2e3a;
@@ -375,7 +376,7 @@ main { padding: 16px 20px; }
     <div class="t-ctrl">
       <button id="btn-bb-open" class="primary">{{ T.write_blackboard }}</button>
       <button id="btn-img-upload">{{ T.upload_image }}</button>
-            <button id="btn-audio" style="background:#10b981;border-color:#10b981;color:#fff;">{{ T.audio_start }}</button>
+      <button id="btn-audio" style="background:#10b981;border-color:#10b981;color:#fff;">{{ T.audio_start }}</button>
       <button id="btn-bb-clear" class="danger">{{ T.clear_blackboard }}</button>
       <button id="btn-invite">{{ T.invite_link }}</button>
       <input type="file" id="img-file" accept="image/*" style="display:none;">
@@ -385,11 +386,12 @@ main { padding: 16px 20px; }
     {% if role == 'student' %}
     <div class="t-ctrl">
       <button id="btn-hand" class="primary" style="width:100%;">{{ T.raise_hand }}</button>
-          <div class="t-ctrl" id="audio-listen-row" style="display:none;">
+    </div>
+    <div class="t-ctrl" id="audio-listen-row" style="display:none;">
       <button id="btn-audio-listen" style="width:100%;background:#10b981;border-color:#10b981;color:#fff;">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#fff;margin-right:6px;"></span>
         {{ T.audio_listening }}
       </button>
-    </div>
     </div>
     {% endif %}
 
@@ -415,9 +417,9 @@ main { padding: 16px 20px; }
         <div id="messages"></div>
         <button id="jump-latest" class="jump-latest-btn" type="button">{{ T.jump_to_latest }}</button>
         <form id="announce-form" class="chat-form" onsubmit="return false;">
-  <input type="text" id="announce-input" placeholder="{{ T.send }}">
-  <button class="btn sm" type="button" id="announce-submit">{{ T.send }}</button>
-</form>
+          <input type="text" id="announce-input" placeholder="{{ T.send }}" autocomplete="off">
+          <button class="btn sm" type="button" id="announce-submit">{{ T.send }}</button>
+        </form>
       </div>
 
       <div class="pane" data-pane="qa">
@@ -493,6 +495,10 @@ main { padding: 16px 20px; }
 </div>
 
 <script>
+window.addEventListener("error", (e) => {
+  console.error("Global error:", e.message, e.filename, e.lineno);
+});
+
 window.I18N = {
   system: {{ T.system|tojson }},
   error: {{ T.error|tojson }},
@@ -575,7 +581,6 @@ window.INITIAL_QUESTIONS = [
       const name = tab.dataset.tab;
       document.querySelectorAll(".side-tab").forEach(t => t.classList.toggle("active", t === tab));
       document.querySelectorAll(".pane").forEach(p => p.classList.toggle("active", p.dataset.pane === name));
-      if (name === "history") loadHistory();
       if (name === "chat") tab.classList.remove("has-unread");
     });
   });
@@ -591,6 +596,14 @@ window.INITIAL_QUESTIONS = [
     }
     let escaped = escapeHtml(text);
     escaped = escaped.replace(/\[img\]([^\[]+)\[\/img\]/g, (m, url) => '<img src="' + url + '" alt="attachment"/>');
+    return escaped;
+  }
+  function renderMessageBody(text) {
+    let escaped = escapeHtml(text);
+    escaped = escaped.replace(/\[audio\]([^\[]+)\[\/audio\]/g,
+      (m, url) => '<audio controls preload="none" src="' + url + '" style="display:block;max-width:100%;margin-top:6px;"></audio>');
+    escaped = escaped.replace(/\[img\]([^\[]+)\[\/img\]/g,
+      (m, url) => '<img src="' + url + '" style="display:block;max-width:100%;border-radius:8px;margin-top:6px;" alt="attachment"/>');
     return escaped;
   }
   function setDirectBB(text) {
@@ -633,7 +646,7 @@ window.INITIAL_QUESTIONS = [
     div.dataset.mid = m.id;
     const who = m.type === "system" ? I18N.system : m.name;
     const showHelpful = (m.type === "user" && m.name !== USER_NAME);
-    let html = '<div class="who">' + escapeHtml(who) + '</div><div class="body">' + escapeHtml(m.content) + '</div>';
+    let html = '<div class="who">' + escapeHtml(who) + '</div><div class="body">' + renderMessageBody(m.content) + '</div>';
     if (showHelpful) {
       html += '<button class="helpful-btn" data-mid="' + m.id + '">' + I18N.helpful + ' <span class="hc">' + (m.helpful || 0) + '</span></button>';
     }
@@ -775,18 +788,19 @@ window.INITIAL_QUESTIONS = [
     }
   });
 
-  // ===== POLLING (setTimeout chain + inFlight guard) =====
+  // ===== POLLING =====
   let pollTimer = null;
   let pollInFlight = false;
   let lastQuestionsKey = "";
   function questionsKey(items) { return items.map(q => q.id + ":" + (q.answer || "").length).join(","); }
   lastQuestionsKey = questionsKey(window.INITIAL_QUESTIONS || []);
 
-      async function pollNow() {
+  async function pollNow() {
     if (pollInFlight) return;
     pollInFlight = true;
     try {
       const res = await fetch('/api/poll/' + CLASS_ID + '?since_id=' + lastMsgId, { method: "POST" });
+      if (!res.ok) return;
       const d = await res.json();
 
       if (d.blackboard !== lastBlackboardSeen) {
@@ -834,17 +848,31 @@ window.INITIAL_QUESTIONS = [
     if (!document.hidden) pollNow();
   });
 
-  function scheduleNextPoll() {
-    clearTimeout(pollTimer);
-    pollTimer = setTimeout(async () => {
-      if (document.hidden) { scheduleNextPoll(); return; }
+  // ===== CHAT FORM =====
+  async function sendMessage() {
+    const input = document.getElementById("announce-input");
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    try {
+      const res = await fetch('/api/announce/' + CLASS_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        statusEl.textContent = I18N.error + ": " + (data.error || res.status);
+        return;
+      }
       await pollNow();
-      scheduleNextPoll();
-    }, 4000);
+    } catch (err) { statusEl.textContent = I18N.error + ": " + err; }
   }
 
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) pollNow();
+  const announceBtn = document.getElementById("announce-submit");
+  const announceInput = document.getElementById("announce-input");
+  if (announceBtn) announceBtn.addEventListener("click", (e) => { e.preventDefault(); sendMessage(); });
+  if (announceInput) announceInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); sendMessage(); }
   });
 
   // ===== BLACKBOARD =====
@@ -1019,7 +1047,7 @@ window.INITIAL_QUESTIONS = [
     } catch (err) {}
   });
 
-    // ===== LIVE AUDIO (WebSocket) =====
+  // ===== LIVE AUDIO (WebSocket) =====
   let audioWs = null;
   let audioCtx = null;
   let micStream = null;
@@ -1060,18 +1088,22 @@ window.INITIAL_QUESTIONS = [
   }
 
   function playPCM(arrayBuffer) {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    try {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      }
+      const pcm = new Int16Array(arrayBuffer);
+      const buffer = audioCtx.createBuffer(1, pcm.length, 16000);
+      const ch = buffer.getChannelData(0);
+      for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32767;
+      const src = audioCtx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(audioCtx.destination);
+      src.start();
+      if (listenRow) listenRow.style.display = "";
+    } catch (e) {
+      console.error("playPCM error:", e);
     }
-    const pcm = new Int16Array(arrayBuffer);
-    const buffer = audioCtx.createBuffer(1, pcm.length, 16000);
-    const ch = buffer.getChannelData(0);
-    for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32767;
-    const src = audioCtx.createBufferSource();
-    src.buffer = buffer;
-    src.connect(audioCtx.destination);
-    try { src.start(); } catch (e) {}
-    if (listenRow) listenRow.style.display = "";
   }
 
   async function startAudioSending() {
@@ -1197,7 +1229,6 @@ window.INITIAL_QUESTIONS = [
   }
 
   try {
-    // ===== RENDERER =====
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
@@ -1232,7 +1263,6 @@ window.INITIAL_QUESTIONS = [
       controls.update();
     };
 
-    // ===== LIGHTS (compact) =====
     scene.add(new THREE.AmbientLight(0xffffff, 0.65));
     const hemi = new THREE.HemisphereLight(0xcfe3ff, 0x8b6b4a, 0.55);
     scene.add(hemi);
@@ -1245,7 +1275,6 @@ window.INITIAL_QUESTIONS = [
     sun.shadow.bias = -0.0006;
     scene.add(sun);
 
-    // ===== FLOOR =====
     const floorTex = (() => {
       const c = document.createElement("canvas");
       c.width = c.height = 256;
@@ -1281,7 +1310,6 @@ window.INITIAL_QUESTIONS = [
     grass.receiveShadow = true;
     scene.add(grass);
 
-    // ===== WALLS =====
     const wallMat = new THREE.MeshStandardMaterial({ color: 0xf0efe9, roughness: 0.95 });
     const backWall = new THREE.Mesh(new THREE.PlaneGeometry(16, 8), wallMat);
     backWall.position.set(0, 4, -6.5);
@@ -1294,7 +1322,6 @@ window.INITIAL_QUESTIONS = [
     rightWall.position.set(8, 4, 0); rightWall.rotation.y = -Math.PI / 2;
     scene.add(rightWall);
 
-    // ===== BLACKBOARD =====
     const bbCanvas = document.createElement("canvas");
     bbCanvas.width = 1024; bbCanvas.height = 512;
     const bbCtx = bbCanvas.getContext("2d");
@@ -1354,7 +1381,6 @@ window.INITIAL_QUESTIONS = [
     });
     drawBlackboardText(window.INITIAL_BB);
 
-    // ===== CLOCK (only redrawn when needed) =====
     const clockCanvas = document.createElement("canvas");
     clockCanvas.width = clockCanvas.height = 128;
     const clockCtx = clockCanvas.getContext("2d");
@@ -1399,7 +1425,6 @@ window.INITIAL_QUESTIONS = [
     clockMesh.position.set(-7.4, 5, -6.49);
     scene.add(clockMesh);
 
-    // ===== ATTENDANCE =====
     const attCanvas = document.createElement("canvas");
     attCanvas.width = 256; attCanvas.height = 128;
     const attCtx = attCanvas.getContext("2d");
@@ -1428,7 +1453,6 @@ window.INITIAL_QUESTIONS = [
     attMesh.position.set(7.9, 3.5, -1); attMesh.rotation.y = -Math.PI/2;
     scene.add(attMesh);
 
-    // ===== AVATAR SYSTEM =====
     function hashName(name) {
       let h = 0;
       for (let i = 0; i < name.length; i++) h = ((h<<5)-h + name.charCodeAt(i)) | 0;
@@ -1481,7 +1505,6 @@ window.INITIAL_QUESTIONS = [
       return sp;
     }
 
-    // Low-poly shared geometries (reused across all avatars)
     const HEAD_GEO = new THREE.SphereGeometry(0.48, 20, 16);
     const TORSO_GEO = new THREE.CapsuleGeometry(0.40, 0.30, 6, 14);
     const UPPER_ARM_GEO = new THREE.CapsuleGeometry(0.11, 0.14, 4, 10);
@@ -1498,7 +1521,6 @@ window.INITIAL_QUESTIONS = [
     const MOUTH_GEO = new THREE.SphereGeometry(0.05, 10, 8);
     const BLUSH_GEO = new THREE.CircleGeometry(0.06, 10);
 
-    // Shared materials
     const EYE_WHITE_MAT = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const EYE_PUPIL_MAT = new THREE.MeshBasicMaterial({ color: 0x111111 });
     const EYE_HIGHLIGHT_MAT = new THREE.MeshBasicMaterial({ color: 0xffffff });
@@ -1734,7 +1756,6 @@ window.INITIAL_QUESTIONS = [
       return g;
     }
 
-    // ===== DESK / CHAIR =====
     const DESK_TOP_GEO = new THREE.BoxGeometry(1.4, 0.09, 0.8);
     const DESK_LEG_GEO = new THREE.BoxGeometry(0.09, 0.7, 0.09);
     const CHAIR_SEAT_GEO = new THREE.BoxGeometry(0.6, 0.08, 0.6);
@@ -1778,7 +1799,6 @@ window.INITIAL_QUESTIONS = [
       return g;
     }
 
-    // ===== TEACHER =====
     const teacherMember = MEMBERS.find(m => m.role === "teacher");
     const teacherSkin = (teacherMember && teacherMember.skin) || "default";
     const teacher = createChibiAvatar({
@@ -1788,7 +1808,6 @@ window.INITIAL_QUESTIONS = [
     teacher.rotation.y = Math.PI;
     scene.add(teacher);
 
-    // ===== STUDENTS =====
     const studentMembers = MEMBERS.filter(m => m.role === "student");
     const positions = [];
     const cols = 4;
@@ -1817,19 +1836,12 @@ window.INITIAL_QUESTIONS = [
 
     window._3d = { characterMap, drawBlackboardText };
 
-    // ===== ANIMATION (throttled) =====
     let lastFrame = performance.now();
-    let frameSkip = 0;
     function animate() {
       requestAnimationFrame(animate);
       const now = performance.now();
       const delta = (now - lastFrame) / 1000;
       lastFrame = now;
-      // skip every other frame if device is slow
-      frameSkip = (frameSkip + 1) % 2;
-      if (frameSkip === 0 && delta < 0.05) {
-        // still allow controls update on every other frame
-      }
       const t = now / 1000;
 
       for (const name in characterMap) {
@@ -1882,7 +1894,6 @@ window.INITIAL_QUESTIONS = [
     }
     animate();
 
-    // hook: talking + highlight when message arrives
     window._onMessageFor3D = function (msgName, content) {
       const c = characterMap[msgName];
       if (!c) return;
