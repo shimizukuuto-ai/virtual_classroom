@@ -97,184 +97,135 @@ def init_db():
         with conn.cursor() as c:
             c.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                name TEXT NOT NULL UNIQUE,
-                email TEXT UNIQUE,
-                lang TEXT NOT NULL DEFAULT 'en',
-                title TEXT DEFAULT '',
-                bio TEXT DEFAULT '',
-                skin TEXT DEFAULT 'default',
-                bonus_xp INTEGER DEFAULT 0,
-                created_at TEXT NOT NULL
+                id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE, email TEXT UNIQUE,
+                lang TEXT NOT NULL DEFAULT 'en', title TEXT DEFAULT '', bio TEXT DEFAULT '',
+                skin TEXT DEFAULT 'default', bonus_xp INTEGER DEFAULT 0, created_at TEXT NOT NULL
             );""")
             c.execute("""
             CREATE TABLE IF NOT EXISTS classes (
-                id SERIAL PRIMARY KEY,
-                title TEXT NOT NULL,
-                subject TEXT NOT NULL,
-                description TEXT,
-                teacher_id INTEGER NOT NULL,
-                join_code TEXT NOT NULL UNIQUE,
-                is_public INTEGER NOT NULL DEFAULT 1,
-                blackboard TEXT DEFAULT '',
-                stage INTEGER DEFAULT 0,
-                taught_by TEXT DEFAULT '',
-                is_weekly INTEGER DEFAULT 0,
-                weekly_time TEXT DEFAULT '',
-                next_session TEXT DEFAULT '',
-                allow_anonymous INTEGER DEFAULT 0,
-                board_theme TEXT DEFAULT 'default',
-                created_at TEXT NOT NULL
+                id SERIAL PRIMARY KEY, title TEXT NOT NULL, subject TEXT NOT NULL,
+                description TEXT, teacher_id INTEGER NOT NULL, join_code TEXT NOT NULL UNIQUE,
+                is_public INTEGER NOT NULL DEFAULT 1, blackboard TEXT DEFAULT '',
+                stage INTEGER DEFAULT 0, taught_by TEXT DEFAULT '',
+                is_weekly INTEGER DEFAULT 0, weekly_time TEXT DEFAULT '',
+                next_session TEXT DEFAULT '', allow_anonymous INTEGER DEFAULT 0,
+                board_theme TEXT DEFAULT 'default', created_at TEXT NOT NULL
             );""")
             c.execute("""
             CREATE TABLE IF NOT EXISTS class_steps (
-                id SERIAL PRIMARY KEY,
-                class_id INTEGER NOT NULL,
-                position INTEGER NOT NULL,
-                title TEXT NOT NULL,
-                description TEXT DEFAULT '',
-                created_at TEXT NOT NULL
+                id SERIAL PRIMARY KEY, class_id INTEGER NOT NULL, position INTEGER NOT NULL,
+                title TEXT NOT NULL, description TEXT DEFAULT '', created_at TEXT NOT NULL
             );""")
             c.execute("""
             CREATE TABLE IF NOT EXISTS enrollments (
-                id SERIAL PRIMARY KEY,
-                class_id INTEGER NOT NULL,
-                user_id INTEGER NOT NULL,
-                role TEXT NOT NULL,
-                joined_at TEXT NOT NULL,
-                UNIQUE(class_id, user_id)
+                id SERIAL PRIMARY KEY, class_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
+                role TEXT NOT NULL, joined_at TEXT NOT NULL, UNIQUE(class_id, user_id)
             );""")
             c.execute("""
             CREATE TABLE IF NOT EXISTS messages (
-                id SERIAL PRIMARY KEY,
-                class_id INTEGER NOT NULL,
-                sender_type TEXT NOT NULL,
-                sender_name TEXT NOT NULL,
-                content TEXT NOT NULL,
-                helpful_count INTEGER DEFAULT 0,
-                like_count INTEGER DEFAULT 0,
-                created_at TEXT NOT NULL
+                id SERIAL PRIMARY KEY, class_id INTEGER NOT NULL, sender_type TEXT NOT NULL,
+                sender_name TEXT NOT NULL, content TEXT NOT NULL,
+                helpful_count INTEGER DEFAULT 0, like_count INTEGER DEFAULT 0, created_at TEXT NOT NULL
             );""")
             c.execute("""
             CREATE TABLE IF NOT EXISTS message_helpful (
-                id SERIAL PRIMARY KEY,
-                message_id INTEGER NOT NULL,
-                user_id INTEGER NOT NULL,
-                created_at TEXT NOT NULL,
-                UNIQUE(message_id, user_id)
+                id SERIAL PRIMARY KEY, message_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
+                created_at TEXT NOT NULL, UNIQUE(message_id, user_id)
             );""")
             c.execute("""
             CREATE TABLE IF NOT EXISTS message_likes (
-                id SERIAL PRIMARY KEY,
-                message_id INTEGER NOT NULL,
-                user_id INTEGER NOT NULL,
-                created_at TEXT NOT NULL,
-                UNIQUE(message_id, user_id)
+                id SERIAL PRIMARY KEY, message_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
+                created_at TEXT NOT NULL, UNIQUE(message_id, user_id)
             );""")
             c.execute("""
             CREATE TABLE IF NOT EXISTS join_requests (
-                id SERIAL PRIMARY KEY,
-                class_id INTEGER NOT NULL,
-                user_id INTEGER NOT NULL,
-                status TEXT NOT NULL DEFAULT 'pending',
-                created_at TEXT NOT NULL,
-                UNIQUE(class_id, user_id)
+                id SERIAL PRIMARY KEY, class_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL, UNIQUE(class_id, user_id)
             );""")
             c.execute("""
             CREATE TABLE IF NOT EXISTS blackboard_history (
-                id SERIAL PRIMARY KEY,
-                class_id INTEGER NOT NULL,
-                content TEXT,
-                author TEXT,
-                created_at TEXT NOT NULL
+                id SERIAL PRIMARY KEY, class_id INTEGER NOT NULL, content TEXT, author TEXT, created_at TEXT NOT NULL
             );""")
             c.execute("""
             CREATE TABLE IF NOT EXISTS class_bans (
-                id SERIAL PRIMARY KEY,
-                class_id INTEGER NOT NULL,
-                user_id INTEGER NOT NULL,
-                reason TEXT DEFAULT '',
-                created_at TEXT NOT NULL,
-                UNIQUE(class_id, user_id)
+                id SERIAL PRIMARY KEY, class_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
+                reason TEXT DEFAULT '', created_at TEXT NOT NULL, UNIQUE(class_id, user_id)
             );""")
             c.execute("""
             CREATE TABLE IF NOT EXISTS questions (
-                id SERIAL PRIMARY KEY,
-                class_id INTEGER NOT NULL,
-                content TEXT NOT NULL,
-                is_anonymous INTEGER DEFAULT 1,
-                asked_by INTEGER,
-                answered_by INTEGER,
-                answer TEXT,
-                answered_at TEXT,
-                created_at TEXT NOT NULL
+                id SERIAL PRIMARY KEY, class_id INTEGER NOT NULL, content TEXT NOT NULL,
+                is_anonymous INTEGER DEFAULT 1, asked_by INTEGER, answered_by INTEGER,
+                answer TEXT, answered_at TEXT, created_at TEXT NOT NULL
             );""")
             c.execute("""
             CREATE TABLE IF NOT EXISTS user_badges (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                badge_key TEXT NOT NULL,
-                earned_at TEXT NOT NULL,
-                UNIQUE(user_id, badge_key)
+                id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, badge_key TEXT NOT NULL,
+                earned_at TEXT NOT NULL, UNIQUE(user_id, badge_key)
             );""")
             c.execute("""
             CREATE TABLE IF NOT EXISTS attendance (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                class_id INTEGER NOT NULL,
-                date TEXT NOT NULL,
-                UNIQUE(user_id, class_id, date)
+                id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, class_id INTEGER NOT NULL,
+                date TEXT NOT NULL, UNIQUE(user_id, class_id, date)
             );""")
             c.execute("""
             CREATE TABLE IF NOT EXISTS learning_cards (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                class_id INTEGER NOT NULL,
-                content TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, class_id INTEGER NOT NULL,
+                content TEXT NOT NULL, created_at TEXT NOT NULL
             );""")
             c.execute("""
             CREATE TABLE IF NOT EXISTS class_files (
-                id SERIAL PRIMARY KEY,
-                class_id INTEGER NOT NULL,
-                filename TEXT NOT NULL,
-                url TEXT NOT NULL,
-                mime TEXT DEFAULT 'application/pdf',
-                uploaded_by INTEGER,
-                created_at TEXT NOT NULL
+                id SERIAL PRIMARY KEY, class_id INTEGER NOT NULL, filename TEXT NOT NULL,
+                url TEXT NOT NULL, mime TEXT DEFAULT 'application/pdf',
+                uploaded_by INTEGER, created_at TEXT NOT NULL
             );""")
             c.execute("""
             CREATE TABLE IF NOT EXISTS class_groups (
-                id SERIAL PRIMARY KEY,
-                class_id INTEGER NOT NULL,
-                name TEXT NOT NULL,
-                position INTEGER DEFAULT 0,
-                created_at TEXT NOT NULL
+                id SERIAL PRIMARY KEY, class_id INTEGER NOT NULL, name TEXT NOT NULL,
+                position INTEGER DEFAULT 0, created_at TEXT NOT NULL
             );""")
             c.execute("""
             CREATE TABLE IF NOT EXISTS group_members (
-                id SERIAL PRIMARY KEY,
-                group_id INTEGER NOT NULL,
-                user_id INTEGER NOT NULL,
-                joined_at TEXT NOT NULL,
-                UNIQUE(group_id, user_id)
+                id SERIAL PRIMARY KEY, group_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
+                joined_at TEXT NOT NULL, UNIQUE(group_id, user_id)
             );""")
             c.execute("""
             CREATE TABLE IF NOT EXISTS group_boards (
-                id SERIAL PRIMARY KEY,
-                group_id INTEGER NOT NULL UNIQUE,
-                content TEXT DEFAULT '',
-                updated_at TEXT NOT NULL
+                id SERIAL PRIMARY KEY, group_id INTEGER NOT NULL UNIQUE,
+                content TEXT DEFAULT '', updated_at TEXT NOT NULL
             );""")
             c.execute("""
             CREATE TABLE IF NOT EXISTS magic_tokens (
-                id SERIAL PRIMARY KEY,
-                token_hash TEXT NOT NULL UNIQUE,
-                email TEXT NOT NULL,
-                expires_at TEXT NOT NULL,
-                used_at TEXT,
-                created_at TEXT NOT NULL
+                id SERIAL PRIMARY KEY, token_hash TEXT NOT NULL UNIQUE, email TEXT NOT NULL,
+                expires_at TEXT NOT NULL, used_at TEXT, created_at TEXT NOT NULL
             );""")
+
+            # ==== 既存DBへの後付け（重要） ====
+            for ddl in [
+                "ALTER TABLE users ADD COLUMN email TEXT UNIQUE",
+                "ALTER TABLE users ADD COLUMN lang TEXT DEFAULT 'en'",
+                "ALTER TABLE users ADD COLUMN title TEXT DEFAULT ''",
+                "ALTER TABLE users ADD COLUMN bio TEXT DEFAULT ''",
+                "ALTER TABLE users ADD COLUMN skin TEXT DEFAULT 'default'",
+                "ALTER TABLE users ADD COLUMN bonus_xp INTEGER DEFAULT 0",
+                "ALTER TABLE classes ADD COLUMN blackboard TEXT DEFAULT ''",
+                "ALTER TABLE classes ADD COLUMN stage INTEGER DEFAULT 0",
+                "ALTER TABLE classes ADD COLUMN taught_by TEXT DEFAULT ''",
+                "ALTER TABLE classes ADD COLUMN is_weekly INTEGER DEFAULT 0",
+                "ALTER TABLE classes ADD COLUMN weekly_time TEXT DEFAULT ''",
+                "ALTER TABLE classes ADD COLUMN next_session TEXT DEFAULT ''",
+                "ALTER TABLE classes ADD COLUMN allow_anonymous INTEGER DEFAULT 0",
+                "ALTER TABLE classes ADD COLUMN board_theme TEXT DEFAULT 'default'",
+                "ALTER TABLE messages ADD COLUMN helpful_count INTEGER DEFAULT 0",
+                "ALTER TABLE messages ADD COLUMN like_count INTEGER DEFAULT 0",
+            ]:
+                try:
+                    c.execute(ddl)
+                except psycopg.errors.DuplicateColumn:
+                    conn.rollback()
+                except psycopg.errors.UndefinedTable:
+                    conn.rollback()
+                except Exception:
+                    conn.rollback()
         conn.commit()
 
 
