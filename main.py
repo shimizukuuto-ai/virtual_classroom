@@ -60,12 +60,12 @@ def current_user(request: Request):
 
 
 def ctx(request, user, **extra):
-    lang = "ja"
+    lang = "en"
     if user is not None:
         try:
-            lang = (user["lang"] or "ja")
+            lang = (user["lang"] or "en")
         except (KeyError, TypeError, IndexError):
-            lang = "ja"
+            lang = "en"
     base = {
         "request": request,
         "user": user,

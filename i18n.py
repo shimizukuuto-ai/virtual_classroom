@@ -450,12 +450,12 @@ class _SafeDict(dict):
 
 
 def t(lang, key):
-    return STRINGS.get(lang, STRINGS["ja"]).get(key, key)
+    return STRINGS.get(lang, STRINGS["en"]).get(key, key)
 
 
 def all_t(lang):
-    return _SafeDict(STRINGS.get(lang, STRINGS["ja"]))
+    return STRINGS.get(lang, STRINGS["en"])
 
 
 def default_steps(lang):
-    return DEFAULT_STEPS.get(lang, DEFAULT_STEPS["ja"])
+    return DEFAULT_STEPS.get(lang, DEFAULT_STEPS["en"])

@@ -114,7 +114,7 @@ def init_db():
                 id SERIAL PRIMARY KEY,
                 name TEXT NOT NULL UNIQUE,
                 email TEXT UNIQUE,
-                lang TEXT NOT NULL DEFAULT 'ja',
+                lang TEXT NOT NULL DEFAULT 'en',
                 title TEXT DEFAULT '',
                 bio TEXT DEFAULT '',
                 skin TEXT DEFAULT 'default',
@@ -265,7 +265,7 @@ def init_db():
 # ============================================================
 # users
 # ============================================================
-def create_user(name, email=None, lang="ja"):
+def create_user(name, email=None, lang="en"):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
             try:
