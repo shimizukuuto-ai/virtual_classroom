@@ -281,6 +281,7 @@ STRINGS = {
         "rating_good": "いいね",
         "rating_bad": "バッド",
         "rating_none": "まだ評価がありません",
+                "pdf_no_files": "まだPDFはありません",
     },
     "en": {
         "app_title": "Virtual Classroom",
@@ -564,6 +565,7 @@ STRINGS = {
         "rating_good": "Good",
         "rating_bad": "Bad",
         "rating_none": "No ratings yet",
+                "pdf_no_files": "No PDFs yet",
     },
 }
 
