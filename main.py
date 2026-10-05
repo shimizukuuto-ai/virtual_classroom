@@ -32,7 +32,7 @@ from db import (
     add_bonus_xp, reset_bonus_xp,
     add_class_file, list_class_files,
     create_group, list_groups, delete_group, add_member_to_group,
-    remove_member_from_group, get_user_group, set_group_board,
+    remove_member_from_group, get_user_group, set_group_board,add_student_note, list_student_notes, delete_student_note,
     BADGES, SKINS, RANKS,
 )
 from i18n import all_t, default_steps
@@ -1063,6 +1063,48 @@ async def audio_ws(websocket: WebSocket, class_id: int):
             if not audio_rooms[class_id]:
                 del audio_rooms[class_id]
 
+# ============================================================
+# student notes
+# ============================================================
+@app.post("/api/notes/{class_id}")
+async def api_note_create(request: Request, class_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if not get_role(class_id, user["id"]):
+        return JSONResponse({"error": "not member"}, status_code=403)
+    data = await request.json()
+    content = (data.get("content") or "").strip()
+    title = (data.get("title") or "").strip()
+    if not content:
+        return JSONResponse({"error": "empty"}, status_code=400)
+    add_student_note(user["id"], class_id, content, title)
+    return JSONResponse({"ok": True})
+
+
+@app.get("/api/notes/{class_id}")
+async def api_note_list(request: Request, class_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if not get_role(class_id, user["id"]):
+        return JSONResponse({"error": "not member"}, status_code=403)
+    rows = list_student_notes(user["id"], class_id, limit=50)
+    return JSONResponse({
+        "items": [
+            {"id": r["id"], "title": r["title"] or "", "content": r["content"], "created_at": r["created_at"]}
+            for r in rows
+        ]
+    })
+
+
+@app.post("/api/notes/{class_id}/{nid}/delete")
+async def api_note_delete(request: Request, class_id: int, nid: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    delete_student_note(nid, user["id"])
+    return JSONResponse({"ok": True})
 
 # ============================================================
 # dev

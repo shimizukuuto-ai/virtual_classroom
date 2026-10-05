@@ -193,23 +193,125 @@ main { padding: 16px 20px; }
 .group-board-edit { width: 100%; min-height: 100px; background: #0f1117; color: #e5e7eb; border: 1px solid #2a2e3a; border-radius: 8px; padding: 10px; font-family: inherit; font-size: 13px; box-sizing: border-box; }
 
 @media (max-width: 900px) {
-  main { padding: 8px 12px; }
-  .room-grid { grid-template-columns: 1fr; gap: 12px; }
-  #canvas-container { height: 35vh; min-height: 220px; border-radius: 12px; }
-  .hud { padding: 8px 10px; font-size: 11px; max-width: 200px; top: 10px; left: 10px; }
-  .hud h2 { font-size: 13px; }
-  .hud .meta { font-size: 10px; }
-  .reset-view-btn, .view-toggle-btn { padding: 6px 8px; font-size: 10px; top: 10px; }
-  .reset-view-btn { right: 10px; }
-  .view-toggle-btn { right: 100px; }
-  .hint { font-size: 10px; padding: 4px 10px; bottom: 10px; }
-  .stage-bar-dark { padding: 10px 12px; margin-top: 10px; }
-  .stage-step { min-width: 60px; }
-  .side { height: auto; min-height: 0; max-height: none; }
-  .side-info { padding: 12px 16px; }
-  .t-ctrl { padding: 10px 14px; }
-  .side-tabs .side-tab { padding: 10px 6px; font-size: 11px; }
-  .pane { padding: 12px 14px; }
+  body { background: #0f1117 !important; }
+  main { padding: 0 !important; max-width: 100% !important; }
+  .room-grid { display: flex; flex-direction: column; gap: 0; }
+  
+  #canvas-container {
+    height: 30vh; min-height: 180px;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .hud {
+    top: 8px; left: 8px; padding: 6px 10px; border-radius: 8px;
+    max-width: 150px;
+  }
+  .hud h2 { font-size: 12px; }
+  .hud .meta { font-size: 9px; gap: 4px; }
+  .hud code { padding: 1px 4px; font-size: 9px; }
+  .hud .role-badge { padding: 1px 5px; font-size: 8px; }
+  .reset-view-btn, .view-toggle-btn {
+    top: 8px; padding: 5px 8px; font-size: 10px; border-radius: 8px;
+  }
+  .reset-view-btn { right: 8px; }
+  .view-toggle-btn { right: 82px; }
+  .hint { display: none; }
+  
+  .stage-bar-dark {
+    margin: 8px 8px 0; padding: 10px 12px; border-radius: 12px;
+  }
+  .stage-title { font-size: 10px; letter-spacing: .05em; }
+  .stage-head { margin-bottom: 6px; }
+  .stage-controls button { padding: 4px 8px; font-size: 10px; }
+  .stage-steps { gap: 4px; }
+  .stage-step { min-width: 50px; padding: 6px 4px; }
+  .stage-step .dot { width: 8px; height: 8px; }
+  .stage-step .label { font-size: 9px; }
+  .stage-step.current { background: rgba(99,102,241,.2); }
+  
+  .side {
+    margin: 8px; border-radius: 12px;
+    height: auto; min-height: 0; max-height: none;
+  }
+  .side-info { padding: 10px 14px; }
+  .side-info h2 { font-size: 13px; margin-bottom: 6px; }
+  .side-info .rowline { font-size: 11px; padding: 2px 0; }
+  
+  .t-ctrl { padding: 8px 10px; gap: 5px; }
+  .t-ctrl button {
+    padding: 9px 8px; font-size: 11px; min-width: 60px;
+    border-radius: 8px;
+  }
+  .t-ctrl button[style*="width:100%"] { min-width: 100%; }
+  
+  .side-tabs { overflow-x: auto; }
+  .side-tab {
+    flex: 0 0 auto; padding: 10px 12px; font-size: 11px;
+    min-width: 70px;
+  }
+  
+  .side-body { min-height: 300px; }
+  .pane { padding: 12px; }
+  
+  .bb-wrap {
+    aspect-ratio: auto;
+    min-height: 160px; max-height: 300px;
+    font-size: 12px; padding: 10px 12px; line-height: 1.6;
+    border-width: 4px;
+  }
+  
+  #messages { max-height: 300px; }
+  .msg { font-size: 12px; padding: 8px 10px; border-radius: 10px; }
+  .msg .body { padding-right: 0; }
+  .msg .helpful-btn, .msg .like-btn {
+    position: static;
+    display: inline-block;
+    margin-top: 6px;
+    margin-right: 4px;
+    padding: 3px 8px;
+    font-size: 10px;
+  }
+  .msg .helpful-btn { margin-left: 0; }
+  
+  .chat-form input { font-size: 13px; padding: 10px; }
+  .chat-form button { padding: 10px 14px; font-size: 12px; }
+  
+  .q-form textarea { min-height: 60px; }
+  .q-item { padding: 10px 12px; }
+  .member-card { padding: 8px 10px; }
+  
+  .drawer {
+    padding: 14px; max-height: 85vh;
+  }
+  .drawer h3 { font-size: 14px; margin-bottom: 10px; }
+  .drawer textarea.bb-editor {
+    aspect-ratio: auto;
+    min-height: 200px;
+    font-size: 13px;
+  }
+  .drawer textarea { min-height: 140px; font-size: 13px; }
+  
+  .board-fullscreen-head { padding: 10px 14px; }
+  .board-fullscreen-head h2 { font-size: 14px; }
+  .board-fullscreen-body { padding: 10px; }
+  .board-fullscreen .bb-wrap { font-size: 13px; padding: 14px; }
+  
+  .color-palette { gap: 5px; margin-bottom: 6px; }
+  .color-swatch { width: 24px; height: 24px; }
+  .color-hint { display: none; }
+  
+  .history-item { padding: 10px; }
+  .file-item { padding: 8px 10px; font-size: 12px; }
+  .group-card { padding: 10px; }
+}
+
+@media (max-width: 400px) {
+  #canvas-container { height: 26vh; min-height: 150px; }
+  .hud { max-width: 120px; padding: 5px 8px; }
+  .hud h2 { font-size: 11px; }
+  .hud .meta { font-size: 8px; }
+  .t-ctrl button { min-width: 50px; font-size: 10px; padding: 8px 6px; }
+  .side-tab { padding: 8px 10px; font-size: 10px; min-width: 60px; }
 }
 </style>
 
@@ -308,6 +410,9 @@ main { padding: 16px 20px; }
       <button class="side-tab active" data-tab="board">{{ T.blackboard }}</button>
       <button class="side-tab" data-tab="chat">{{ T.log }}</button>
       <button class="side-tab" data-tab="qa">{{ T.qa_tab }}</button>
+            {% if role == 'student' %}
+      <button class="side-tab" data-tab="notebook">📓 ノート</button>
+      {% endif %}
       <button class="side-tab" data-tab="files">{{ T.pdf_files }}</button>
       {% if role == 'student' and my_group %}
       <button class="side-tab" data-tab="group">👥 {{ T.group_my }}</button>
@@ -352,6 +457,23 @@ main { padding: 16px 20px; }
         </div>
         <div id="qa-list"></div>
       </div>
+
+            {% if role == 'student' %}
+      <div class="pane" data-pane="notebook">
+        <div style="margin-bottom:12px;">
+          <button id="note-save-bb" style="width:100%;background:#6366f1;border:none;color:#fff;padding:10px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">
+            📓 今の黒板をノートに保存
+          </button>
+        </div>
+        <div style="margin-bottom:12px;">
+          <textarea id="note-input" placeholder="自分のメモを書く..." style="width:100%;min-height:80px;background:#232733;border:1px solid #2a2e3a;color:#e5e7eb;border-radius:8px;padding:10px;font-size:13px;box-sizing:border-box;font-family:inherit;"></textarea>
+          <button id="note-save-custom" style="width:100%;margin-top:6px;background:#10b981;border:none;color:#fff;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">
+            自分のメモを保存
+          </button>
+        </div>
+        <div id="notes-list"></div>
+      </div>
+      {% endif %}
 
       <div class="pane" data-pane="files">
         <div id="files-list"></div>
@@ -1611,6 +1733,65 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
   window.addEventListener("beforeunload", () => {
     stopAudioSending();
     if (audioWs) try { audioWs.close(); } catch (e) {}
+  });
+
+    // ===== STUDENT NOTEBOOK =====
+  const notesList = document.getElementById("notes-list");
+  async function loadNotes() {
+    if (!notesList) return;
+    try {
+      const res = await fetch('/api/notes/' + CLASS_ID);
+      const d = await res.json();
+      if (!d.items || !d.items.length) {
+        notesList.innerHTML = '<div style="color:#6b7280;font-size:12px;padding:8px;">まだノートがありません</div>';
+        return;
+      }
+      notesList.innerHTML = "";
+      for (const n of d.items) {
+        const div = document.createElement("div");
+        div.className = "history-item";
+        div.innerHTML =
+          '<div class="meta">' + escapeHtml(n.created_at) + (n.title ? " · " + escapeHtml(n.title) : "") + '</div>' +
+          '<div class="body">' + escapeHtml(n.content.slice(0, 300)) + '</div>' +
+          '<div class="actions"><button data-nid="' + n.id + '" style="background:#ef4444;">削除</button></div>';
+        notesList.appendChild(div);
+      }
+      notesList.querySelectorAll("button[data-nid]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const nid = btn.dataset.nid;
+          await fetch('/api/notes/' + CLASS_ID + '/' + nid + '/delete', { method: "POST" });
+          loadNotes();
+        });
+      });
+    } catch (err) {}
+  }
+  const noteSaveBB = document.getElementById("note-save-bb");
+  if (noteSaveBB) noteSaveBB.addEventListener("click", async () => {
+    const content = lastBlackboardSeen || "";
+    if (!content.trim()) { alert("黒板が空です"); return; }
+    await fetch('/api/notes/' + CLASS_ID, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content, title: "黒板スナップショット" })
+    });
+    loadNotes();
+  });
+  const noteSaveCustom = document.getElementById("note-save-custom");
+  if (noteSaveCustom) noteSaveCustom.addEventListener("click", async () => {
+    const ta = document.getElementById("note-input");
+    const content = ta.value.trim();
+    if (!content) return;
+    await fetch('/api/notes/' + CLASS_ID, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content, title: "" })
+    });
+    ta.value = "";
+    loadNotes();
+  });
+  // タブクリック時にノート読み込み
+  document.querySelectorAll(".side-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      if (tab.dataset.tab === "notebook") loadNotes();
+    });
   });
 
   // ===== INITIAL POLL + SCHEDULE =====

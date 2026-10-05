@@ -194,6 +194,15 @@ def init_db():
                 content TEXT DEFAULT '', updated_at TEXT NOT NULL
             );""")
             c.execute("""
+            CREATE TABLE IF NOT EXISTS student_notes (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                class_id INTEGER NOT NULL,
+                title TEXT DEFAULT '',
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );""")
+            c.execute("""
             CREATE TABLE IF NOT EXISTS magic_tokens (
                 id SERIAL PRIMARY KEY, token_hash TEXT NOT NULL UNIQUE, email TEXT NOT NULL,
                 expires_at TEXT NOT NULL, used_at TEXT, created_at TEXT NOT NULL
@@ -988,3 +997,26 @@ def use_magic_token(token_hash):
             ok = c.rowcount > 0
         conn.commit()
         return ok
+
+        # ===== student notes (共有ノート) =====
+def add_student_note(user_id, class_id, content, title=""):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("""INSERT INTO student_notes (user_id, class_id, content, title, created_at)
+                VALUES (%s,%s,%s,%s,%s)""", (user_id, class_id, content, title or "", now()))
+        conn.commit()
+
+
+def list_student_notes(user_id, class_id, limit=50):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("""SELECT * FROM student_notes WHERE user_id=%s AND class_id=%s
+                ORDER BY id DESC LIMIT %s""", (user_id, class_id, limit))
+            return c.fetchall()
+
+
+def delete_student_note(nid, user_id):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("DELETE FROM student_notes WHERE id=%s AND user_id=%s", (nid, user_id))
+        conn.commit()
