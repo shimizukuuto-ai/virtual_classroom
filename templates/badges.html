@@ -44,23 +44,14 @@
 .badge-name { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
 .badge-desc { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
 
-.skins-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
+.customize-cta {
+  background: linear-gradient(135deg, #eef2ff, #f5f3ff);
+  border: 1.5px solid #c7d2fe; border-radius: var(--radius-lg);
+  padding: 24px; margin-top: 24px; display: flex;
+  justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
 }
-.skin-card {
-  background: var(--surface); border: 1.5px solid var(--border);
-  border-radius: var(--radius); padding: 18px; text-align: center;
-  transition: all .15s;
-}
-.skin-card.equipped { border-color: var(--primary); background: var(--primary-soft); }
-.skin-card.locked { opacity: .55; }
-.skin-swatch {
-  width: 56px; height: 56px; border-radius: 50%;
-  margin: 0 auto 12px; box-shadow: 0 4px 12px rgba(0,0,0,.15);
-}
-.skin-name { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
-.skin-req { font-size: 11px; color: var(--text-muted); }
+.customize-cta .txt h2 { margin: 0 0 4px; font-size: 18px; font-weight: 800; }
+.customize-cta .txt p { margin: 0; font-size: 13px; color: #4338ca; }
 </style>
 
 <div class="rank-hero">
@@ -82,40 +73,18 @@
   {% for key, info in BADGES.items() %}
     {% set earned = key in earned_keys %}
     <div class="badge-card {{ 'earned' if earned else 'locked' }}">
-      <div class="badge-icon">
-        {% if earned %}★{% else %}☆{% endif %}
-      </div>
+      <div class="badge-icon">{% if earned %}★{% else %}☆{% endif %}</div>
       <div class="badge-name">{{ info[0] if lang == 'ja' else info[1] }}</div>
       <div class="badge-desc">{{ info[2] if lang == 'ja' else info[3] }}</div>
     </div>
   {% endfor %}
 </div>
 
-<h2 style="font-size:17px;font-weight:800;margin:32px 0 12px;">{{ T.skins }}</h2>
-<div class="skins-grid">
-  {% for key, info in SKINS.items() %}
-    {% set unlocked = stats.xp >= info[2] %}
-    {% set equipped = user.skin == key %}
-    <div class="skin-card {{ 'equipped' if equipped else '' }} {{ 'locked' if not unlocked else '' }}">
-      <div class="skin-swatch" style="background: #{{ info[3][2:] }};"></div>
-      <div class="skin-name">{{ info[0] if lang == 'ja' else info[1] }}</div>
-      <div class="skin-req">
-        {% if equipped %}{{ T.skin_equipped }}
-        {% elif unlocked %}
-          <form method="post" action="/skin/{{ key }}" style="margin-top:6px;">
-            <button class="btn sm" type="submit">{{ T.skin_apply }}</button>
-          </form>
-        {% else %}
-          {{ T.skin_locked }} ({{ info[2] }} XP)
-        {% endif %}
-      </div>
-    </div>
-  {% endfor %}
-</div>
-
-<div class="card" style="margin-top:24px;">
-  <h2>{{ T.customize }}</h2>
-  <p class="muted" style="margin-bottom:12px;">{{ T.customize_desc }}</p>
-  <a class="btn" href="/customize">{{ T.customize }} →</a>
+<div class="customize-cta">
+  <div class="txt">
+    <h2>{{ T.customize }}</h2>
+    <p>{{ T.customize_desc }}</p>
+  </div>
+  <a class="btn lg" href="/customize">{{ T.customize }} →</a>
 </div>
 {% endblock %}

@@ -58,13 +58,19 @@ BADGES = {
     "students_100": ("100人の先生", "100 Students", "累計100人の生徒", "Taught 100 students total"),
 }
 
+# (名前ja, 名前en, 必要XP, 色hex, 必要教えた数)
 SKINS = {
-    "default": ("標準", "Default", 0, "0x3b82f6"),
-    "glasses": ("眼鏡", "Glasses", 100, "0x6366f1"),
-    "hat":     ("帽子", "Hat", 300, "0xf59e0b"),
-    "robe":    ("ローブ", "Robe", 800, "0x8b5cf6"),
-    "crown":   ("王冠", "Crown", 2000, "0xfbbf24"),
-    "aura":    ("オーラ", "Aura", 5000, "0xef4444"),
+    "default":      ("標準", "Default", 0, "0x3b82f6", 0),
+    "glasses":      ("眼鏡", "Glasses", 100, "0x6366f1", 0),
+    "hat":          ("帽子", "Hat", 300, "0xf59e0b", 0),
+    "robe":         ("ローブ", "Robe", 800, "0x8b5cf6", 0),
+    "crown":        ("王冠", "Crown", 2000, "0xfbbf24", 0),
+    "aura":         ("オーラ", "Aura", 5000, "0xef4444", 0),
+    # 教師限定（教えたクラス数で解放）
+    "mortarboard":  ("学位帽", "Mortarboard", 0, "0x1e293b", 1),
+    "cape":         ("マント", "Cape", 0, "0xdc2626", 3),
+    "golden":       ("黄金ローブ", "Golden Robe", 0, "0xfbbf24", 10),
+    "legend":       ("伝説の冠", "Legend Crown", 0, "0xef4444", 30),
 }
 
 RANKS = [
@@ -308,7 +314,12 @@ def update_user_profile(uid, title, bio):
 def set_user_skin(uid, skin_key):
     if skin_key not in SKINS:
         return False
-    if calc_xp(uid) < SKINS[skin_key][2]:
+    info = SKINS[skin_key]
+    xp = calc_xp(uid)
+    s = user_stats(uid) or {}
+    if xp < info[2]:
+        return False
+    if info[4] > 0 and s.get("taught", 0) < info[4]:
         return False
     with get_conn() as conn:
         with conn.cursor() as c:

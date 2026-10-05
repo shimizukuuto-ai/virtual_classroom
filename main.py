@@ -1145,17 +1145,19 @@ def customize_page(request: Request):
     tiers = {k: get_unlock_tier(user["id"], k) for k in UNLOCK_TIERS.keys()}
     return templates.TemplateResponse(
         request, "customize.html",
-        ctx(request, user, stats=stats, tiers=tiers),
+        ctx(request, user, stats=stats, tiers=tiers,
+            SKINS=SKINS),
     )
 
 
 @app.post("/customize")
 def customize_submit(
     request: Request,
-    hair: str = Form(...),
-    skin: str = Form(...),
-    shirt: str = Form(...),
+    hair: str = Form(""),
+    skin: str = Form(""),
+    shirt: str = Form(""),
     style: str = Form(""),
+    skin_key: str = Form(""),
 ):
     user = current_user(request)
     if not user:
@@ -1170,6 +1172,8 @@ def customize_submit(
         )
     except (ValueError, TypeError):
         pass
+    if skin_key:
+        set_user_skin(user["id"], skin_key)
     return RedirectResponse("/customize", status_code=303)
 
 
