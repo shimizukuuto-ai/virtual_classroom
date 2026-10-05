@@ -410,8 +410,8 @@ main { padding: 16px 20px; }
       <button class="side-tab active" data-tab="board">{{ T.blackboard }}</button>
       <button class="side-tab" data-tab="chat">{{ T.log }}</button>
       <button class="side-tab" data-tab="qa">{{ T.qa_tab }}</button>
-            {% if role == 'student' %}
-      <button class="side-tab" data-tab="notebook">📓 ノート</button>
+                 {% if role == 'student' %}
+      <button class="side-tab" data-tab="notebook">📓 {{ T.notebook }}</button>
       {% endif %}
       <button class="side-tab" data-tab="files">{{ T.pdf_files }}</button>
       {% if role == 'student' and my_group %}
@@ -458,17 +458,17 @@ main { padding: 16px 20px; }
         <div id="qa-list"></div>
       </div>
 
-            {% if role == 'student' %}
+                 {% if role == 'student' %}
       <div class="pane" data-pane="notebook">
         <div style="margin-bottom:12px;">
           <button id="note-save-bb" style="width:100%;background:#6366f1;border:none;color:#fff;padding:10px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">
-            📓 今の黒板をノートに保存
+            📓 {{ T.note_save_bb }}
           </button>
         </div>
         <div style="margin-bottom:12px;">
-          <textarea id="note-input" placeholder="自分のメモを書く..." style="width:100%;min-height:80px;background:#232733;border:1px solid #2a2e3a;color:#e5e7eb;border-radius:8px;padding:10px;font-size:13px;box-sizing:border-box;font-family:inherit;"></textarea>
+          <textarea id="note-input" placeholder="{{ T.note_input_ph }}" style="width:100%;min-height:80px;background:#232733;border:1px solid #2a2e3a;color:#e5e7eb;border-radius:8px;padding:10px;font-size:13px;box-sizing:border-box;font-family:inherit;"></textarea>
           <button id="note-save-custom" style="width:100%;margin-top:6px;background:#10b981;border:none;color:#fff;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">
-            自分のメモを保存
+            {{ T.note_save_custom }}
           </button>
         </div>
         <div id="notes-list"></div>

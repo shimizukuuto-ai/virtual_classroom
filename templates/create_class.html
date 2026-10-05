@@ -37,12 +37,12 @@
       <option value="0">{{ T.vis_private }}</option>
     </select>
 
-    <label>Q&A</label>
+        <label>{{ T.qa_anonymous_setting }}</label>
     <select name="allow_anonymous">
-      <option value="0" selected>実名のみ / Real name only</option>
-      <option value="1">匿名を許可 / Allow anonymous</option>
+      <option value="0" selected>{{ T.qa_realname_only }}</option>
+      <option value="1">{{ T.qa_allow_anonymous }}</option>
     </select>
-    <div class="hint">匿名を許可しない場合、Q&Aは実名で投稿されます。</div>
+    <div class="hint">{{ T.qa_realname_hint }}</div>
 
     <label>{{ T.weekly_class }}</label>
     <select name="is_weekly">
