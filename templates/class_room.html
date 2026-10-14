@@ -537,15 +537,20 @@ main { padding: 16px 20px; }
       <button id="btn-rate-good" class="green" style="flex:1;">👍 {{ T.rate_good }}</button>
       <button id="btn-rate-bad" class="red" style="flex:1;">👎 {{ T.rate_bad }}</button>
     </div>
-    <div class="t-ctrl" id="audio-listen-row" style="display:none;">
+        <div class="t-ctrl" id="audio-listen-row" style="display:none;">
       <button id="btn-audio-listen" class="green" style="width:100%;">
         🔊 {{ T.audio_listening }}
       </button>
     </div>
+    {% if cls.is_interview %}
+    <div class="t-ctrl" id="student-audio-row" style="display:none;">
+      <button id="btn-audio-student" class="green" style="width:100%;">{{ T.audio_start }}</button>
+    </div>
+    {% endif %}
     {% endif %}
 
     <div class="t-ctrl">
-            <button id="btn-share-record" style="display:none;background:#f59e0b;border-color:#f59e0b;color:#fff;">📋 記録を共有</button>
+                        <button id="btn-share-record" style="display:none;background:#f59e0b;border-color:#f59e0b;color:#fff;">📋 {{ T.share_record }}</button>
       <button id="btn-card-open">{{ T.create_card }}</button>
       <button id="btn-board-fullscreen2">⛶ {{ T.board_fullscreen }}</button>
     </div>
@@ -833,7 +838,11 @@ window.I18N = {
   rate_good_thanks: {{ T.rate_good_thanks|tojson }},
   rate_bad_thanks: {{ T.rate_bad_thanks|tojson }},
   rate_you_rated_good: {{ T.rate_you_rated_good|tojson }},
-  rate_you_rated_bad: {{ T.rate_you_rated_bad|tojson }}
+    rate_you_rated_bad: {{ T.rate_you_rated_bad|tojson }},
+  share_record: {{ T.share_record|tojson }},
+  share_record_active: {{ T.share_record_active|tojson }},
+  share_record_both: {{ T.share_record_both|tojson }},
+  share_record_agreed: {{ T.share_record_agreed|tojson }}
 };
 window.CLASS_ID = {{ cls.id }};
 window.CLASS_JOIN_CODE = {{ cls.join_code|tojson }};
@@ -1179,15 +1188,20 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
       }
       if (typeof d.stage === "number") applyStage(d.stage);
 
-            if (typeof d.record_shared_teacher !== "undefined") {
+                  if (typeof d.record_shared_teacher !== "undefined") {
         const newT = d.record_shared_teacher ? 1 : 0;
         const newS = d.record_shared_student ? 1 : 0;
         if (newT !== window.RECORD_T || newS !== window.RECORD_S) {
           window.RECORD_T = newT;
           window.RECORD_S = newS;
           if (shareBtn && shareBtn.style.display !== "none") {
-            const mine = ROLE === "teacher" ? newT : newS;
-            shareBtn.textContent = (newT && newS) ? "✓ 共有中（双方合意）" : (mine ? "✓ 記録を共有中" : "📋 記録を共有");
+            if (newT && newS) {
+              shareBtn.textContent = "✓ " + I18N.share_record_both;
+            } else if (ROLE === "teacher" ? newT : newS) {
+              shareBtn.textContent = "✓ " + I18N.share_record_active;
+            } else {
+              shareBtn.textContent = "📋 " + I18N.share_record;
+            }
           }
         }
       }
@@ -1818,9 +1832,10 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
     if (audioWs && (audioWs.readyState === WebSocket.OPEN || audioWs.readyState === WebSocket.CONNECTING)) return;
     audioWs = new WebSocket(buildWsUrl());
     audioWs.binaryType = "arraybuffer";
-    audioWs.onmessage = (e) => {
+        audioWs.onmessage = (e) => {
       if (typeof e.data === "string") return;
-      if (ROLE === "teacher") return;
+      // 面談モードでは先生も生徒も受信する
+      if (ROLE === "teacher" && !window.IS_INTERVIEW) return;
       playPCM(e.data);
     };
     audioWs.onclose = () => {
@@ -1875,30 +1890,43 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
     if (scriptProcessor) { try { scriptProcessor.disconnect(); } catch (e) {} scriptProcessor = null; }
     if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
   }
-  if (audioBtn && ROLE === "teacher") {
-    audioBtn.addEventListener("click", async () => {
-      if (audioSending) {
-        stopAudioSending();
-        audioBtn.textContent = I18N.audio_start;
-        audioBtn.className = "green";
-        statusEl.textContent = I18N.audio_off;
-        setTimeout(() => { statusEl.textContent = ""; }, 1500);
-      } else {
-        connectAudioWs();
-        statusEl.textContent = I18N.audio_connecting;
-        setTimeout(async () => {
-          await startAudioSending();
-          if (audioSending) {
-            audioBtn.textContent = "● " + I18N.audio_stop;
-            audioBtn.className = "red";
-            statusEl.textContent = I18N.audio_live;
-          } else {
-            statusEl.textContent = I18N.audio_mic_error;
-          }
-        }, 300);
-      }
-    });
+    async function handleAudioToggle(btn) {
+    if (audioSending) {
+      stopAudioSending();
+      btn.textContent = I18N.audio_start;
+      btn.className = "green";
+      statusEl.textContent = I18N.audio_off;
+      setTimeout(() => { statusEl.textContent = ""; }, 1500);
+    } else {
+      connectAudioWs();
+      statusEl.textContent = I18N.audio_connecting;
+      setTimeout(async () => {
+        await startAudioSending();
+        if (audioSending) {
+          btn.textContent = "● " + I18N.audio_stop;
+          btn.className = "red";
+          statusEl.textContent = I18N.audio_live;
+        } else {
+          statusEl.textContent = I18N.audio_mic_error;
+        }
+      }, 300);
+    }
   }
+
+  // 先生の音声ボタン
+  if (audioBtn && ROLE === "teacher") {
+    audioBtn.addEventListener("click", () => handleAudioToggle(audioBtn));
+  }
+
+  // 面談モード: 生徒も音声を使える
+  const studentAudioRow = document.getElementById("student-audio-row");
+  const studentAudioBtn = document.getElementById("btn-audio-student");
+  if (studentAudioBtn && window.IS_INTERVIEW && ROLE === "student") {
+    if (studentAudioRow) studentAudioRow.style.display = "";
+    studentAudioBtn.addEventListener("click", () => handleAudioToggle(studentAudioBtn));
+  }
+
+  // 生徒側はWS接続を維持（通常モードでは聴くだけ、面談モードでは送信も）
   if (ROLE === "student") {
     connectAudioWs();
     setInterval(() => {
@@ -1994,17 +2022,24 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
   if (rateGood) rateGood.addEventListener("click", () => sendRating(1));
   if (rateBad) rateBad.addEventListener("click", () => sendRating(-1));
 
-    // ===== INTERVIEW RECORD SHARING =====
+      // ===== INTERVIEW RECORD SHARING =====
   const shareBtn = document.getElementById("btn-share-record");
   if (shareBtn && window.IS_INTERVIEW) {
     shareBtn.style.display = "";
     function updateShareBtn() {
       const mine = ROLE === "teacher" ? window.RECORD_T : window.RECORD_S;
-      shareBtn.textContent = mine ? "✓ 記録を共有中" : "📋 記録を共有";
-      shareBtn.style.background = mine ? "#10b981" : "#f59e0b";
-      shareBtn.style.borderColor = mine ? "#10b981" : "#f59e0b";
       if (window.RECORD_T && window.RECORD_S) {
-        shareBtn.textContent = "✓ 共有中（双方合意）";
+        shareBtn.textContent = "✓ " + I18N.share_record_both;
+        shareBtn.style.background = "#10b981";
+        shareBtn.style.borderColor = "#10b981";
+      } else if (mine) {
+        shareBtn.textContent = "✓ " + I18N.share_record_active;
+        shareBtn.style.background = "#10b981";
+        shareBtn.style.borderColor = "#10b981";
+      } else {
+        shareBtn.textContent = "📋 " + I18N.share_record;
+        shareBtn.style.background = "#f59e0b";
+        shareBtn.style.borderColor = "#f59e0b";
       }
     }
     updateShareBtn();
@@ -2021,7 +2056,7 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
           else window.RECORD_S = next ? 1 : 0;
           updateShareBtn();
           if (window.RECORD_T && window.RECORD_S) {
-            statusEl.textContent = "双方が合意しました。記録が共有されます。";
+            statusEl.textContent = I18N.share_record_agreed;
             setTimeout(() => { statusEl.textContent = ""; }, 3000);
           }
         }
