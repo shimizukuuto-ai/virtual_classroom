@@ -241,6 +241,9 @@ def init_db():
                 "ALTER TABLE classes ADD COLUMN weekly_time TEXT DEFAULT ''",
                 "ALTER TABLE classes ADD COLUMN next_session TEXT DEFAULT ''",
                 "ALTER TABLE classes ADD COLUMN allow_anonymous INTEGER DEFAULT 0",
+                                "ALTER TABLE classes ADD COLUMN is_interview INTEGER DEFAULT 0",
+                "ALTER TABLE classes ADD COLUMN record_shared_teacher INTEGER DEFAULT 0",
+                "ALTER TABLE classes ADD COLUMN record_shared_student INTEGER DEFAULT 0",
                 "ALTER TABLE classes ADD COLUMN board_theme TEXT DEFAULT 'default'",
                 "ALTER TABLE messages ADD COLUMN helpful_count INTEGER DEFAULT 0",
                 "ALTER TABLE messages ADD COLUMN like_count INTEGER DEFAULT 0",
@@ -499,18 +502,24 @@ def list_user_cards(uid, limit=20):
 # ===== classes =====
 def create_class(title, subject, description, teacher_id, join_code,
                  is_public=1, taught_by="", is_weekly=0, weekly_time="",
-                 next_session="", allow_anonymous=0):
+                 next_session="", allow_anonymous=0, is_interview=0):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
             try:
-                c.execute("""INSERT INTO classes
+                c.execute(
+                    """INSERT INTO classes
                     (title, subject, description, teacher_id, join_code, is_public, created_at,
-                     blackboard, stage, taught_by, is_weekly, weekly_time, next_session, allow_anonymous)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,'',0,%s,%s,%s,%s,%s) RETURNING id""",
+                     blackboard, stage, taught_by, is_weekly, weekly_time, next_session,
+                     allow_anonymous, is_interview)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,'',0,%s,%s,%s,%s,%s,%s) RETURNING id""",
                     (title, subject, description, teacher_id, join_code, is_public, now(),
-                     taught_by, is_weekly, weekly_time, next_session, allow_anonymous))
+                     taught_by, is_weekly, weekly_time, next_session, allow_anonymous, is_interview),
+                )
                 cid = c.fetchone()["id"]
-                c.execute("INSERT INTO enrollments (class_id, user_id, role, joined_at) VALUES (%s,%s,'teacher',%s)", (cid, teacher_id, now()))
+                c.execute(
+                    "INSERT INTO enrollments (class_id, user_id, role, joined_at) VALUES (%s,%s,'teacher',%s)",
+                    (cid, teacher_id, now()),
+                )
                 conn.commit()
             except psycopg.errors.UniqueViolation:
                 conn.rollback()
@@ -1160,3 +1169,15 @@ def get_my_rating(teacher_id, student_id, class_id):
                 WHERE teacher_id=%s AND student_id=%s AND class_id=%s""",
                 (teacher_id, student_id, class_id))
             return c.fetchone()
+
+       
+
+
+
+def set_share_record(class_id, role, share):
+    col = "record_shared_teacher" if role == "teacher" else "record_shared_student"
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute(f"UPDATE classes SET {col}=%s WHERE id=%s",
+                      (1 if share else 0, class_id))
+        conn.commit()
