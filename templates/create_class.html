@@ -30,6 +30,13 @@
     <label>{{ T.description }}</label>
     <textarea name="description" rows="3" placeholder="{{ T.ph_description }}"></textarea>
 
+        <label>クラスの種類</label>
+    <select name="is_interview">
+      <option value="0" selected>通常クラス（複数人・公開授業）</option>
+      <option value="1">個人面談モード（1対1・非公開）</option>
+    </select>
+    <div class="hint">個人面談モードでは、先生と生徒が1対1で話せます。音声は双方向、記録は双方の許可で共有されます。</div>
+    
     <label>{{ T.visibility_label }}</label>
     <select name="is_public">
       <option value="2">{{ T.vis_public_open }}</option>

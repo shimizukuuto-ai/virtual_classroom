@@ -545,6 +545,7 @@ main { padding: 16px 20px; }
     {% endif %}
 
     <div class="t-ctrl">
+            <button id="btn-share-record" style="display:none;background:#f59e0b;border-color:#f59e0b;color:#fff;">📋 記録を共有</button>
       <button id="btn-card-open">{{ T.create_card }}</button>
       <button id="btn-board-fullscreen2">⛶ {{ T.board_fullscreen }}</button>
     </div>
@@ -844,6 +845,9 @@ window.ALLOW_ANONYMOUS = {{ (1 if allow_anonymous else 0)|tojson }};
 window.INITIAL_BB = {{ (cls.blackboard or '')|tojson }};
 window.TEACHER_DISPLAY_NAME = {{ (cls.taught_by or T.teacher)|tojson }};
 window.TEACHER_ID = {{ (members|selectattr('role','equalto','teacher')|map(attribute='user_id')|list|first) if members else 0 }};
+window.IS_INTERVIEW = {{ (1 if cls.is_interview else 0)|tojson }};
+window.RECORD_T = {{ (1 if cls.record_shared_teacher else 0)|tojson }};
+window.RECORD_S = {{ (1 if cls.record_shared_student else 0)|tojson }};
 window.STEPS = [
   {% for s in steps %}{id: {{ s.id }}, title: {{ s.title|tojson }}},{% endfor %}
 ];
@@ -1174,6 +1178,19 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
         if (window._3d && window._3d.drawBlackboardText) window._3d.drawBlackboardText(d.blackboard);
       }
       if (typeof d.stage === "number") applyStage(d.stage);
+
+            if (typeof d.record_shared_teacher !== "undefined") {
+        const newT = d.record_shared_teacher ? 1 : 0;
+        const newS = d.record_shared_student ? 1 : 0;
+        if (newT !== window.RECORD_T || newS !== window.RECORD_S) {
+          window.RECORD_T = newT;
+          window.RECORD_S = newS;
+          if (shareBtn && shareBtn.style.display !== "none") {
+            const mine = ROLE === "teacher" ? newT : newS;
+            shareBtn.textContent = (newT && newS) ? "✓ 共有中（双方合意）" : (mine ? "✓ 記録を共有中" : "📋 記録を共有");
+          }
+        }
+      }
 
       let appended = false;
       for (const m of d.messages) {
@@ -1976,6 +1993,41 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
   }
   if (rateGood) rateGood.addEventListener("click", () => sendRating(1));
   if (rateBad) rateBad.addEventListener("click", () => sendRating(-1));
+
+    // ===== INTERVIEW RECORD SHARING =====
+  const shareBtn = document.getElementById("btn-share-record");
+  if (shareBtn && window.IS_INTERVIEW) {
+    shareBtn.style.display = "";
+    function updateShareBtn() {
+      const mine = ROLE === "teacher" ? window.RECORD_T : window.RECORD_S;
+      shareBtn.textContent = mine ? "✓ 記録を共有中" : "📋 記録を共有";
+      shareBtn.style.background = mine ? "#10b981" : "#f59e0b";
+      shareBtn.style.borderColor = mine ? "#10b981" : "#f59e0b";
+      if (window.RECORD_T && window.RECORD_S) {
+        shareBtn.textContent = "✓ 共有中（双方合意）";
+      }
+    }
+    updateShareBtn();
+    shareBtn.addEventListener("click", async () => {
+      const mine = ROLE === "teacher" ? window.RECORD_T : window.RECORD_S;
+      const next = !mine;
+      try {
+        const res = await fetch('/api/class/' + CLASS_ID + '/share_record', {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ share: next })
+        });
+        if (res.ok) {
+          if (ROLE === "teacher") window.RECORD_T = next ? 1 : 0;
+          else window.RECORD_S = next ? 1 : 0;
+          updateShareBtn();
+          if (window.RECORD_T && window.RECORD_S) {
+            statusEl.textContent = "双方が合意しました。記録が共有されます。";
+            setTimeout(() => { statusEl.textContent = ""; }, 3000);
+          }
+        }
+      } catch (err) {}
+    });
+  }
 
   // ===== INITIAL POLL + SCHEDULE =====
   pollNow().then(() => scheduleNextPoll());
@@ -2986,45 +3038,91 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
        PLACE TEACHER + STUDENTS
     ========================================================= */
     // teacher faces students (rotation.y = 0 means faces +z which is toward students)
-    const teacherMember = MEMBERS.find(m => m.role === "teacher");
+        const teacherMember = MEMBERS.find(m => m.role === "teacher");
     const teacherSkin = (teacherMember && teacherMember.skin) || "default";
-    const teacher = createChibiAvatar({
-      name: TEACHER_DISPLAY_NAME, seated: false, skinKey: teacherSkin, isTeacher: true,
-    });
-    teacher.position.set(0, 0.15, -4.2);
-    teacher.rotation.y = 0;          // faces +z (toward students)
-    teacher.userData.baseHeadRotY = 0;
-    scene.add(teacher);
-
     const studentMembers = MEMBERS.filter(m => m.role === "student");
-    const positions = [];
-    const cols = 4;
-    const rows = Math.min(2, Math.max(1, Math.ceil(studentMembers.length / cols)));
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        positions.push({ x: -3.3 + c * 2.2, z: -0.4 + r * 2.3 });
-      }
-    }
-    const characterMap = { [TEACHER_DISPLAY_NAME]: teacher };
+    const characterMap = {};
 
-    studentMembers.forEach((m, i) => {
-      if (i >= positions.length) return;
-      const p = positions[i];
-      const desk = createDesk(); desk.position.set(p.x, 0.15, p.z); scene.add(desk);
-      const chair = createChair(); chair.position.set(p.x, 0.15, p.z + 0.9); scene.add(chair);
-      const stu = createChibiAvatar({
-        name: m.name, seated: true, skinKey: m.skin || "default", isTeacher: false,
+    if (window.IS_INTERVIEW) {
+      // ===== 個人面談モード =====
+      // 大きな共有デスク1つ、隣り合う2席、先生と生徒が横並び
+      const desk = new THREE.Group();
+      const topMat = new THREE.MeshStandardMaterial({ color: 0xe0b88a, roughness: 0.75 });
+      const top = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.1, 1.0), topMat);
+      top.position.y = 0.75; top.castShadow = true; top.receiveShadow = true;
+      desk.add(top);
+      const legMat = new THREE.MeshStandardMaterial({ color: 0x5a4530, roughness: 0.85 });
+      const legGeo = new THREE.BoxGeometry(0.1, 0.7, 0.1);
+      [[-1.15, -0.4], [1.15, -0.4], [-1.15, 0.4], [1.15, 0.4]].forEach(([x, z]) => {
+        const leg = new THREE.Mesh(legGeo, legMat);
+        leg.position.set(x, 0.35, z); leg.castShadow = true;
+        desk.add(leg);
       });
-      stu.position.set(p.x, 0.15, p.z + 0.9);
-      // face the board (-z), so rotate PI. Add slight inward turn so faces are visible.
-      const inwardTurn = (p.x < 0) ? 0.25 : -0.25;
-      stu.rotation.y = Math.PI + inwardTurn * 0.6;
-      stu.userData.baseHeadRotY = 0;
-      // small head tilt toward board
-      stu.userData.baseHeadRotX = -0.05;
-      scene.add(stu);
-      characterMap[m.name] = stu;
-    });
+      desk.position.set(0, 0.15, -1.5);
+      scene.add(desk);
+
+      // 椅子2つ
+      const c1 = createChair(); c1.position.set(-0.75, 0.15, -0.6); scene.add(c1);
+      const c2 = createChair(); c2.position.set(0.75, 0.15, -0.6); scene.add(c2);
+
+      // 先生（左）
+      const teacher = createChibiAvatar({
+        name: TEACHER_DISPLAY_NAME, seated: true, skinKey: teacherSkin, isTeacher: true,
+      });
+      teacher.position.set(-0.75, 0.15, -0.6);
+      teacher.rotation.y = Math.PI;
+      teacher.userData.baseHeadRotX = -0.05;
+      scene.add(teacher);
+      characterMap[TEACHER_DISPLAY_NAME] = teacher;
+
+      // 生徒（右、1人だけ）
+      const stu = studentMembers[0];
+      if (stu) {
+        const s = createChibiAvatar({
+          name: stu.name, seated: true, skinKey: stu.skin || "default", isTeacher: false,
+        });
+        s.position.set(0.75, 0.15, -0.6);
+        s.rotation.y = Math.PI;
+        s.userData.baseHeadRotX = -0.05;
+        scene.add(s);
+        characterMap[stu.name] = s;
+      }
+    } else {
+      // ===== 通常クラスモード =====
+      const teacher = createChibiAvatar({
+        name: TEACHER_DISPLAY_NAME, seated: false, skinKey: teacherSkin, isTeacher: true,
+      });
+      teacher.position.set(0, 0.15, -4.2);
+      teacher.rotation.y = 0;
+      teacher.userData.baseHeadRotY = 0;
+      scene.add(teacher);
+      characterMap[TEACHER_DISPLAY_NAME] = teacher;
+
+      const positions = [];
+      const cols = 4;
+      const rows = Math.min(2, Math.max(1, Math.ceil(studentMembers.length / cols)));
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          positions.push({ x: -3.3 + c * 2.2, z: -0.4 + r * 2.3 });
+        }
+      }
+      studentMembers.forEach((m, i) => {
+        if (i >= positions.length) return;
+        const p = positions[i];
+        const desk = createDesk(); desk.position.set(p.x, 0.15, p.z); scene.add(desk);
+        const chair = createChair(); chair.position.set(p.x, 0.15, p.z + 0.9); scene.add(chair);
+        const stu = createChibiAvatar({
+          name: m.name, seated: true, skinKey: m.skin || "default", isTeacher: false,
+        });
+        stu.position.set(p.x, 0.15, p.z + 0.9);
+        const inwardTurn = (p.x < 0) ? 0.25 : -0.25;
+        stu.rotation.y = Math.PI + inwardTurn * 0.6;
+        stu.userData.baseHeadRotY = 0;
+        stu.userData.baseHeadRotX = -0.05;
+        scene.add(stu);
+        characterMap[m.name] = stu;
+      });
+    }
 
     /* =========================================================
        LIKE floating hearts
