@@ -19,7 +19,7 @@ from db import (
     list_classes_for_user, list_public_classes, list_subjects,
     list_members, get_role,
     add_message, get_messages, get_message, mark_helpful, mark_like,
-    set_blackboard, set_stage, set_allow_anonymous,
+    set_blackboard, set_stage, set_allow_anonymous,    set_share_record,
     create_join_request, list_pending_requests_for_teacher, get_request_by_id,
     set_request_status, count_pending_for_teacher, list_my_requests,
     count_students, list_all_users, delete_user,
@@ -338,6 +338,7 @@ def create_class_submit(
     weekly_time: str = Form(""),
     next_session: str = Form(""),
     allow_anonymous: str = Form("0"),
+    is_interview: str = Form("0"),
 ):
     user = current_user(request)
     if not user:
@@ -355,6 +356,7 @@ def create_class_submit(
             weekly_time=weekly_time.strip(),
             next_session=next_session.strip(),
             allow_anonymous=1 if allow_anonymous == "1" else 0,
+            is_interview=1 if is_interview == "1" else 0,
         )
         if cid:
             break
@@ -459,6 +461,9 @@ async def api_poll(request: Request, class_id: int, since_id: int = 0):
         "blackboard": cls["blackboard"] or "",
         "stage": cls["stage"] or 0,
         "allow_anonymous": bool(cls.get("allow_anonymous") or 0),
+                "is_interview": bool(cls.get("is_interview") or 0),
+        "record_shared_teacher": bool(cls.get("record_shared_teacher") or 0),
+        "record_shared_student": bool(cls.get("record_shared_student") or 0),
         "steps": [{"id": s["id"], "title": s["title"]} for s in steps],
                 "members": [{
             "id": m["user_id"], "name": m["name"], "role": m["role"],
@@ -815,6 +820,22 @@ async def api_set_allow_anonymous(request: Request, class_id: int):
     set_allow_anonymous(class_id, 1 if allow else 0)
     return JSONResponse({"ok": True, "allow": allow})
 
+@app.post("/api/class/{class_id}/share_record")
+async def api_share_record(request: Request, class_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    role = get_role(class_id, user["id"])
+    if not role:
+        return JSONResponse({"error": "not member"}, status_code=403)
+    cls = get_class_by_id(class_id)
+    if not cls or not cls.get("is_interview"):
+        return JSONResponse({"error": "not interview"}, status_code=400)
+    data = await request.json()
+    share = bool(data.get("share", False))
+    set_share_record(class_id, role, share)
+    return JSONResponse({"ok": True})
+
 
 # ============================================================
 # history
@@ -1100,6 +1121,8 @@ async def audio_ws(websocket: WebSocket, class_id: int):
         await websocket.close(code=1008)
         return
 
+    is_interview = bool(cls.get("is_interview"))
+
     await websocket.accept()
     audio_rooms.setdefault(class_id, [])
     audio_rooms[class_id].append(websocket)
@@ -1108,7 +1131,8 @@ async def audio_ws(websocket: WebSocket, class_id: int):
         while True:
             data = await websocket.receive()
             if "bytes" in data and data["bytes"] is not None:
-                if role != "teacher":
+                # 面談モードでは双方向、通常モードでは先生のみ送信可
+                if not is_interview and role != "teacher":
                     continue
                 payload = data["bytes"]
                 for ws in list(audio_rooms.get(class_id, [])):
