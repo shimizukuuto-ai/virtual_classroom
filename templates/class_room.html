@@ -1,4 +1,10 @@
 {% extends "base.html" %}
+{% block extra_head %}
+<meta property="og:image" content="https://virtual-classroom-sg.onrender.com/class/{{ cls.id }}/card.png">
+<meta property="og:title" content="{{ cls.title }} - Virtual Classroom">
+<meta property="og:description" content="{{ cls.subject }} · {{ cls.description or '' }}">
+<meta name="twitter:card" content="summary_large_image">
+{% endblock %}
 {% block main_class %}wide{% endblock %}
 {% block title %}{{ cls.title }} - {{ T.app_title }}{% endblock %}
 {% block content %}
@@ -511,6 +517,10 @@ main { padding: 16px 20px; }
       </div>
       <div class="rowline"><span>{{ T.members_label }}</span><span class="v">{{ members|length }}</span></div>
       <div class="rowline"><span>{{ T.you_label }}</span><span class="v">{{ user.name }}</span></div>
+                  <div class="rowline" id="remaining-row" style="display:none;">
+        <span class="label">{{ T.remaining_time }}</span>
+        <span class="value" id="remaining-time">--:--</span>
+      </div>
       <div class="status" id="status"></div>
     </div>
 
@@ -522,6 +532,7 @@ main { padding: 16px 20px; }
       <button id="btn-pdf-upload">📄 {{ T.pdf_share }}</button>
       <button id="btn-bb-clear" class="danger">{{ T.clear_blackboard }}</button>
       <button id="btn-invite">{{ T.invite_link }}</button>
+                  <button id="btn-share-class">🔗 {{ T.share_on_x }}</button>
       <button id="btn-groups-open">👥 {{ T.group_manage }}</button>
       <input type="file" id="img-file" accept="image/*" style="display:none;">
       <input type="file" id="pdf-file" accept="application/pdf" style="display:none;">
@@ -842,7 +853,9 @@ window.I18N = {
   share_record: {{ T.share_record|tojson }},
   share_record_active: {{ T.share_record_active|tojson }},
   share_record_both: {{ T.share_record_both|tojson }},
-  share_record_agreed: {{ T.share_record_agreed|tojson }}
+  share_record_agreed: {{ T.share_record_agreed|tojson }},
+    remaining_ended: {{ T.remaining_ended|tojson }},
+  share_text_template: {{ T.share_text_template|tojson }},
 };
 window.CLASS_ID = {{ cls.id }};
 window.CLASS_JOIN_CODE = {{ cls.join_code|tojson }};
@@ -1633,6 +1646,18 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
     }).catch(() => { prompt("Invite link:", url); });
   });
 
+     // ===== SHARE CLASS =====
+  const shareClassBtn = document.getElementById("btn-share-class");
+  if (shareClassBtn) shareClassBtn.addEventListener("click", () => {
+    const tmpl = I18N.share_text_template;
+    const text = tmpl
+      .replace("{title}", window.CLASS_TITLE || "")
+      .replace("{subject}", window.CLASS_SUBJECT || "");
+    const encoded = encodeURIComponent(text);
+    const url = encodeURIComponent(location.origin + "/invite/" + window.CLASS_JOIN_CODE);
+    window.open("https://twitter.com/intent/tweet?text=" + encoded + "&url=" + url + "&hashtags=VirtualClassroom", "_blank");
+  });
+
   // ===== HISTORY =====
   let lastHistoryLoad = 0;
   async function loadHistory() {
@@ -2062,6 +2087,31 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
         }
       } catch (err) {}
     });
+  }
+
+     // ===== REMAINING TIME =====
+  const endsAtStr = {{ (cls.ends_at or '')|tojson }};
+  const remainingRow = document.getElementById("remaining-row");
+  const remainingTime = document.getElementById("remaining-time");
+  let endsAt = null;
+  if (endsAtStr) {
+    try { endsAt = new Date(endsAtStr); } catch (e) {}
+  }
+  if (endsAt && remainingRow && remainingTime) {
+    remainingRow.style.display = "";
+    setInterval(() => {
+      const now = new Date();
+      const diff = Math.floor((endsAt - now) / 1000);
+      if (diff <= 0) {
+        remainingTime.textContent = I18N.remaining_ended;
+        remainingTime.style.color = "#ef4444";
+        return;
+      }
+      const m = Math.floor(diff / 60);
+      const s = diff % 60;
+      remainingTime.textContent = m + ":" + String(s).padStart(2, "0");
+      if (diff < 60) remainingTime.style.color = "#f59e0b";
+    }, 1000);
   }
 
   // ===== INITIAL POLL + SCHEDULE =====

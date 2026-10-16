@@ -251,6 +251,8 @@ def init_db():
                 "ALTER TABLE users ADD COLUMN custom_skin INTEGER DEFAULT -1",
                 "ALTER TABLE users ADD COLUMN custom_shirt INTEGER DEFAULT -1",
                 "ALTER TABLE users ADD COLUMN custom_style TEXT DEFAULT ''",
+                                "ALTER TABLE classes ADD COLUMN duration INTEGER DEFAULT 30",
+                "ALTER TABLE classes ADD COLUMN ends_at TEXT DEFAULT ''",
             ]:
                 try:
                     c.execute(ddl)
@@ -502,7 +504,10 @@ def list_user_cards(uid, limit=20):
 # ===== classes =====
 def create_class(title, subject, description, teacher_id, join_code,
                  is_public=1, taught_by="", is_weekly=0, weekly_time="",
-                 next_session="", allow_anonymous=0, is_interview=0):
+                 next_session="", allow_anonymous=0, is_interview=0,
+                 duration=30):
+    from datetime import datetime, timedelta
+    ends_at = (datetime.now() + timedelta(minutes=duration)).isoformat(timespec="seconds")
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
             try:
@@ -510,10 +515,11 @@ def create_class(title, subject, description, teacher_id, join_code,
                     """INSERT INTO classes
                     (title, subject, description, teacher_id, join_code, is_public, created_at,
                      blackboard, stage, taught_by, is_weekly, weekly_time, next_session,
-                     allow_anonymous, is_interview)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,'',0,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                     allow_anonymous, is_interview, duration, ends_at)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,'',0,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
                     (title, subject, description, teacher_id, join_code, is_public, now(),
-                     taught_by, is_weekly, weekly_time, next_session, allow_anonymous, is_interview),
+                     taught_by, is_weekly, weekly_time, next_session,
+                     allow_anonymous, is_interview, duration, ends_at),
                 )
                 cid = c.fetchone()["id"]
                 c.execute(

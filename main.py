@@ -9,6 +9,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Resp
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from fastapi.responses import Response, StreamingResponse
+from ogp import class_card, profile_card
 
 from db import (
     init_pool, close_pool,
@@ -339,6 +341,7 @@ def create_class_submit(
     next_session: str = Form(""),
     allow_anonymous: str = Form("0"),
     is_interview: str = Form("0"),
+    duration: str = Form("30"),
 ):
     user = current_user(request)
     if not user:
@@ -357,6 +360,7 @@ def create_class_submit(
             next_session=next_session.strip(),
             allow_anonymous=1 if allow_anonymous == "1" else 0,
             is_interview=1 if is_interview == "1" else 0,
+            duration=int(duration) if duration.isdigit() else 30,
         )
         if cid:
             break
@@ -430,7 +434,9 @@ def class_room(request: Request, class_id: int):
         ctx(request, user, cls=cls, role=role, members=members,
             messages=messages, steps=steps, questions=questions, bans=bans,
             files=files, groups=groups, my_group=my_group,
-            allow_anonymous=bool(cls.get("allow_anonymous") or 0)),
+            allow_anonymous=bool(cls.get("allow_anonymous") or 0),
+            duration=cls.get("duration") or 30,
+            ends_at=cls.get("ends_at") or ""),
     )
 
 
@@ -1230,6 +1236,30 @@ def api_rating(request: Request, teacher_id: int):
         "bad": r["bad"] if r else 0,
         "total": r["total"] if r else 0,
     })
+
+# ============================================================
+# OGP image generation
+# ============================================================
+@app.get("/class/{class_id}/card.png")
+def class_card_png(class_id: int):
+    cls = get_class_by_id(class_id)
+    if not cls:
+        return Response(status_code=404)
+    teacher = get_user_by_id(cls["teacher_id"])
+    teacher_name = teacher["name"] if teacher else "Teacher"
+    count = count_students(class_id)
+    buf = class_card(cls, teacher_name, count)
+    return StreamingResponse(buf, media_type="image/png")
+
+
+@app.get("/u/{uid}/card.png")
+def profile_card_png(uid: int):
+    user = get_user_by_id(uid)
+    if not user:
+        return Response(status_code=404)
+    stats = user_stats(uid) or {}
+    buf = profile_card(user, stats)
+    return StreamingResponse(buf, media_type="image/png")
 
 # ============================================================
 # dev
