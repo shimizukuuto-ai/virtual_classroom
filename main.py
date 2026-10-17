@@ -1400,6 +1400,33 @@ async def api_study_move(request: Request, class_id: int):
     return JSONResponse({"ok": True})
 
 # ============================================================
+
+# ============================================================
+# pomodoro
+# ============================================================
+@app.post("/api/pomodoro/{class_id}/start")
+async def pomodoro_start(request: Request, class_id: int):
+    user = current_user(request)
+    if not user or not get_role(class_id, user["id"]):
+        return JSONResponse({"error": "not member"}, status_code=403)
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    duration = int(data.get("duration", 1500))
+    duration = max(60, min(duration, 3600))
+    ends = (datetime.now(timezone.utc) + timedelta(seconds=duration)).isoformat()
+    set_pomodoro(class_id, "focus", duration, ends)
+    return JSONResponse({"ok": True, "ends_at": ends, "duration": duration})
+
+@app.post("/api/pomodoro/{class_id}/stop")
+async def pomodoro_stop(request: Request, class_id: int):
+    user = current_user(request)
+    if not user or not get_role(class_id, user["id"]):
+        return JSONResponse({"error": "not member"}, status_code=403)
+    set_pomodoro(class_id, "idle", 0, None)
+    return JSONResponse({"ok": True})
+
 # dev
 # ============================================================
 if os.environ.get("ENABLE_DEV") == "1":

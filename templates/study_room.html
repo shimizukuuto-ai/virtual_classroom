@@ -93,20 +93,13 @@ controls.maxPolarAngle = Math.PI / 2.1;
 controls.minDistance = 5;
 controls.maxDistance = 25;
 
-scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 const dirLight = new THREE.DirectionalLight(0xfff0d0, 1.0);
 dirLight.position.set(5, 10, 5);
 dirLight.castShadow = true;
 dirLight.shadow.mapSize.width = 2048;
 dirLight.shadow.mapSize.height = 2048;
 scene.add(dirLight);
-
-const spotLight = new THREE.SpotLight(0xffeedd, 1.5);
-spotLight.position.set(0, 10, 0);
-spotLight.angle = Math.PI / 4;
-spotLight.penumbra = 0.5;
-spotLight.castShadow = true;
-scene.add(spotLight);
 
 const floorMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 });
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), floorMat);
@@ -120,6 +113,13 @@ backWall.position.set(0, 5, -8);
 backWall.receiveShadow = true;
 scene.add(backWall);
 
+// 入口（Entrance）の表現
+const entranceMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, emissive: 0x3b82f6, emissiveIntensity: 0.5 });
+const entrance = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.1, 32), entranceMat);
+entrance.position.set(0, 0.05, 6);
+scene.add(entrance);
+
+// タイマー（壁掛け）
 const timerCanvas = document.createElement('canvas');
 timerCanvas.width = 1024;
 timerCanvas.height = 512;
@@ -127,6 +127,7 @@ const ctx = timerCanvas.getContext('2d');
 const timerTexture = new THREE.CanvasTexture(timerCanvas);
 timerTexture.colorSpace = THREE.SRGBColorSpace;
 timerTexture.minFilter = THREE.LinearFilter;
+timerTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
 function drawTimer(state, minutes, seconds, labelText) {
   ctx.fillStyle = '#0f172a';
@@ -142,8 +143,8 @@ function drawTimer(state, minutes, seconds, labelText) {
   ctx.fillText(labelText, 512, 130);
 
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 240px monospace';
-  ctx.fillText(`${minutes}:${seconds}`, 512, 310);
+  ctx.font = 'bold 260px monospace';
+  ctx.fillText(`${minutes}:${seconds}`, 512, 320);
 
   timerTexture.needsUpdate = true;
 }
@@ -199,6 +200,7 @@ seatPositions.forEach((p) => {
   scene.add(createDeskAndChair(p.x, p.z));
 });
 
+// 教室と同じアバター関数
 function createChibiAvatar({ name, seated = false, customHair = -1, customSkin = -1, customShirt = -1 }) {
   const g = new THREE.Group();
   const skinColors = [0xffd8b0, 0xffe0bd, 0xe0ac69, 0x8d5524, 0x5c3a21, 0x2a1a0a];
@@ -250,7 +252,7 @@ function createChibiAvatar({ name, seated = false, customHair = -1, customSkin =
 }
 
 const avatarMap = {}; 
-const targetPositions = {}; // ★ ここで宣言（エラー解消）
+const targetPositions = {}; 
 
 function updateAvatarPositions(members, positions) {
   members.forEach((m, idx) => {
@@ -258,21 +260,40 @@ function updateAvatarPositions(members, positions) {
     const uid = String(m.id);
     const seatIdx = positions[uid] !== undefined ? positions[uid] : -1;
     
+    // 席が割り当てられていればそこへ、なければ入口へ
+    let targetX = 0, targetZ = 6; // 入口
+    let isSeated = false;
+    
     if (seatIdx >= 0 && seatIdx < seatPositions.length) {
       const seat = seatPositions[seatIdx];
-      targetPositions[uid] = { x: seat.x, z: seat.z + 0.8 }; 
-      
-      if (!avatarMap[uid]) {
-        const av = createChibiAvatar({ 
-          name: m.name, 
-          seated: true, 
-          customHair: m.custom_hair, 
-          customSkin: m.custom_skin, 
-          customShirt: m.custom_shirt 
-        });
-        av.position.set(seat.x, 0, seat.z + 0.8);
-        scene.add(av);
-        avatarMap[uid] = av;
+      targetX = seat.x;
+      targetZ = seat.z + 0.8;
+      isSeated = true;
+    }
+    
+    targetPositions[uid] = { x: targetX, z: targetZ };
+    
+    if (!avatarMap[uid]) {
+      const av = createChibiAvatar({ 
+        name: m.name, 
+        seated: isSeated, 
+        customHair: m.custom_hair, 
+        customSkin: m.custom_skin, 
+        customShirt: m.custom_shirt 
+      });
+      av.position.set(targetX, 0, targetZ);
+      scene.add(av);
+      avatarMap[uid] = av;
+    } else {
+      // 既存のアバターの座り状態を更新
+      const av = avatarMap[uid];
+      const body = av.children[0];
+      if (isSeated) {
+        body.position.y = 0.55;
+        av.children[1].position.y = 1.1; // head
+      } else {
+        body.position.y = 0.7;
+        av.children[1].position.y = 1.25; // head
       }
     }
   });
@@ -376,6 +397,7 @@ setInterval(() => {
 }, 1000);
 
 let lastMessageId = 0;
+let hasAutoSeated = false;
 
 async function poll() {
   try {
@@ -396,6 +418,26 @@ async function poll() {
     
     if (data.members && data.study_positions) {
       updateAvatarPositions(data.members, data.study_positions);
+      
+      // 自分がまだ席に座っていない場合、空いている席を探して自動で座る
+      if (!hasAutoSeated) {
+        const mySeat = data.study_positions[String(window.USER_ID)];
+        if (mySeat === undefined) {
+          const occupied = new Set(Object.values(data.study_positions));
+          for (let i = 0; i < seatPositions.length; i++) {
+            if (!occupied.has(i)) {
+              await fetch(`/api/study/${window.CLASS_ID}/move`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ seat_index: i })
+              });
+              hasAutoSeated = true;
+              break;
+            }
+          }
+        } else {
+          hasAutoSeated = true;
+        }
+      }
     }
     
     if (data.messages) {
