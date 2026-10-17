@@ -9,6 +9,13 @@
     background: rgba(15, 23, 42, 0.8); padding: 15px 20px; border-radius: 12px;
     backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1); pointer-events: none;
   }
+  /* デバッグ用のパネル */
+  .debug-panel {
+    position: absolute; top: 100px; left: 20px; z-index: 100; color: #fff;
+    background: rgba(220, 38, 38, 0.9); padding: 15px; border-radius: 8px;
+    font-family: monospace; font-size: 12px; white-space: pre-wrap; max-width: 400px;
+    pointer-events: none;
+  }
   .timer-overlay {
     position: absolute; top: 40px; left: 50%; transform: translateX(-50%);
     z-index: 20; text-align: center; pointer-events: none;
@@ -54,6 +61,9 @@
   <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">{{ T.room_study }} · {{ cls.subject }} ({{ members|length }}/12)</div>
 </div>
 
+<!-- デバッグ情報表示用 -->
+<div class="debug-panel" id="debug-panel">Debug: 読み込み中...</div>
+
 <div class="timer-overlay state-idle" id="timer-container">
   <div id="timer-label">READY</div>
   <div id="timer-digits">25:00</div>
@@ -88,406 +98,426 @@ window.CLASS_ID = {{ cls.id }};
 window.USER_ID = {{ user.id }};
 window.MEMBERS = {{ members|tojson }};
 
-// ==== 3D Setup ====
-const container = document.getElementById('canvas-container');
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x1e293b);
-scene.fog = new THREE.Fog(0x1e293b, 15, 40);
-
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.set(0, 8, 15);
-
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-container.appendChild(renderer.domElement);
-
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 2, -2);
-controls.enableDamping = true;
-controls.maxPolarAngle = Math.PI / 2.1;
-controls.minDistance = 5;
-controls.maxDistance = 25;
-
-scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-const dirLight = new THREE.DirectionalLight(0xfff0d0, 1.0);
-dirLight.position.set(5, 10, 5);
-dirLight.castShadow = true;
-dirLight.shadow.mapSize.width = 2048;
-dirLight.shadow.mapSize.height = 2048;
-scene.add(dirLight);
-
-const floorMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 });
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), floorMat);
-floor.rotation.x = -Math.PI / 2;
-floor.receiveShadow = true;
-scene.add(floor);
-
-const wallMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
-const backWall = new THREE.Mesh(new THREE.PlaneGeometry(30, 10), wallMat);
-backWall.position.set(0, 5, -8);
-backWall.receiveShadow = true;
-scene.add(backWall);
-
-// 入口
-const entranceMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.5 });
-const entrance = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.1, 32), entranceMat);
-entrance.position.set(0, 0.05, 6);
-scene.add(entrance);
-
-// 机と椅子
-const seatPositions = [];
-for (let row = 0; row < 3; row++) {
-  for (let col = 0; col < 4; col++) {
-    const x = -4.5 + col * 3;
-    const z = -2 + row * 3;
-    seatPositions.push({ x, z });
-  }
+const debugPanel = document.getElementById('debug-panel');
+function logDebug(msg) {
+  console.log(msg);
+  debugPanel.textContent = typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2);
 }
 
-function createDeskAndChair(x, z) {
-  const group = new THREE.Group();
-  const deskTop = new THREE.Mesh(new THREE.BoxGeometry(2, 0.1, 1), new THREE.MeshStandardMaterial({ color: 0x8b5a2b }));
-  deskTop.position.y = 0.75; deskTop.castShadow = true; deskTop.receiveShadow = true; group.add(deskTop);
-  
-  const legGeo = new THREE.BoxGeometry(0.1, 0.75, 0.1);
-  const legMat = new THREE.MeshStandardMaterial({ color: 0x5c3a21 });
-  [[-0.9, -0.4], [0.9, -0.4], [-0.9, 0.4], [0.9, 0.4]].forEach(([lx, lz]) => {
-    const leg = new THREE.Mesh(legGeo, legMat); leg.position.set(lx, 0.375, lz); leg.castShadow = true; group.add(leg);
-  });
+try {
+  logDebug("Jinja MEMBERS: " + JSON.stringify(window.MEMBERS));
 
-  const chairSeat = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.6), new THREE.MeshStandardMaterial({ color: 0x3b82f6 }));
-  chairSeat.position.set(0, 0.5, 0.8); chairSeat.castShadow = true; group.add(chairSeat);
+  // ==== 3D Setup ====
+  const container = document.getElementById('canvas-container');
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1e293b);
+  scene.fog = new THREE.Fog(0x1e293b, 15, 40);
 
-  const chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.1), new THREE.MeshStandardMaterial({ color: 0x3b82f6 }));
-  chairBack.position.set(0, 0.8, 1.1); chairBack.castShadow = true; group.add(chairBack);
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(0, 8, 15);
 
-  group.position.set(x, 0, z);
-  return group;
-}
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  container.appendChild(renderer.domElement);
 
-seatPositions.forEach((p) => { scene.add(createDeskAndChair(p.x, p.z)); });
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 2, -2);
+  controls.enableDamping = true;
+  controls.maxPolarAngle = Math.PI / 2.1;
+  controls.minDistance = 5;
+  controls.maxDistance = 25;
 
-// ★エラー回避のため roundRect を使わないアバター関数
-function createChibiAvatar({ name, seated = false, customHair = -1, customSkin = -1, customShirt = -1 }) {
-  const g = new THREE.Group();
-  const skinColors = [0xffd8b0, 0xffe0bd, 0xe0ac69, 0x8d5524, 0x5c3a21, 0x2a1a0a];
-  const shirtColors = [0x3b82f6, 0xef4444, 0x10b981, 0xf59e0b, 0x8b5cf6, 0xec4899, 0x64748b, 0x14b8a6];
-  const hairColors = [0x2a1a0a, 0x4a2e15, 0x8b5a2b, 0xd2b48c, 0x1e293b, 0x94a3b8, 0xdc2626, 0xf59e0b, 0xec4899];
-  
-  const sColor = customSkin >= 0 ? skinColors[customSkin % skinColors.length] : 0xffd8b0;
-  const bColor = customShirt >= 0 ? shirtColors[customShirt % shirtColors.length] : 0x3b82f6;
-  const hColor = customHair >= 0 ? hairColors[customHair % hairColors.length] : 0x2a1a0a;
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+  const dirLight = new THREE.DirectionalLight(0xfff0d0, 1.0);
+  dirLight.position.set(5, 10, 5);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.width = 2048;
+  dirLight.shadow.mapSize.height = 2048;
+  scene.add(dirLight);
 
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.6, 16), new THREE.MeshStandardMaterial({ color: bColor, roughness: 0.7 }));
-  body.position.y = seated ? 0.55 : 0.7; body.castShadow = true; g.add(body);
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  scene.add(floor);
 
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 24), new THREE.MeshStandardMaterial({ color: sColor, roughness: 0.55 }));
-  head.position.y = seated ? 1.1 : 1.25; head.castShadow = true; g.add(head);
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
+  const backWall = new THREE.Mesh(new THREE.PlaneGeometry(30, 10), wallMat);
+  backWall.position.set(0, 5, -8);
+  backWall.receiveShadow = true;
+  scene.add(backWall);
 
-  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.335, 24, 24, 0, Math.PI * 2, 0, Math.PI / 1.75), new THREE.MeshStandardMaterial({ color: hColor, roughness: 0.8 }));
-  hair.position.copy(head.position); hair.position.y += 0.02; g.add(hair);
+  // 入口
+  const entranceMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.5 });
+  const entrance = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.1, 32), entranceMat);
+  entrance.position.set(0, 0.05, 6);
+  scene.add(entrance);
 
-  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
-  const eyeGeo = new THREE.SphereGeometry(0.05, 12, 12);
-  const eyeY = head.position.y + 0.02;
-  const lEye = new THREE.Mesh(eyeGeo, eyeMat); lEye.position.set(-0.11, eyeY, 0.28); g.add(lEye);
-  const rEye = new THREE.Mesh(eyeGeo, eyeMat); rEye.position.set(0.11, eyeY, 0.28); g.add(rEye);
-
-  const armMat = new THREE.MeshStandardMaterial({ color: bColor, roughness: 0.7 });
-  const armGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.55, 8);
-  const armY = seated ? 0.6 : 0.72;
-  const lArm = new THREE.Mesh(armGeo, armMat); lArm.position.set(-0.36, armY, 0); lArm.rotation.z = 0.3; lArm.castShadow = true; g.add(lArm);
-  const rArm = new THREE.Mesh(armGeo, armMat); rArm.position.set(0.36, armY, 0); rArm.rotation.z = -0.3; rArm.castShadow = true; g.add(rArm);
-
-  if (!seated) {
-    const legMat = new THREE.MeshStandardMaterial({ color: 0x333a4a });
-    const legGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.42, 8);
-    const lLeg = new THREE.Mesh(legGeo, legMat); lLeg.position.set(-0.12, 0.21, 0); g.add(lLeg);
-    const rLeg = new THREE.Mesh(legGeo, legMat); rLeg.position.set(0.12, 0.21, 0); g.add(rLeg);
+  // 机と椅子
+  const seatPositions = [];
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 4; col++) {
+      const x = -4.5 + col * 3;
+      const z = -2 + row * 3;
+      seatPositions.push({ x, z });
+    }
   }
 
-  const c = document.createElement('canvas'); c.width = 256; c.height = 64;
-  const cctx = c.getContext('2d');
-  // roundRectを使わずにfillRectで描画（互換性確保）
-  cctx.fillStyle = "rgba(15,23,42,0.8)"; cctx.fillRect(8, 8, 240, 48);
-  cctx.fillStyle = "#fff"; cctx.font = "bold 26px sans-serif"; cctx.textAlign = "center"; cctx.textBaseline = "middle";
-  cctx.fillText(name, 128, 32);
-  const tex = new THREE.CanvasTexture(c);
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true }));
-  sp.scale.set(1.5, 0.375, 1); sp.position.y = seated ? 1.72 : 1.9; sp.renderOrder = 999; g.add(sp);
-
-  return g;
-}
-
-const avatarMap = {}; 
-const targetPositions = {}; 
-
-// ページロード直後に Jinja のデータからアバターを生成する
-function initAvatarsFromJinja() {
-  if (!window.MEMBERS) return;
-  window.MEMBERS.forEach((m) => {
-    if (m.role === 'teacher') return;
-    const uid = String(m.user_id);
-    if (!avatarMap[uid]) {
-      const av = createChibiAvatar({ 
-        name: m.name, 
-        seated: false, 
-        customHair: m.custom_hair, 
-        customSkin: m.custom_skin, 
-        customShirt: m.custom_shirt 
-      });
-      av.position.set(0, 0, 6); // まずは入口に立たせる
-      scene.add(av);
-      avatarMap[uid] = av;
-      targetPositions[uid] = { x: 0, z: 6, seated: false };
-    }
-  });
-}
-
-function updateAvatarPositions(members, positions) {
-  members.forEach((m) => {
-    if (m.role === 'teacher') return;
-    const uid = String(m.id !== undefined ? m.id : m.user_id);
-    const seatIdx = positions[uid] !== undefined ? positions[uid] : -1;
+  function createDeskAndChair(x, z) {
+    const group = new THREE.Group();
+    const deskTop = new THREE.Mesh(new THREE.BoxGeometry(2, 0.1, 1), new THREE.MeshStandardMaterial({ color: 0x8b5a2b }));
+    deskTop.position.y = 0.75; deskTop.castShadow = true; deskTop.receiveShadow = true; group.add(deskTop);
     
-    let targetX = 0, targetZ = 6; 
-    let isSeated = false;
-    
-    if (seatIdx >= 0 && seatIdx < seatPositions.length) {
-      const seat = seatPositions[seatIdx];
-      targetX = seat.x;
-      targetZ = seat.z + 0.8;
-      isSeated = true;
-    }
-    
-    targetPositions[uid] = { x: targetX, z: targetZ, seated: isSeated };
-    
-    if (!avatarMap[uid]) {
-      const av = createChibiAvatar({ 
-        name: m.name, 
-        seated: isSeated, 
-        customHair: m.custom_hair, 
-        customSkin: m.custom_skin, 
-        customShirt: m.custom_shirt 
-      });
-      av.position.set(targetX, 0, targetZ);
-      scene.add(av);
-      avatarMap[uid] = av;
-    } else {
-      const av = avatarMap[uid];
-      const body = av.children[0];
-      const head = av.children[1];
-      const hair = av.children[2];
-      if (isSeated && body.position.y !== 0.55) {
-        body.position.y = 0.55; head.position.y = 1.1; hair.position.y = 1.12;
-      } else if (!isSeated && body.position.y !== 0.7) {
-        body.position.y = 0.7; head.position.y = 1.25; hair.position.y = 1.27;
+    const legGeo = new THREE.BoxGeometry(0.1, 0.75, 0.1);
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x5c3a21 });
+    [[-0.9, -0.4], [0.9, -0.4], [-0.9, 0.4], [0.9, 0.4]].forEach(([lx, lz]) => {
+      const leg = new THREE.Mesh(legGeo, legMat); leg.position.set(lx, 0.375, lz); leg.castShadow = true; group.add(leg);
+    });
+
+    const chairSeat = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.6), new THREE.MeshStandardMaterial({ color: 0x3b82f6 }));
+    chairSeat.position.set(0, 0.5, 0.8); chairSeat.castShadow = true; group.add(chairSeat);
+
+    const chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.1), new THREE.MeshStandardMaterial({ color: 0x3b82f6 }));
+    chairBack.position.set(0, 0.8, 1.1); chairBack.castShadow = true; group.add(chairBack);
+
+    group.position.set(x, 0, z);
+    return group;
+  }
+
+  seatPositions.forEach((p) => { scene.add(createDeskAndChair(p.x, p.z)); });
+
+  // ★ シンプルで確実に動くアバター生成（エラー要因を排除）
+  function createChibiAvatar({ name, seated = false, customHair = -1, customSkin = -1, customShirt = -1 }) {
+    try {
+      const g = new THREE.Group();
+      const skinColors = [0xffd8b0, 0xffe0bd, 0xe0ac69, 0x8d5524, 0x5c3a21, 0x2a1a0a];
+      const shirtColors = [0x3b82f6, 0xef4444, 0x10b981, 0xf59e0b, 0x8b5cf6, 0xec4899, 0x64748b, 0x14b8a6];
+      const hairColors = [0x2a1a0a, 0x4a2e15, 0x8b5a2b, 0xd2b48c, 0x1e293b, 0x94a3b8, 0xdc2626, 0xf59e0b, 0xec4899];
+      
+      const sColor = customSkin >= 0 ? skinColors[customSkin % skinColors.length] : 0xffd8b0;
+      const bColor = customShirt >= 0 ? shirtColors[customShirt % shirtColors.length] : 0x3b82f6;
+      const hColor = customHair >= 0 ? hairColors[customHair % hairColors.length] : 0x2a1a0a;
+
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.6, 16), new THREE.MeshStandardMaterial({ color: bColor, roughness: 0.7 }));
+      body.position.y = seated ? 0.55 : 0.7; body.castShadow = true; g.add(body);
+
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 24), new THREE.MeshStandardMaterial({ color: sColor, roughness: 0.55 }));
+      head.position.y = seated ? 1.1 : 1.25; head.castShadow = true; g.add(head);
+
+      const hair = new THREE.Mesh(new THREE.SphereGeometry(0.335, 24, 24, 0, Math.PI * 2, 0, Math.PI / 1.75), new THREE.MeshStandardMaterial({ color: hColor, roughness: 0.8 }));
+      hair.position.copy(head.position); hair.position.y += 0.02; g.add(hair);
+
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+      const eyeGeo = new THREE.SphereGeometry(0.05, 12, 12);
+      const eyeY = head.position.y + 0.02;
+      const lEye = new THREE.Mesh(eyeGeo, eyeMat); lEye.position.set(-0.11, eyeY, 0.28); g.add(lEye);
+      const rEye = new THREE.Mesh(eyeGeo, eyeMat); rEye.position.set(0.11, eyeY, 0.28); g.add(rEye);
+
+      const armMat = new THREE.MeshStandardMaterial({ color: bColor, roughness: 0.7 });
+      const armGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.55, 8);
+      const armY = seated ? 0.6 : 0.72;
+      const lArm = new THREE.Mesh(armGeo, armMat); lArm.position.set(-0.36, armY, 0); lArm.rotation.z = 0.3; lArm.castShadow = true; g.add(lArm);
+      const rArm = new THREE.Mesh(armGeo, armMat); rArm.position.set(0.36, armY, 0); rArm.rotation.z = -0.3; rArm.castShadow = true; g.add(rArm);
+
+      if (!seated) {
+        const legMat = new THREE.MeshStandardMaterial({ color: 0x333a4a });
+        const legGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.42, 8);
+        const lLeg = new THREE.Mesh(legGeo, legMat); lLeg.position.set(-0.12, 0.21, 0); g.add(lLeg);
+        const rLeg = new THREE.Mesh(legGeo, legMat); rLeg.position.set(0.12, 0.21, 0); g.add(rLeg);
       }
+
+      const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+      const cctx = c.getContext('2d');
+      cctx.fillStyle = "rgba(15,23,42,0.8)"; cctx.fillRect(8, 8, 240, 48);
+      cctx.fillStyle = "#fff"; cctx.font = "bold 26px sans-serif"; cctx.textAlign = "center"; cctx.textBaseline = "middle";
+      cctx.fillText(name, 128, 32);
+      const tex = new THREE.CanvasTexture(c);
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true }));
+      sp.scale.set(1.5, 0.375, 1); sp.position.y = seated ? 1.72 : 1.9; sp.renderOrder = 999; g.add(sp);
+
+      return g;
+    } catch (err) {
+      logDebug("createChibiAvatar ERROR: " + err.message);
+      return new THREE.Group(); // エラー時も空のグループを返してクラッシュを防ぐ
     }
-  });
-}
-
-// 初期化
-initAvatarsFromJinja();
-
-function animate() {
-  requestAnimationFrame(animate);
-  Object.keys(targetPositions).forEach(uid => {
-    const av = avatarMap[uid];
-    const target = targetPositions[uid];
-    if (av && target) {
-      av.position.x += (target.x - av.position.x) * 0.1;
-      av.position.z += (target.z - av.position.z) * 0.1;
-    }
-  });
-  controls.update();
-  renderer.render(scene, camera);
-}
-animate();
-
-// 席のクリック判定
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-const clickableSeats = [];
-
-seatPositions.forEach((p, i) => {
-  const hitBox = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshBasicMaterial({ visible: false }));
-  hitBox.position.set(p.x, 0.5, p.z + 0.5);
-  hitBox.userData.seatIndex = i;
-  scene.add(hitBox);
-  clickableSeats.push(hitBox);
-});
-
-container.addEventListener('pointerdown', (e) => {
-  const startX = e.clientX;
-  const startY = e.clientY;
-  
-  const onPointerUp = async (upEvent) => {
-    if (Math.abs(upEvent.clientX - startX) > 5 || Math.abs(upEvent.clientY - startY) > 5) return;
-    
-    mouse.x = (upEvent.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(upEvent.clientY / window.innerHeight) * 2 + 1;
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(clickableSeats);
-    
-    if (intersects.length > 0) {
-      const seatIdx = intersects[0].object.userData.seatIndex;
-      await fetch(`/api/study/${window.CLASS_ID}/move`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ seat_index: seatIdx })
-      });
-      poll();
-    }
-    container.removeEventListener('pointerup', onPointerUp);
-  };
-  container.addEventListener('pointerup', onPointerUp);
-});
-
-// タイマーロジック
-let timeLeft = 1500;
-let isRunning = false;
-let mode = 'idle';
-let lastTime = performance.now();
-
-function updateTimerDisplay() {
-  const m = String(Math.floor(timeLeft / 60)).padStart(2, '0');
-  const s = String(Math.floor(timeLeft % 60)).padStart(2, '0');
-  let label = 'READY';
-  let cls = 'state-idle';
-  if (mode === 'focus') { label = 'FOCUS TIME'; cls = 'state-focus'; }
-  if (mode === 'break') { label = 'BREAK TIME'; cls = 'state-break'; }
-  
-  document.getElementById('timer-label').textContent = label;
-  document.getElementById('timer-digits').textContent = `${m}:${s}`;
-  document.getElementById('timer-container').className = `timer-overlay ${cls}`;
-}
-updateTimerDisplay();
-
-async function startPomodoro(duration) {
-  await fetch(`/api/pomodoro/${window.CLASS_ID}/start`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ duration })
-  });
-  poll();
-}
-
-setInterval(() => {
-  if (isRunning && timeLeft > 0) {
-    const now = performance.now();
-    const dt = (now - lastTime) / 1000;
-    lastTime = now;
-    timeLeft -= dt;
-    
-    if (timeLeft <= 0) {
-      timeLeft = 0;
-      isRunning = false;
-      if (mode === 'focus') {
-        mode = 'break';
-        startPomodoro(300); 
-      } else if (mode === 'break') {
-        mode = 'focus';
-        startPomodoro(1500); 
-      }
-    }
-    updateTimerDisplay();
   }
-}, 1000);
 
-let lastMessageId = 0;
-let hasAutoSeated = false;
+  const avatarMap = {}; 
+  const targetPositions = {}; 
 
-async function poll() {
-  try {
-    const res = await fetch(`/api/poll/${window.CLASS_ID}`, { method: 'POST' });
-    const data = await res.json();
+  function initAvatarsFromJinja() {
+    if (!window.MEMBERS || !Array.isArray(window.MEMBERS)) {
+      logDebug("MEMBERS is not an array or empty");
+      return;
+    }
+    logDebug("Creating avatars for " + window.MEMBERS.length + " members");
     
-    if (data.pomodoro) {
-      mode = data.pomodoro.state;
-      if (mode !== 'idle' && data.pomodoro.ends_at) {
-        timeLeft = Math.max(0, Math.floor((new Date(data.pomodoro.ends_at).getTime() - Date.now()) / 1000));
-        isRunning = true;
+    window.MEMBERS.forEach((m) => {
+      if (m.role === 'teacher') return;
+      const uid = String(m.user_id);
+      if (!avatarMap[uid]) {
+        const av = createChibiAvatar({ 
+          name: m.name, 
+          seated: false, 
+          customHair: m.custom_hair, 
+          customSkin: m.custom_skin, 
+          customShirt: m.custom_shirt 
+        });
+        // 強制的に目立つ位置（カメラの目の前）に配置
+        av.position.set(0, 0, 4); 
+        scene.add(av);
+        avatarMap[uid] = av;
+        targetPositions[uid] = { x: 0, z: 4, seated: false };
+      }
+    });
+    logDebug("Avatars created: " + Object.keys(avatarMap).length);
+  }
+
+  function updateAvatarPositions(members, positions) {
+    members.forEach((m) => {
+      if (m.role === 'teacher') return;
+      const uid = String(m.id !== undefined ? m.id : m.user_id);
+      const seatIdx = positions[uid] !== undefined ? positions[uid] : -1;
+      
+      let targetX = 0, targetZ = 6; 
+      let isSeated = false;
+      
+      if (seatIdx >= 0 && seatIdx < seatPositions.length) {
+        const seat = seatPositions[seatIdx];
+        targetX = seat.x;
+        targetZ = seat.z + 0.8;
+        isSeated = true;
+      }
+      
+      targetPositions[uid] = { x: targetX, z: targetZ, seated: isSeated };
+      
+      if (!avatarMap[uid]) {
+        const av = createChibiAvatar({ 
+          name: m.name, 
+          seated: isSeated, 
+          customHair: m.custom_hair, 
+          customSkin: m.custom_skin, 
+          customShirt: m.custom_shirt 
+        });
+        av.position.set(targetX, 0, targetZ);
+        scene.add(av);
+        avatarMap[uid] = av;
       } else {
+        const av = avatarMap[uid];
+        const body = av.children[0];
+        const head = av.children[1];
+        const hair = av.children[2];
+        if (isSeated && body.position.y !== 0.55) {
+          body.position.y = 0.55; head.position.y = 1.1; hair.position.y = 1.12;
+        } else if (!isSeated && body.position.y !== 0.7) {
+          body.position.y = 0.7; head.position.y = 1.25; hair.position.y = 1.27;
+        }
+      }
+    });
+  }
+
+  // 初期化
+  initAvatarsFromJinja();
+
+  function animate() {
+    requestAnimationFrame(animate);
+    Object.keys(targetPositions).forEach(uid => {
+      const av = avatarMap[uid];
+      const target = targetPositions[uid];
+      if (av && target) {
+        av.position.x += (target.x - av.position.x) * 0.1;
+        av.position.z += (target.z - av.position.z) * 0.1;
+      }
+    });
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // 席のクリック判定
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+  const clickableSeats = [];
+
+  seatPositions.forEach((p, i) => {
+    const hitBox = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshBasicMaterial({ visible: false }));
+    hitBox.position.set(p.x, 0.5, p.z + 0.5);
+    hitBox.userData.seatIndex = i;
+    scene.add(hitBox);
+    clickableSeats.push(hitBox);
+  });
+
+  container.addEventListener('pointerdown', (e) => {
+    const startX = e.clientX;
+    const startY = e.clientY;
+    
+    const onPointerUp = async (upEvent) => {
+      if (Math.abs(upEvent.clientX - startX) > 5 || Math.abs(upEvent.clientY - startY) > 5) return;
+      
+      mouse.x = (upEvent.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(upEvent.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(clickableSeats);
+      
+      if (intersects.length > 0) {
+        const seatIdx = intersects[0].object.userData.seatIndex;
+        await fetch(`/api/study/${window.CLASS_ID}/move`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ seat_index: seatIdx })
+        });
+        poll();
+      }
+      container.removeEventListener('pointerup', onPointerUp);
+    };
+    container.addEventListener('pointerup', onPointerUp);
+  });
+
+  // タイマーロジック
+  let timeLeft = 1500;
+  let isRunning = false;
+  let mode = 'idle';
+  let lastTime = performance.now();
+
+  function updateTimerDisplay() {
+    const m = String(Math.floor(timeLeft / 60)).padStart(2, '0');
+    const s = String(Math.floor(timeLeft % 60)).padStart(2, '0');
+    let label = 'READY';
+    let cls = 'state-idle';
+    if (mode === 'focus') { label = 'FOCUS TIME'; cls = 'state-focus'; }
+    if (mode === 'break') { label = 'BREAK TIME'; cls = 'state-break'; }
+    
+    document.getElementById('timer-label').textContent = label;
+    document.getElementById('timer-digits').textContent = `${m}:${s}`;
+    document.getElementById('timer-container').className = `timer-overlay ${cls}`;
+  }
+  updateTimerDisplay();
+
+  async function startPomodoro(duration) {
+    await fetch(`/api/pomodoro/${window.CLASS_ID}/start`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ duration })
+    });
+    poll();
+  }
+
+  setInterval(() => {
+    if (isRunning && timeLeft > 0) {
+      const now = performance.now();
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+      timeLeft -= dt;
+      
+      if (timeLeft <= 0) {
+        timeLeft = 0;
         isRunning = false;
-        timeLeft = mode === 'break' ? 300 : 1500;
+        if (mode === 'focus') {
+          mode = 'break';
+          startPomodoro(300); 
+        } else if (mode === 'break') {
+          mode = 'focus';
+          startPomodoro(1500); 
+        }
       }
       updateTimerDisplay();
     }
-    
-    // APIからデータが来たらそれを使い、なければJinjaのデータを使う
-    const membersList = (data.members && data.members.length > 0) ? data.members : (window.MEMBERS || []);
-    const studyPos = data.study_positions || {};
-    
-    if (membersList.length > 0) {
-      updateAvatarPositions(membersList, studyPos);
+  }, 1000);
+
+  let lastMessageId = 0;
+  let hasAutoSeated = false;
+
+  async function poll() {
+    try {
+      const res = await fetch(`/api/poll/${window.CLASS_ID}`, { method: 'POST' });
+      const data = await res.json();
       
-      // 自分の席が決まっていない場合、自動で空き席を探して座る
-      if (!hasAutoSeated) {
-        const mySeat = studyPos[String(window.USER_ID)];
-        if (mySeat === undefined) {
-          const occupied = new Set(Object.values(studyPos));
-          for (let i = 0; i < seatPositions.length; i++) {
-            if (!occupied.has(i)) {
-              await fetch(`/api/study/${window.CLASS_ID}/move`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ seat_index: i })
-              });
-              hasAutoSeated = true;
-              // 移動APIが完了したら即座に再取得して座らせる
-              setTimeout(poll, 500); 
-              break;
-            }
-          }
+      if (data.pomodoro) {
+        mode = data.pomodoro.state;
+        if (mode !== 'idle' && data.pomodoro.ends_at) {
+          timeLeft = Math.max(0, Math.floor((new Date(data.pomodoro.ends_at).getTime() - Date.now()) / 1000));
+          isRunning = true;
         } else {
-          hasAutoSeated = true;
+          isRunning = false;
+          timeLeft = mode === 'break' ? 300 : 1500;
+        }
+        updateTimerDisplay();
+      }
+      
+      const membersList = (data.members && data.members.length > 0) ? data.members : (window.MEMBERS || []);
+      const studyPos = data.study_positions || {};
+      
+      if (membersList.length > 0) {
+        updateAvatarPositions(membersList, studyPos);
+        
+        if (!hasAutoSeated) {
+          const mySeat = studyPos[String(window.USER_ID)];
+          if (mySeat === undefined) {
+            const occupied = new Set(Object.values(studyPos));
+            for (let i = 0; i < seatPositions.length; i++) {
+              if (!occupied.has(i)) {
+                await fetch(`/api/study/${window.CLASS_ID}/move`, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ seat_index: i })
+                });
+                hasAutoSeated = true;
+                setTimeout(poll, 500); 
+                break;
+              }
+            }
+          } else {
+            hasAutoSeated = true;
+          }
         }
       }
-    }
-    
-    if (data.messages) {
-      const chatBox = document.getElementById('chat-messages');
-      data.messages.forEach(m => {
-        if (m.id > lastMessageId) {
-          lastMessageId = m.id;
-          const el = document.createElement('div');
-          el.className = 'chat-msg';
-          el.innerHTML = `<span class="name">${m.name}</span>${m.content}`;
-          chatBox.appendChild(el);
-          chatBox.scrollTop = chatBox.scrollHeight;
-        }
-      });
-    }
-  } catch (e) { console.error(e); }
-}
-setInterval(poll, 3000);
-poll();
-
-document.getElementById('btn-focus').onclick = () => startPomodoro(1500);
-document.getElementById('btn-break').onclick = () => startPomodoro(300);
-document.getElementById('btn-stop').onclick = async () => {
-  await fetch(`/api/pomodoro/${window.CLASS_ID}/stop`, { method: 'POST' });
+      
+      if (data.messages) {
+        const chatBox = document.getElementById('chat-messages');
+        data.messages.forEach(m => {
+          if (m.id > lastMessageId) {
+            lastMessageId = m.id;
+            const el = document.createElement('div');
+            el.className = 'chat-msg';
+            el.innerHTML = `<span class="name">${m.name}</span>${m.content}`;
+            chatBox.appendChild(el);
+            chatBox.scrollTop = chatBox.scrollHeight;
+          }
+        });
+      }
+    } catch (e) { console.error(e); }
+  }
+  setInterval(poll, 3000);
   poll();
-};
 
-document.getElementById('chat-form').onsubmit = async (e) => {
-  e.preventDefault();
-  const input = document.getElementById('chat-input');
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = '';
-  await fetch(`/api/announce/${window.CLASS_ID}`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: text })
+  document.getElementById('btn-focus').onclick = () => startPomodoro(1500);
+  document.getElementById('btn-break').onclick = () => startPomodoro(300);
+  document.getElementById('btn-stop').onclick = async () => {
+    await fetch(`/api/pomodoro/${window.CLASS_ID}/stop`, { method: 'POST' });
+    poll();
+  };
+
+  document.getElementById('chat-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    await fetch(`/api/announce/${window.CLASS_ID}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text })
+    });
+    poll();
+  };
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
   });
-  poll();
-};
 
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
+} catch (globalError) {
+  logDebug("GLOBAL ERROR: " + globalError.message + "\n" + globalError.stack);
+}
 </script>
 {% endblock %}
