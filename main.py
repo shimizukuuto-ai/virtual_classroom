@@ -38,7 +38,7 @@ from db import (
     remove_member_from_group, get_user_group, set_group_board,
     add_student_note, list_student_notes, delete_student_note,
     save_upload, get_upload,    set_user_customization, get_unlock_tier, UNLOCK_TIERS,
-    rate_teacher, get_teacher_rating, get_my_rating,
+    rate_teacher, get_teacher_rating, get_my_rating,    create_post, list_posts, get_post, delete_post, create_comment, list_comments,
     BADGES, SKINS, RANKS,
 )
 from i18n import all_t, default_steps
@@ -437,6 +437,7 @@ def class_room(request: Request, class_id: int):
             allow_anonymous=bool(cls.get("allow_anonymous") or 0),
             duration=cls.get("duration") or 30,
             ends_at=cls.get("ends_at") or ""),
+            posts=list_posts(class_id),
     )
 
 
@@ -1260,6 +1261,97 @@ def profile_card_png(uid: int):
     stats = user_stats(uid) or {}
     buf = profile_card(user, stats)
     return StreamingResponse(buf, media_type="image/png")
+
+# ============================================================
+# bulletin board (posts / comments)
+# ============================================================
+@app.post("/api/posts/{class_id}")
+async def api_post_create(request: Request, class_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    role = get_role(class_id, user["id"])
+    if not role:
+        return JSONResponse({"error": "not member"}, status_code=403)
+    data = await request.json()
+    title = (data.get("title") or "").strip()
+    content = (data.get("content") or "").strip()
+    if not title or not content:
+        return JSONResponse({"error": "empty"}, status_code=400)
+    is_pinned = 1 if role == "teacher" and data.get("is_pinned") else 0
+    create_post(class_id, user["id"], user["name"], title, content, is_pinned)
+    return JSONResponse({"ok": True})
+
+
+@app.get("/api/posts/{class_id}")
+async def api_post_list(request: Request, class_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if not get_role(class_id, user["id"]):
+        return JSONResponse({"error": "not member"}, status_code=403)
+    rows = list_posts(class_id)
+    return JSONResponse({
+        "posts": [
+            {"id": r["id"], "title": r["title"], "author": r["author_name"],
+             "content": r["content"], "is_pinned": r["is_pinned"],
+             "comment_count": r["comment_count"], "created_at": r["created_at"]}
+            for r in rows
+        ]
+    })
+
+
+@app.post("/api/posts/{post_id}/comments")
+async def api_comment_create(request: Request, post_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    post = get_post(post_id)
+    if not post:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    if not get_role(post["class_id"], user["id"]):
+        return JSONResponse({"error": "not member"}, status_code=403)
+    data = await request.json()
+    content = (data.get("content") or "").strip()
+    if not content:
+        return JSONResponse({"error": "empty"}, status_code=400)
+    create_comment(post_id, user["id"], user["name"], content)
+    return JSONResponse({"ok": True})
+
+
+@app.get("/api/posts/{post_id}/comments")
+async def api_comment_list(request: Request, post_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    post = get_post(post_id)
+    if not post:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    if not get_role(post["class_id"], user["id"]):
+        return JSONResponse({"error": "not member"}, status_code=403)
+    rows = list_comments(post_id)
+    return JSONResponse({
+        "comments": [
+            {"id": r["id"], "author": r["author_name"], "content": r["content"],
+             "created_at": r["created_at"]}
+            for r in rows
+        ]
+    })
+
+
+@app.post("/api/posts/{post_id}/delete")
+async def api_post_delete(request: Request, post_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    post = get_post(post_id)
+    if not post:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    role = get_role(post["class_id"], user["id"])
+    if int(post["author_id"]) != int(user["id"]) and role != "teacher":
+        return JSONResponse({"error": "unauthorized"}, status_code=403)
+    delete_post(post_id)
+    return JSONResponse({"ok": True})
 
 # ============================================================
 # dev

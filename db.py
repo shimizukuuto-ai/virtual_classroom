@@ -220,6 +220,26 @@ def init_db():
                 UNIQUE(teacher_id, student_id, class_id)
             );""")
             c.execute("""
+            CREATE TABLE IF NOT EXISTS posts (
+                id SERIAL PRIMARY KEY,
+                class_id INTEGER NOT NULL,
+                author_id INTEGER NOT NULL,
+                author_name TEXT NOT NULL,
+                title TEXT NOT NULL,
+                content TEXT NOT NULL,
+                is_pinned INTEGER DEFAULT 0,
+                created_at TEXT NOT NULL
+            );""")
+            c.execute("""
+            CREATE TABLE IF NOT EXISTS comments (
+                id SERIAL PRIMARY KEY,
+                post_id INTEGER NOT NULL,
+                author_id INTEGER NOT NULL,
+                author_name TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );""")
+            c.execute("""
             CREATE TABLE IF NOT EXISTS magic_tokens (
                 id SERIAL PRIMARY KEY, token_hash TEXT NOT NULL UNIQUE, email TEXT NOT NULL,
                 expires_at TEXT NOT NULL, used_at TEXT, created_at TEXT NOT NULL
@@ -1187,3 +1207,65 @@ def set_share_record(class_id, role, share):
             c.execute(f"UPDATE classes SET {col}=%s WHERE id=%s",
                       (1 if share else 0, class_id))
         conn.commit()
+
+
+
+# ===== bulletin board (posts / comments) =====
+def create_post(class_id, author_id, author_name, title, content, is_pinned=0):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute(
+                """INSERT INTO posts (class_id, author_id, author_name, title, content, is_pinned, created_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (class_id, author_id, author_name, title, content, is_pinned, now()),
+            )
+            pid = c.fetchone()["id"]
+        conn.commit()
+    return pid
+
+
+def list_posts(class_id):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute(
+                """SELECT p.*,
+                (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comment_count
+                FROM posts p
+                WHERE p.class_id = %s
+                ORDER BY p.is_pinned DESC, p.created_at DESC""",
+                (class_id,),
+            )
+            return c.fetchall()
+
+
+def get_post(post_id):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("SELECT * FROM posts WHERE id=%s", (post_id,))
+            return c.fetchone()
+
+
+def delete_post(post_id):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("DELETE FROM comments WHERE post_id=%s", (post_id,))
+            c.execute("DELETE FROM posts WHERE id=%s", (post_id,))
+        conn.commit()
+
+
+def create_comment(post_id, author_id, author_name, content):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute(
+                """INSERT INTO comments (post_id, author_id, author_name, content, created_at)
+                VALUES (%s,%s,%s,%s,%s)""",
+                (post_id, author_id, author_name, content, now()),
+            )
+        conn.commit()
+
+
+def list_comments(post_id):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("SELECT * FROM comments WHERE post_id=%s ORDER BY id ASC", (post_id,))
+            return c.fetchall()

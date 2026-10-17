@@ -570,6 +570,7 @@ main { padding: 16px 20px; }
       <button class="side-tab active" data-tab="board">{{ T.blackboard }}</button>
       <button class="side-tab" data-tab="chat">{{ T.log }}</button>
       <button class="side-tab" data-tab="qa">{{ T.qa_tab }}</button>
+            <button class="side-tab" data-tab="bulletin">📋 {{ T.bulletin }}</button>
                  {% if role == 'student' %}
       <button class="side-tab" data-tab="notebook">📓 {{ T.notebook }}</button>
       {% endif %}
@@ -616,6 +617,26 @@ main { padding: 16px 20px; }
           <button id="qa-submit" class="btn sm" type="button" style="width:100%;">{{ T.qa_ask }}</button>
         </div>
         <div id="qa-list"></div>
+      </div>
+
+            <div class="pane" data-pane="bulletin">
+        <div id="post-list-view">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <span style="font-size:13px;font-weight:700;color:#fff;">{{ T.bulletin }}</span>
+            <button id="btn-new-post" class="btn sm" style="background:#6366f1;">{{ T.new_post }}</button>
+          </div>
+          <div id="posts-container"></div>
+        </div>
+        <div id="post-detail-view" style="display:none;">
+          <button id="btn-back-to-list" class="btn sm ghost" style="margin-bottom:12px;background:#232733;color:#e5e7eb;border-color:#2a2e3a;">{{ T.back_to_list }}</button>
+          <div id="post-content-container" style="background:#232733;border:1px solid #2a2e3a;border-radius:10px;padding:14px;margin-bottom:16px;"></div>
+          <h4 style="margin:0 0 10px;color:#fff;font-size:13px;">レス</h4>
+          <div id="comments-container"></div>
+          <div style="margin-top:12px;">
+            <textarea id="comment-input" placeholder="{{ T.reply_placeholder }}" style="width:100%;min-height:60px;background:#232733;border:1px solid #2a2e3a;color:#e5e7eb;border-radius:8px;padding:10px;font-size:13px;box-sizing:border-box;font-family:inherit;"></textarea>
+            <button id="btn-submit-comment" class="btn sm" style="margin-top:6px;width:100%;">{{ T.reply }}</button>
+          </div>
+        </div>
       </div>
 
                  {% if role == 'student' %}
@@ -768,6 +789,16 @@ main { padding: 16px 20px; }
   </div>
 </div>
 
+<div class="drawer" id="post-drawer">
+  <h3>{{ T.new_post }}</h3>
+  <input type="text" id="new-post-title" placeholder="{{ T.post_title }}" style="width:100%;margin-bottom:10px;background:#232733;border:1px solid #2a2e3a;color:#e5e7eb;border-radius:8px;padding:10px;box-sizing:border-box;">
+  <textarea id="new-post-content" placeholder="{{ T.post_content }}" style="width:100%;min-height:160px;background:#0f1117;color:#e5e7eb;border:1px solid #2a2e3a;border-radius:8px;padding:14px;box-sizing:border-box;line-height:1.6;resize:vertical;"></textarea>
+  <div style="margin-top:10px;display:flex;gap:8px;">
+    <button id="btn-post-submit" class="btn green">{{ T.post_submit }}</button>
+    <button id="btn-post-cancel" class="btn ghost" style="background:#232733;color:#e5e7eb;border-color:#2a2e3a;">{{ T.post_cancel }}</button>
+  </div>
+</div>
+
 <!-- fullscreen board -->
 <div class="board-fullscreen" id="board-fullscreen">
   <div class="board-fullscreen-head">
@@ -890,6 +921,17 @@ window.INITIAL_QUESTIONS = [
 window.INITIAL_FILES = [
   {% for f in files %}{id: {{ f.id }}, filename: {{ f.filename|tojson }}, url: {{ f.url|tojson }}},{% endfor %}
 ];
+
+window.INITIAL_POSTS = [
+  {% for p in posts %}{
+    id: {{ p.id }}, title: {{ p.title|tojson }},
+    author: {{ p.author_name|tojson }},
+    content: {{ p.content|tojson }},
+    is_pinned: {{ p.is_pinned }},
+    comment_count: {{ p.comment_count }},
+    created_at: {{ p.created_at|tojson }}
+  },{% endfor %}
+];
 window.INITIAL_GROUPS = {{ groups|tojson }};
 window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
 </script>
@@ -912,6 +954,7 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
       document.querySelectorAll(".pane").forEach(p => p.classList.toggle("active", p.dataset.pane === name));
       if (name === "history") loadHistory();
       if (name === "chat") tab.classList.remove("has-unread");
+      if (name === "bulletin") loadPosts();
     });
   });
 
@@ -2113,6 +2156,139 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
       if (diff < 60) remainingTime.style.color = "#f59e0b";
     }, 1000);
   }
+
+    // ===== BULLETIN BOARD =====
+  const postsContainer = document.getElementById("posts-container");
+  const postListView = document.getElementById("post-list-view");
+  const postDetailView = document.getElementById("post-detail-view");
+  const postContentContainer = document.getElementById("post-content-container");
+  const commentsContainer = document.getElementById("comments-container");
+  const postDrawer = document.getElementById("post-drawer");
+  const newPostTitle = document.getElementById("new-post-title");
+  const newPostContent = document.getElementById("new-post-content");
+
+  let currentPostId = null;
+
+  function renderPosts(posts) {
+    if (!postsContainer) return;
+    if (!posts.length) {
+      postsContainer.innerHTML = '<div style="color:#6b7280;font-size:12px;padding:8px;">' + I18N.no_posts + '</div>';
+      return;
+    }
+    postsContainer.innerHTML = posts.map(p => {
+      const pin = p.is_pinned ? '<span style="background:#f59e0b;color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;margin-right:6px;font-weight:700;">' + I18N.pinned + '</span>' : '';
+      return '<div class="q-item" data-pid="' + p.id + '" style="cursor:pointer;">' +
+        '<div class="q-head"><span>' + escapeHtml(p.author) + '</span><span>' + escapeHtml(p.created_at) + '</span></div>' +
+        '<div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:6px;">' + pin + escapeHtml(p.title) + '</div>' +
+        '<div style="font-size:11px;color:#6b7280;">' + p.comment_count + ' レス</div>' +
+        '</div>';
+    }).join("");
+    postsContainer.querySelectorAll(".q-item").forEach(el => {
+      el.addEventListener("click", () => openPost(el.dataset.pid));
+    });
+  }
+  renderPosts(window.INITIAL_POSTS || []);
+
+  async function loadPosts() {
+    if (!postsContainer) return;
+    try {
+      const res = await fetch('/api/posts/' + CLASS_ID);
+      const d = await res.json();
+      if (res.ok) renderPosts(d.posts || []);
+    } catch (e) {}
+  }
+
+  async function openPost(pid) {
+    currentPostId = pid;
+    postListView.style.display = "none";
+    postDetailView.style.display = "block";
+    try {
+      const res = await fetch('/api/posts/' + pid + '/comments');
+      const d = await res.json();
+      const post = (window.INITIAL_POSTS || []).find(p => p.id == pid);
+      if (post) {
+        const del = (ROLE === "teacher" || post.author === USER_NAME)
+          ? '<button id="btn-del-post" class="q-delete" style="margin-top:8px;background:#ef4444;color:#fff;padding:4px 10px;border-radius:6px;">' + I18N.qa_delete + '</button>'
+          : '';
+        postContentContainer.innerHTML =
+          '<div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:8px;">' + escapeHtml(post.title) + '</div>' +
+          '<div style="font-size:11px;color:#6b7280;margin-bottom:12px;">' + escapeHtml(post.author) + ' · ' + escapeHtml(post.created_at) + '</div>' +
+          '<div style="font-size:13px;color:#e5e7eb;line-height:1.7;white-space:pre-wrap;">' + renderMessageBody(post.content) + '</div>' +
+          del;
+        const delBtn = document.getElementById("btn-del-post");
+        if (delBtn) delBtn.addEventListener("click", async () => {
+          if (!confirm(I18N.qa_confirm_delete)) return;
+          await fetch('/api/posts/' + pid + '/delete', { method: "POST" });
+          backToList();
+          loadPosts();
+        });
+      }
+      if (!d.comments || !d.comments.length) {
+        commentsContainer.innerHTML = '<div style="color:#6b7280;font-size:12px;padding:8px;">まだレスはありません</div>';
+      } else {
+        commentsContainer.innerHTML = d.comments.map(c =>
+          '<div class="q-item" style="padding:10px 12px;margin-bottom:8px;">' +
+          '<div class="q-head"><span>' + escapeHtml(c.author) + '</span><span>' + escapeHtml(c.created_at) + '</span></div>' +
+          '<div style="font-size:13px;color:#e5e7eb;white-space:pre-wrap;">' + renderMessageBody(c.content) + '</div>' +
+          '</div>'
+        ).join("");
+      }
+    } catch (e) {}
+  }
+
+  function backToList() {
+    currentPostId = null;
+    postDetailView.style.display = "none";
+    postListView.style.display = "block";
+  }
+
+  const btnBack = document.getElementById("btn-back-to-list");
+  if (btnBack) btnBack.addEventListener("click", backToList);
+
+  const btnNewPost = document.getElementById("btn-new-post");
+  if (btnNewPost) btnNewPost.addEventListener("click", () => {
+    newPostTitle.value = "";
+    newPostContent.value = "";
+    postDrawer.classList.add("open");
+  });
+  const btnPostCancel = document.getElementById("btn-post-cancel");
+  if (btnPostCancel) btnPostCancel.addEventListener("click", () => postDrawer.classList.remove("open"));
+
+  const btnPostSubmit = document.getElementById("btn-post-submit");
+  if (btnPostSubmit) btnPostSubmit.addEventListener("click", async () => {
+    const title = newPostTitle.value.trim();
+    const content = newPostContent.value.trim();
+    if (!title || !content) return;
+    try {
+      const res = await fetch('/api/posts/' + CLASS_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, content })
+      });
+      if (res.ok) {
+        postDrawer.classList.remove("open");
+        await loadPosts();
+      }
+    } catch (e) {}
+  });
+
+  const btnSubmitComment = document.getElementById("btn-submit-comment");
+  if (btnSubmitComment) btnSubmitComment.addEventListener("click", async () => {
+    if (!currentPostId) return;
+    const ta = document.getElementById("comment-input");
+    const content = ta.value.trim();
+    if (!content) return;
+    try {
+      const res = await fetch('/api/posts/' + currentPostId + '/comments', {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content })
+      });
+      if (res.ok) {
+        ta.value = "";
+        await openPost(currentPostId);
+        await loadPosts();
+      }
+    } catch (e) {}
+  });
 
   // ===== INITIAL POLL + SCHEDULE =====
   pollNow().then(() => scheduleNextPoll());
