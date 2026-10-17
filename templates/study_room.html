@@ -10,7 +10,7 @@
     backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1); pointer-events: none;
   }
   /* デバッグ用のパネル */
-  .debug-panel {
+  .debug-panel { display: none; /* 解決したので非表示 */
     position: absolute; top: 100px; left: 20px; z-index: 100; color: #fff;
     background: rgba(220, 38, 38, 0.9); padding: 15px; border-radius: 8px;
     font-family: monospace; font-size: 12px; white-space: pre-wrap; max-width: 400px;
@@ -256,7 +256,6 @@ try {
     logDebug("Creating avatars for " + window.MEMBERS.length + " members");
     
     window.MEMBERS.forEach((m) => {
-      if (m.role === 'teacher') return;
       const uid = String(m.user_id);
       if (!avatarMap[uid]) {
         const av = createChibiAvatar({ 
@@ -278,7 +277,6 @@ try {
 
   function updateAvatarPositions(members, positions) {
     members.forEach((m) => {
-      if (m.role === 'teacher') return;
       const uid = String(m.id !== undefined ? m.id : m.user_id);
       const seatIdx = positions[uid] !== undefined ? positions[uid] : -1;
       
