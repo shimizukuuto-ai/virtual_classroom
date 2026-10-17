@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ T.posts }} - {{ T.app_title }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ T.posts }}</h1>
+  <form method="get" action="/posts" style="display:flex;gap:8px;">
+    <input name="q" value="{{ q }}" placeholder="{{ T.search }}" style="margin:0;flex:1;">
+    <button type="submit">{{ T.search }}</button>
+  </form>
+  <a class="btn" href="/posts/new" style="margin-top:10px;">{{ T.write_post }}</a>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
+  {% for p in posts %}
+  <a class="card" href="/posts/{{ p.id }}" style="text-decoration:none;color:inherit;margin:0;">
+    <div style="font-size:12px;color:#64748b;">{{ p.created_at[:10] }} · {{ p.author_name }}</div>
+    <h3 style="margin:6px 0;font-size:16px;">{{ p.title }}</h3>
+    <div style="font-size:13px;color:#475569;">{{ p.body[:120] }}{% if p.body|length > 120 %}…{% endif %}</div>
+    {% if p.tags %}<div style="margin-top:8px;font-size:11px;color:#3b82f6;">{{ p.tags }}</div>{% endif %}
+  </a>
+  {% else %}
+  <div class="card muted">{{ T.no_posts }}</div>
+  {% endfor %}
+</div>
+{% endblock %}

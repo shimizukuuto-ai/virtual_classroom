@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ post.title }} - {{ T.app_title }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1 style="margin-bottom:6px;">{{ post.title }}</h1>
+  <div class="muted">{{ post.author_name }} · {{ post.created_at[:10] }}</div>
+  {% if post.tags %}<div style="margin-top:8px;font-size:12px;color:#3b82f6;">{{ post.tags }}</div>{% endif %}
+</div>
+<div class="card">
+  <div style="white-space:pre-wrap;line-height:1.9;font-size:15px;">{{ post.body }}</div>
+</div>
+
+<div class="card">
+  <h2>{{ T.comments }}</h2>
+  {% for c in comments %}
+  <div style="padding:10px 0;border-bottom:1px solid #e2e8f0;">
+    <div class="muted">{{ c.author_name }} · {{ c.created_at[:16] }}</div>
+    <div style="white-space:pre-wrap;margin-top:4px;">{{ c.body }}</div>
+  </div>
+  {% else %}
+  <p class="muted">{{ T.no_comments }}</p>
+  {% endfor %}
+
+  {% if user %}
+  <form method="post" action="/posts/{{ post.id }}/comment" style="margin-top:14px;">
+    <textarea name="body" rows="3" required></textarea>
+    <button type="submit">{{ T.send }}</button>
+  </form>
+  {% endif %}
+</div>
+
+{% if user and user.id == post.author_id %}
+<form method="post" action="/posts/{{ post.id }}/delete"
+      onsubmit="return confirm('{{ T.confirm_delete }}')">
+  <button class="red" type="submit">{{ T.delete }}</button>
+</form>
+{% endif %}
+{% endblock %}

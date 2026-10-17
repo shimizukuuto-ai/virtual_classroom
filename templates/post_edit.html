@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{{ T.write_post }} - {{ T.app_title }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ T.write_post }}</h1>
+  <form method="post" action="/posts/new">
+    <label>{{ T.post_title }}</label>
+    <input type="text" name="title" required>
+    <label>{{ T.post_tags }}</label>
+    <input type="text" name="tags" placeholder="math, physics, memo">
+    <label>{{ T.post_body }}</label>
+    <textarea name="body" rows="14" required></textarea>
+    <button type="submit">{{ T.save }}</button>
+    <a class="btn gray" href="/posts">{{ T.cancel }}</a>
+  </form>
+</div>
+{% endblock %}

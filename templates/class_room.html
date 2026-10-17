@@ -458,6 +458,28 @@ main { padding: 16px 20px; }
   .t-ctrl button { min-width: 50px; font-size: 10px; padding: 8px 6px; }
   .side-tab { padding: 10px 12px; font-size: 10px; min-width: 60px; }
 }
+
+#bulletin-modal {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.7); z-index: 200;
+  align-items: center; justify-content: center;
+}
+#bulletin-modal .panel {
+  background: #fff; width: min(900px, 92vw); height: min(600px, 85vh);
+  border-radius: 12px; padding: 20px; display: flex; flex-direction: column;
+}
+#bulletin-modal .body-grid {
+  display: grid; grid-template-columns: 220px 1fr; gap: 14px;
+  flex: 1; min-height: 0;
+}
+#bulletin-list, #bulletin-reader { overflow: auto; }
+.bb-item {
+  display: block; width: 100%; text-align: left;
+  padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px;
+  margin-bottom: 6px; background: #fff; cursor: pointer;
+}
+.bb-item:hover { background: #eff6ff; border-color: #93c5fd; }
+
 </style>
 
 <div class="room-grid">
@@ -887,6 +909,21 @@ window.I18N = {
   share_record_agreed: {{ T.share_record_agreed|tojson }},
     remaining_ended: {{ T.remaining_ended|tojson }},
   share_text_template: {{ T.share_text_template|tojson }},
+  ai_teacher: {{ T.ai_teacher|tojson }},
+  system: {{ T.system|tojson }},
+  error: {{ T.error|tojson }},
+  thinking: {{ T.thinking|tojson }},
+  save: {{ T.save|tojson }},
+  ask_placeholder: {{ T.ask_placeholder|tojson }},
+  ai_teacher_mode: {{ (1 if cls.ai_teacher_mode else 0) }},
+  // ↓ 追加
+  posts: {{ T.posts|tojson }},
+  loading: {{ T.loading|tojson }},
+  no_posts: {{ T.no_posts|tojson }},
+  open_post: {{ T.open_post|tojson }},
+    pomodoro_idle:     {{ T.pomodoro_idle|tojson }},
+  pomodoro_focusing: {{ T.pomodoro_focusing|tojson }},
+  pomodoro_break:    {{ T.pomodoro_break|tojson }},
 };
 window.CLASS_ID = {{ cls.id }};
 window.CLASS_JOIN_CODE = {{ cls.join_code|tojson }};
@@ -1425,6 +1462,11 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
     try {
       const res = await fetch('/api/poll/' + CLASS_ID, { method: "POST" });
       const data = await res.json();
+      if (data.pomodoro) {
+  pomoState = data.pomodoro.state || "idle";
+  pomoEndsAt = data.pomodoro.ends_at ? new Date(data.pomodoro.ends_at).getTime() : 0;
+  renderPomo();
+}
       bbTextarea.value = data.blackboard || "";
       drawer.classList.add("open");
     } catch (err) {}
@@ -3630,4 +3672,21 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
   }
 })();
 </script>
+<div id="bulletin-modal">
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h2 style="margin:0;">{{ T.posts }}</h2>
+      <button onclick="document.getElementById('bulletin-modal').style.display='none'">✕</button>
+    </div>
+    <div class="body-grid">
+      <div id="bulletin-list"></div>
+      <div id="bulletin-reader"></div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;">
+      <a class="btn" href="/posts/new">{{ T.write_post }}</a>
+      <a class="btn gray" href="/posts">{{ T.view_all }}</a>
+    </div>
+  </div>
+</div>
+
 {% endblock %}

@@ -36,11 +36,11 @@ def close_pool():
 
 
 def now():
-    return datetime.now().isoformat(timespec="seconds")
+    return datetime.datetime.now().isoformat(timespec="seconds")
 
 
 def today():
-    return datetime.now().strftime("%Y-%m-%d")
+    return datetime.datetime.now().strftime("%Y-%m-%d")
 
 
 BADGES = {
@@ -429,7 +429,7 @@ def calc_streak(uid):
     if not rows:
         return 0
     streak = 0
-    expected = datetime.now().date()
+    expected = datetime.datetime.now().date()
     for r in rows:
         try:
             d = datetime.strptime(r["date"], "%Y-%m-%d").date()
@@ -529,7 +529,7 @@ def create_class(title, subject, description, teacher_id, join_code,
                  next_session="", allow_anonymous=0, is_interview=0,
                  duration=30):
     from datetime import datetime, timedelta
-    ends_at = (datetime.now() + timedelta(minutes=duration)).isoformat(timespec="seconds")
+    ends_at = (datetime.datetime.now() + timedelta(minutes=duration)).isoformat(timespec="seconds")
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
             try:
@@ -1226,7 +1226,7 @@ def create_post(class_id, author_id, author_name, title, content, is_pinned=0):
     return pid
 
 
-def list_posts(class_id):
+def list_posts(class_id=None):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
             c.execute(
@@ -1272,6 +1272,15 @@ def list_comments(post_id):
             c.execute("SELECT * FROM comments WHERE post_id=%s ORDER BY id ASC", (post_id,))
             return c.fetchall()
 
+
+from contextlib import contextmanager
+
+@contextmanager
+def _cursor():
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            yield c
+
 def init_posts():
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
@@ -1302,7 +1311,7 @@ def init_posts():
 
 def create_post(author_id, author_name, title, body, tags="", class_id=None, is_public=1):
     now = datetime.datetime.utcnow().isoformat()
-    with conn() as c:
+    with _cursor() as c:
         cur = c.execute("""
             INSERT INTO posts (author_id, author_name, title, body, tags, class_id, is_public, created_at, updated_at)
             VALUES (?,?,?,?,?,?,?,?,?)
@@ -1321,28 +1330,28 @@ def list_posts(q="", class_id=None, limit=50):
         params.append(class_id)
     sql += " ORDER BY id DESC LIMIT ?"
     params.append(limit)
-    with conn() as c:
+    with _cursor() as c:
         return c.execute(sql, params).fetchall()
 
 def get_post(pid):
-    with conn() as c:
+    with _cursor() as c:
         return c.execute("SELECT * FROM posts WHERE id = ?", (pid,)).fetchone()
 
 def update_post(pid, author_id, title, body, tags):
     now = datetime.datetime.utcnow().isoformat()
-    with conn() as c:
+    with _cursor() as c:
         c.execute("""
             UPDATE posts SET title=?, body=?, tags=?, updated_at=?
             WHERE id=? AND author_id=?
         """, (title, body, tags, now, pid, author_id))
 
 def delete_post(pid, author_id):
-    with conn() as c:
+    with _cursor() as c:
         c.execute("DELETE FROM posts WHERE id=? AND author_id=?", (pid, author_id))
 
 def add_comment(post_id, author_id, author_name, body):
     now = datetime.datetime.utcnow().isoformat()
-    with conn() as c:
+    with _cursor() as c:
         cur = c.execute("""
             INSERT INTO post_comments (post_id, author_id, author_name, body, created_at)
             VALUES (?,?,?,?,?)
@@ -1350,11 +1359,11 @@ def add_comment(post_id, author_id, author_name, body):
         return cur.lastrowid
 
 def list_comments(post_id):
-    with conn() as c:
+    with _cursor() as c:
         return c.execute("SELECT * FROM post_comments WHERE post_id=? ORDER BY id ASC", (post_id,)).fetchall()
 
 def init_room_state():
-    with conn() as c:
+    with _cursor() as c:
         c.execute("""
             CREATE TABLE IF NOT EXISTS room_state (
                 class_id INTEGER PRIMARY KEY,
@@ -1367,7 +1376,7 @@ def init_room_state():
         """)
 
 def get_room_state(class_id):
-    with conn() as c:
+    with _cursor() as c:
         row = c.execute("SELECT * FROM room_state WHERE class_id=?", (class_id,)).fetchone()
         if row:
             return row
@@ -1378,7 +1387,7 @@ def get_room_state(class_id):
         return c.execute("SELECT * FROM room_state WHERE class_id=?", (class_id,)).fetchone()
 
 def set_pomodoro(class_id, state, duration, ends_at):
-    with conn() as c:
+    with _cursor() as c:
         c.execute("INSERT OR IGNORE INTO room_state (class_id) VALUES (?)", (class_id,))
         c.execute("""
             UPDATE room_state
@@ -1389,7 +1398,7 @@ def set_pomodoro(class_id, state, duration, ends_at):
               _now() if state != "idle" else None, _now(), class_id))
 
 def migrate_room_type():
-    with conn() as c:
+    with _cursor() as c:
         try:
             c.execute("ALTER TABLE classes ADD COLUMN room_type TEXT DEFAULT 'class'")
         except Exception:

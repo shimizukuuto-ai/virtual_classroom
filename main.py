@@ -11,6 +11,8 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.responses import Response, StreamingResponse
 from ogp import class_card, profile_card
+from datetime import datetime, timedelta, timezone
+from db import get_room_state, set_pomodoro, init_room_state
 
 from db import (
     init_pool, close_pool,
@@ -39,6 +41,8 @@ from db import (
     add_student_note, list_student_notes, delete_student_note,
     save_upload, get_upload,    set_user_customization, get_unlock_tier, UNLOCK_TIERS,
     rate_teacher, get_teacher_rating, get_my_rating,    create_post, list_posts, get_post, delete_post, create_comment, list_comments,
+    create_post, list_posts, get_post, update_post, delete_post,
+    add_comment, list_comments,
     BADGES, SKINS, RANKS,
 )
 from i18n import all_t, default_steps
@@ -128,6 +132,9 @@ def ctx(request, user, **extra):
 @app.on_event("startup")
 def startup():
     init_pool()
+    init_posts()
+    init_room_state()
+    migrate_room_type() 
 
 
 @app.on_event("shutdown")
@@ -342,6 +349,7 @@ def create_class_submit(
     allow_anonymous: str = Form("0"),
     is_interview: str = Form("0"),
     duration: str = Form("30"),
+    room_type: str = Form("class"),
 ):
     user = current_user(request)
     if not user:
@@ -439,7 +447,7 @@ def class_room(request: Request, class_id: int):
         allow_anonymous=bool(cls.get("allow_anonymous") or 0),
         duration=cls.get("duration") or 30,
         ends_at=cls.get("ends_at") or "",
-        posts=list_posts(class_id),   # ← ctx の中へ移動
+        posts=list_posts(class_id=class_id),   # ← ctx の中へ移動
     ),
 )
 
@@ -462,6 +470,7 @@ async def api_poll(request: Request, class_id: int, since_id: int = 0):
         return JSONResponse({"error": "not member"}, status_code=403)
     msg = get_messages(class_id, limit=80)
     steps = list_steps(class_id)
+    rs = get_room_state(class_id)        
     questions = list_questions(class_id, limit=100)
     members = list_members(class_id)
     files = list_class_files(class_id, limit=30)
@@ -500,6 +509,11 @@ async def api_poll(request: Request, class_id: int, since_id: int = 0):
             {"id": f["id"], "filename": f["filename"], "url": f["url"]}
             for f in files
         ],
+        "pomodoro": {                                            # ← 追加
+            "state": rs["pomodoro_state"] or "idle",
+            "ends_at": rs["pomodoro_ends_at"] or "",
+            "duration": rs["pomodoro_duration"] or 0,
+        },
         "groups": groups,
         "my_group": dict(my_group) if my_group else None,
     })
@@ -1293,7 +1307,7 @@ async def api_post_list(request: Request, class_id: int):
         return JSONResponse({"error": "not logged in"}, status_code=401)
     if not get_role(class_id, user["id"]):
         return JSONResponse({"error": "not member"}, status_code=403)
-    rows = list_posts(class_id)
+    rows = list_posts(class_id=class_id)
     return JSONResponse({
         "posts": [
             {"id": r["id"], "title": r["title"], "author": r["author_name"],
@@ -1408,3 +1422,79 @@ if os.environ.get("ENABLE_DEV") == "1":
             return RedirectResponse("/login")
         reset_bonus_xp(user["id"])
         return RedirectResponse(request.headers.get("referer") or "/badges", status_code=303)
+
+@app.get("/posts", response_class=HTMLResponse)
+def posts_index(request: Request, q: str = ""):
+    user = current_user(request)
+    rows = list_posts(q=q)
+    return templates.TemplateResponse(
+        request, "posts.html",
+        ctx(request, user, posts=rows, q=q),
+    )
+
+@app.get("/posts/new", response_class=HTMLResponse)
+def posts_new(request: Request):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse(request, "post_edit.html", ctx(request, user, post=None))
+
+@app.post("/posts/new")
+def posts_create(request: Request, title: str = Form(...), body: str = Form(...), tags: str = Form("")):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    title, body = title.strip(), body.strip()
+    if not title or not body:
+        return RedirectResponse("/posts/new", status_code=303)
+    pid = create_post(user["id"], user["name"], title, body, tags)
+    return RedirectResponse(f"/posts/{pid}", status_code=303)
+
+@app.get("/posts/{pid}", response_class=HTMLResponse)
+def posts_detail(request: Request, pid: int):
+    user = current_user(request)
+    post = get_post(pid)
+    if not post:
+        return HTMLResponse("Not found", status_code=404)
+    comments = list_comments(pid)
+    return templates.TemplateResponse(
+        request, "post_detail.html",
+        ctx(request, user, post=post, comments=comments),
+    )
+
+@app.post("/posts/{pid}/comment")
+def posts_comment(request: Request, pid: int, body: str = Form(...)):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    if body.strip():
+        add_comment(pid, user["id"], user["name"], body.strip())
+    return RedirectResponse(f"/posts/{pid}", status_code=303)
+
+@app.post("/posts/{pid}/delete")
+def posts_delete(request: Request, pid: int):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    delete_post(pid, user["id"])
+    return RedirectResponse("/posts", status_code=303)
+
+@app.get("/api/posts/recent")
+def api_posts_recent(limit: int = 6):
+    rows = list_posts(limit=limit)
+    return {"items": [dict(r) for r in rows]}
+
+@app.get("/api/posts/{pid}")
+def api_post_detail(pid: int):
+    p = get_post(pid)
+    if not p:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    return dict(p)
+
+@app.get("/invite/{code}", response_class=HTMLResponse)
+def invite(request: Request, code: str):
+    user = current_user(request)
+    cls = get_class_by_code(code)
+    return templates.TemplateResponse(
+        request, "invite.html", ctx(request, user, cls=cls, code=code)
+    )
