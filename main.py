@@ -45,7 +45,7 @@ from db import (
     create_post, list_posts, get_post, update_post, delete_post,
     add_comment, list_comments,
     BADGES, SKINS, RANKS,
-    migrate_room_type,
+    migrate_room_type, init_study_state, get_study_positions, set_study_position,
 )
 from i18n import all_t, default_steps
 
@@ -136,7 +136,8 @@ def startup():
     init_pool()
     init_posts()
     init_room_state()
-    migrate_room_type() 
+    migrate_room_type()
+    init_study_state() 
 
 
 @app.on_event("shutdown")
@@ -433,6 +434,9 @@ def class_room(request: Request, class_id: int):
     if not role:
         return HTMLResponse("Not a member", status_code=403)
     members = list_members(class_id)
+    if (cls.get("room_type") or "class") == "study" and role != "teacher":
+        if len(members) > 12:
+            return HTMLResponse("Study room is full (max 12 members).", status_code=403)
     messages = get_messages(class_id, limit=80)
     steps = list_steps(class_id)
     questions = list_questions(class_id, limit=100)
@@ -513,11 +517,12 @@ async def api_poll(request: Request, class_id: int, since_id: int = 0):
             {"id": f["id"], "filename": f["filename"], "url": f["url"]}
             for f in files
         ],
-        "pomodoro": {                                            # ← 追加
+        "pomodoro": {
             "state": rs["pomodoro_state"] or "idle",
             "ends_at": rs["pomodoro_ends_at"] or "",
             "duration": rs["pomodoro_duration"] or 0,
         },
+        "study_positions": get_study_positions(class_id),
         "groups": groups,
         "my_group": dict(my_group) if my_group else None,
     })
@@ -1375,6 +1380,23 @@ async def api_post_delete(request: Request, post_id: int):
     if int(post["author_id"]) != int(user["id"]) and role != "teacher":
         return JSONResponse({"error": "unauthorized"}, status_code=403)
     delete_post(post_id)
+    return JSONResponse({"ok": True})
+
+# ============================================================
+# study room move
+# ============================================================
+@app.post("/api/study/{class_id}/move")
+async def api_study_move(request: Request, class_id: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if not get_role(class_id, user["id"]):
+        return JSONResponse({"error": "not member"}, status_code=403)
+    data = await request.json()
+    seat_index = int(data.get("seat_index", -1))
+    if seat_index < 0:
+        return JSONResponse({"error": "invalid seat"}, status_code=400)
+    set_study_position(class_id, user["id"], seat_index)
     return JSONResponse({"ok": True})
 
 # ============================================================

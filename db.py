@@ -1421,3 +1421,28 @@ def list_class_posts(class_id, limit=50):
             LIMIT %s
         """, (class_id, limit)).fetchall()
         return rows
+
+def init_study_state():
+    with _cursor() as c:
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS study_positions (
+                class_id BIGINT NOT NULL,
+                user_id BIGINT NOT NULL,
+                seat_index INTEGER NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (class_id, user_id)
+            )
+        """)
+
+def get_study_positions(class_id):
+    with _cursor() as c:
+        rows = c.execute("SELECT * FROM study_positions WHERE class_id=%s", (class_id,)).fetchall()
+        return {str(r["user_id"]): r["seat_index"] for r in rows}
+
+def set_study_position(class_id, user_id, seat_index):
+    with _cursor() as c:
+        c.execute("""
+            INSERT INTO study_positions (class_id, user_id, seat_index, updated_at)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (class_id, user_id) DO UPDATE SET seat_index=EXCLUDED.seat_index, updated_at=EXCLUDED.updated_at
+        """, (class_id, user_id, seat_index, now()))

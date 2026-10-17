@@ -2,40 +2,61 @@
 {% block title %}{{ cls.title }} - {{ T.room_study }}{% endblock %}
 {% block content %}
 <style>
-  body { background: #1a1a1a !important; margin: 0; overflow: hidden; }
+  body { background: #0f172a !important; margin: 0; overflow: hidden; }
   #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+  .room-info {
+    position: absolute; top: 20px; left: 20px; z-index: 10; color: #fff;
+    background: rgba(15, 23, 42, 0.8); padding: 15px 20px; border-radius: 12px;
+    backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1); pointer-events: none;
+  }
   .ui-overlay {
     position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-    display: flex; gap: 15px; z-index: 10; background: rgba(15, 23, 42, 0.7);
+    display: flex; gap: 15px; z-index: 10; background: rgba(15, 23, 42, 0.8);
     padding: 15px 25px; border-radius: 50px; backdrop-filter: blur(10px);
     box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1);
   }
   .ui-overlay button {
-    padding: 12px 30px; border-radius: 30px; border: none; font-size: 16px;
-    font-weight: bold; cursor: pointer; color: #fff; transition: transform 0.2s, opacity 0.2s;
+    padding: 10px 24px; border-radius: 30px; border: none; font-size: 15px;
+    font-weight: bold; cursor: pointer; color: #fff; transition: all 0.2s;
   }
   .ui-overlay button:hover { transform: scale(1.05); opacity: 0.9; }
-  .btn-focus { background: #3b82f6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.5); }
-  .btn-break { background: #10b981; box-shadow: 0 0 15px rgba(16, 185, 129, 0.5); }
-  .btn-stop { background: #ef4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.5); }
-  .room-info {
-    position: absolute; top: 20px; left: 20px; z-index: 10; color: #fff;
-    background: rgba(15, 23, 42, 0.7); padding: 15px 20px; border-radius: 12px;
-    backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1);
+  .btn-focus { background: #3b82f6; }
+  .btn-break { background: #10b981; }
+  .btn-stop { background: #ef4444; }
+  .chat-panel {
+    position: absolute; right: 20px; top: 20px; width: 300px; height: calc(100vh - 120px);
+    background: rgba(30, 41, 59, 0.9); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
+    display: flex; flex-direction: column; z-index: 10; backdrop-filter: blur(10px);
   }
+  .chat-header { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #fff; font-weight: bold; }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 10px 15px; display: flex; flex-direction: column; gap: 8px; }
+  .chat-msg { font-size: 13px; color: #e2e8f0; line-height: 1.4; word-break: break-all; }
+  .chat-msg .name { font-size: 11px; color: #94a3b8; display: block; margin-bottom: 2px; }
+  .chat-input-area { padding: 10px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; gap: 8px; }
+  .chat-input-area input { flex: 1; padding: 8px 12px; border-radius: 6px; border: none; background: rgba(0,0,0,0.3); color: #fff; outline: none; }
+  .chat-input-area button { padding: 8px 12px; border-radius: 6px; border: none; background: #3b82f6; color: #fff; cursor: pointer; }
 </style>
 
 <div class="room-info">
   <h2 style="margin: 0; font-size: 20px; color: #e2e8f0;">{{ cls.title }}</h2>
-  <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">{{ T.room_study }} · {{ cls.subject }}</div>
+  <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">{{ T.room_study }} · {{ cls.subject }} ({{ members|length }}/12)</div>
 </div>
 
 <div id="canvas-container"></div>
 
 <div class="ui-overlay">
-  <button id="btn-focus" class="btn-focus">{{ T.focus }}</button>
-  <button id="btn-break" class="btn-break">{{ T.break_ }}</button>
-  <button id="btn-stop" class="btn-stop">{{ T.stop }}</button>
+  <button id="btn-focus" class="btn-focus">Focus (25m)</button>
+  <button id="btn-break" class="btn-break">Break (5m)</button>
+  <button id="btn-stop" class="btn-stop">Stop</button>
+</div>
+
+<div class="chat-panel">
+  <div class="chat-header">Chat</div>
+  <div class="chat-messages" id="chat-messages"></div>
+  <form class="chat-input-area" id="chat-form">
+    <input type="text" id="chat-input" placeholder="Message..." autocomplete="off">
+    <button type="submit">Send</button>
+  </form>
 </div>
 
 <script type="importmap">
@@ -47,15 +68,16 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 window.CLASS_ID = {{ cls.id }};
+window.USER_ID = {{ user.id }};
 window.MEMBERS = {{ members|tojson }};
 
-// ===== 1. 基本セットアップ =====
 const container = document.getElementById('canvas-container');
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x1e293b); // 暗めの背景
+scene.background = new THREE.Color(0x1e293b);
+scene.fog = new THREE.Fog(0x1e293b, 15, 40);
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.set(0, 7, 14);
+camera.position.set(0, 8, 15);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -67,78 +89,65 @@ container.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 2, -2);
 controls.enableDamping = true;
-controls.dampingFactor = 0.05;
 controls.maxPolarAngle = Math.PI / 2.1;
 controls.minDistance = 5;
 controls.maxDistance = 25;
 
-// ===== 2. 照明 =====
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-scene.add(ambientLight);
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const dirLight = new THREE.DirectionalLight(0xfff0d0, 1.0);
+dirLight.position.set(5, 10, 5);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.width = 2048;
+dirLight.shadow.mapSize.height = 2048;
+scene.add(dirLight);
 
-const mainLight = new THREE.DirectionalLight(0xfff0d0, 1.2); // 暖かい光
-mainLight.position.set(5, 10, 5);
-mainLight.castShadow = true;
-mainLight.shadow.mapSize.width = 2048;
-mainLight.shadow.mapSize.height = 2048;
-scene.add(mainLight);
-
-const spotLight = new THREE.SpotLight(0xffeedd, 2);
-spotLight.position.set(0, 8, 0);
+const spotLight = new THREE.SpotLight(0xffeedd, 1.5);
+spotLight.position.set(0, 10, 0);
 spotLight.angle = Math.PI / 4;
 spotLight.penumbra = 0.5;
 spotLight.castShadow = true;
 scene.add(spotLight);
 
-// ===== 3. 部屋（床・壁） =====
-// 床（木目）
-const floorGeo = new THREE.PlaneGeometry(30, 30);
-const floorMat = new THREE.MeshStandardMaterial({ color: 0x4a3b32, roughness: 0.8 });
-const floor = new THREE.Mesh(floorGeo, floorMat);
+const floorMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 });
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), floorMat);
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
 
-// 奥の壁
-const wallGeo = new THREE.PlaneGeometry(30, 10);
-const wallMat = new THREE.MeshStandardMaterial({ color: 0x2d3748, roughness: 0.9 });
-const backWall = new THREE.Mesh(wallGeo, wallMat);
+const wallMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
+const backWall = new THREE.Mesh(new THREE.PlaneGeometry(30, 10), wallMat);
 backWall.position.set(0, 5, -8);
 backWall.receiveShadow = true;
 scene.add(backWall);
 
-// ===== 4. 壁掛けタイマー（Canvasテクスチャ） =====
 const timerCanvas = document.createElement('canvas');
 timerCanvas.width = 1024;
 timerCanvas.height = 512;
 const ctx = timerCanvas.getContext('2d');
 const timerTexture = new THREE.CanvasTexture(timerCanvas);
 timerTexture.colorSpace = THREE.SRGBColorSpace;
+timerTexture.minFilter = THREE.LinearFilter;
 
 function drawTimer(state, minutes, seconds, labelText) {
-  // 背景
   ctx.fillStyle = '#0f172a';
   ctx.fillRect(0, 0, 1024, 512);
   ctx.strokeStyle = '#334155';
-  ctx.lineWidth = 20;
-  ctx.strokeRect(10, 10, 1004, 492);
+  ctx.lineWidth = 16;
+  ctx.strokeRect(8, 8, 1008, 496);
 
-  // ラベル
   ctx.fillStyle = state === 'focus' ? '#60a5fa' : state === 'break' ? '#34d399' : '#94a3b8';
-  ctx.font = 'bold 60px "Helvetica Neue", Arial, sans-serif';
+  ctx.font = 'bold 60px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(labelText, 512, 140);
+  ctx.fillText(labelText, 512, 130);
 
-  // 巨大な時間
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 280px "Courier New", monospace';
-  ctx.fillText(`${minutes}:${seconds}`, 512, 300);
+  ctx.font = 'bold 240px monospace';
+  ctx.fillText(`${minutes}:${seconds}`, 512, 310);
 
   timerTexture.needsUpdate = true;
 }
 
-// 3Dメッシュとして壁に貼る
 const timerBoard = new THREE.Mesh(
   new THREE.PlaneGeometry(8, 4),
   new THREE.MeshBasicMaterial({ map: timerTexture })
@@ -146,22 +155,25 @@ const timerBoard = new THREE.Mesh(
 timerBoard.position.set(0, 4.5, -7.9);
 scene.add(timerBoard);
 
-// 額縁
-const frameGeo = new THREE.BoxGeometry(8.4, 4.4, 0.2);
-const frameMat = new THREE.MeshStandardMaterial({ color: 0x1e293b });
-const frame = new THREE.Mesh(frameGeo, frameMat);
+const frame = new THREE.Mesh(new THREE.BoxGeometry(8.4, 4.4, 0.2), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
 frame.position.set(0, 4.5, -8.0);
 scene.add(frame);
 
-// ===== 5. 机と椅子、アバター =====
-function createDeskAndChair(x, z, rotationY) {
+const SEATS = [];
+const seatPositions = [];
+for (let row = 0; row < 3; row++) {
+  for (let col = 0; col < 4; col++) {
+    const x = -4.5 + col * 3;
+    const z = -2 + row * 3;
+    seatPositions.push({ x, z });
+  }
+}
+
+function createDeskAndChair(x, z) {
   const group = new THREE.Group();
-  
-  // 机
   const deskTop = new THREE.Mesh(new THREE.BoxGeometry(2, 0.1, 1), new THREE.MeshStandardMaterial({ color: 0x8b5a2b }));
   deskTop.position.y = 0.75;
-  deskTop.castShadow = true;
-  deskTop.receiveShadow = true;
+  deskTop.castShadow = true; deskTop.receiveShadow = true;
   group.add(deskTop);
   
   const legGeo = new THREE.BoxGeometry(0.1, 0.75, 0.1);
@@ -169,102 +181,133 @@ function createDeskAndChair(x, z, rotationY) {
   [[-0.9, -0.4], [0.9, -0.4], [-0.9, 0.4], [0.9, 0.4]].forEach(([lx, lz]) => {
     const leg = new THREE.Mesh(legGeo, legMat);
     leg.position.set(lx, 0.375, lz);
-    leg.castShadow = true;
-    group.add(leg);
+    leg.castShadow = true; group.add(leg);
   });
 
-  // 椅子
-  const chairSeat = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.6), new THREE.MeshStandardMaterial({ color: 0x2563eb }));
-  chairSeat.position.set(0, 0.5, 0.6);
-  chairSeat.castShadow = true;
-  group.add(chairSeat);
+  const chairSeat = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.6), new THREE.MeshStandardMaterial({ color: 0x3b82f6 }));
+  chairSeat.position.set(0, 0.5, 0.8);
+  chairSeat.castShadow = true; group.add(chairSeat);
 
-  const chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.1), new THREE.MeshStandardMaterial({ color: 0x2563eb }));
-  chairBack.position.set(0, 0.8, 0.9);
-  chairBack.castShadow = true;
-  group.add(chairBack);
+  const chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.1), new THREE.MeshStandardMaterial({ color: 0x3b82f6 }));
+  chairBack.position.set(0, 0.8, 1.1);
+  chairBack.castShadow = true; group.add(chairBack);
 
   group.position.set(x, 0, z);
-  group.rotation.y = rotationY;
   return group;
 }
 
-// 座っているアバター
-function createSittingAvatar(name, color) {
+seatPositions.forEach((p, i) => {
+  scene.add(createDeskAndChair(p.x, p.z));
+  SEATS.push({ index: i, x: p.x, z: p.z, mesh: null });
+});
+
+const avatarMap = {}; 
+
+function createAvatar(name, color) {
   const g = new THREE.Group();
-  
-  // 胴体（座っているので低め）
   const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 0.5, 16), new THREE.MeshStandardMaterial({ color }));
-  body.position.y = 0.8; 
-  body.castShadow = true; g.add(body);
+  body.position.y = 0.8; body.castShadow = true; g.add(body);
   
-  // 頭
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 24, 24), new THREE.MeshStandardMaterial({ color: 0xffd8b0 }));
-  head.position.y = 1.25; 
-  head.castShadow = true; g.add(head);
+  head.position.y = 1.25; head.castShadow = true; g.add(head);
   
-  // 腕（前に出して集中してる感じ）
   const armGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.4, 8);
   const armMat = new THREE.MeshStandardMaterial({ color });
   const lArm = new THREE.Mesh(armGeo, armMat); lArm.position.set(-0.35, 0.9, 0.2); lArm.rotation.x = Math.PI / 2.5; g.add(lArm);
   const rArm = new THREE.Mesh(armGeo, armMat); rArm.position.set(0.35, 0.9, 0.2); rArm.rotation.x = Math.PI / 2.5; g.add(rArm);
 
-  // 名前タグ
   const c = document.createElement('canvas'); c.width = 256; c.height = 64;
   const cctx = c.getContext('2d');
-  cctx.fillStyle = "rgba(15,23,42,0.8)"; 
-  cctx.roundRect(0,0,256,64, 10); cctx.fill();
+  cctx.fillStyle = "rgba(15,23,42,0.8)"; cctx.roundRect(0,0,256,64, 10); cctx.fill();
   cctx.fillStyle = "#fff"; cctx.font = "bold 24px sans-serif"; cctx.textAlign = "center"; cctx.textBaseline = "middle";
   cctx.fillText(name, 128, 32);
   const tex = new THREE.CanvasTexture(c);
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
-  sp.scale.set(1.5, 0.375, 1); 
-  sp.position.y = 1.7; 
-  g.add(sp);
+  sp.scale.set(1.5, 0.375, 1); sp.position.y = 1.7; g.add(sp);
   
   return g;
 }
 
-// 机とアバターの配置（向かい合わせの島型）
-const members = window.MEMBERS.filter(m => m.role === 'student');
-const colors = [0xef4444, 0x3b82f6, 0x10b981, 0xf59e0b, 0x8b5cf6, 0xec4899];
+const targetPositions = {}; 
 
-// 2列 x 3行の島を作る
-let memberIdx = 0;
-for (let row = 0; row < 2; row++) {
-  for (let col = 0; col < 3; col++) {
-    // 左側の机
-    const xL = -3.5 + col * 3.5;
-    const zL = -2 + row * 4;
-    scene.add(createDeskAndChair(xL, zL, 0)); // 手前を向く
+function updateAvatarPositions(positions) {
+  const colors = [0xef4444, 0x3b82f6, 0x10b981, 0xf59e0b, 0x8b5cf6, 0xec4899, 0x14b8a6, 0xf43f5e, 0x8b5cf6, 0xd946ef, 0x06b6d4, 0x84cc16];
+  
+  window.MEMBERS.forEach((m, idx) => {
+    const uid = String(m.user_id);
+    const seatIdx = positions[uid] !== undefined ? positions[uid] : -1;
     
-    // 右側の机（向かい合わせ）
-    const xR = xL;
-    const zR = zL + 2;
-    scene.add(createDeskAndChair(xR, zR, Math.PI)); // 奥を向く
-
-    // アバターを座らせる
-    if (memberIdx < members.length) {
-      const m = members[memberIdx++];
-      const av = createSittingAvatar(m.name, colors[memberIdx % colors.length]);
-      av.position.set(xL, 0, zL + 0.6); // 椅子の位置
-      av.rotation.y = 0; // 前を向く
-      scene.add(av);
+    if (seatIdx >= 0 && seatIdx < seatPositions.length) {
+      const seat = seatPositions[seatIdx];
+      targetPositions[uid] = { x: seat.x, z: seat.z + 0.8 }; 
+      
+      if (!avatarMap[uid]) {
+        const color = m.user_id === window.USER_ID ? 0x3b82f6 : colors[idx % colors.length];
+        const av = createAvatar(m.name, color);
+        av.position.set(seat.x, 0, seat.z + 0.8);
+        scene.add(av);
+        avatarMap[uid] = av;
+      }
     }
-    if (memberIdx < members.length) {
-      const m = members[memberIdx++];
-      const av = createSittingAvatar(m.name, colors[memberIdx % colors.length]);
-      av.position.set(xR, 0, zR - 0.6); // 椅子の位置
-      av.rotation.y = Math.PI; // 後ろを向く
-      scene.add(av);
-    }
-  }
+  });
 }
 
-// ===== 6. アニメーションとタイマーロジック =====
-let timeLeft = 1500; // 25分
+function animate() {
+  requestAnimationFrame(animate);
+  Object.keys(targetPositions).forEach(uid => {
+    const av = avatarMap[uid];
+    const target = targetPositions[uid];
+    if (av && target) {
+      av.position.x += (target.x - av.position.x) * 0.1;
+      av.position.z += (target.z - av.position.z) * 0.1;
+    }
+  });
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const clickableSeats = [];
+
+seatPositions.forEach((p, i) => {
+  const hitBox = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshBasicMaterial({ visible: false }));
+  hitBox.position.set(p.x, 0.5, p.z + 0.5);
+  hitBox.userData.seatIndex = i;
+  scene.add(hitBox);
+  clickableSeats.push(hitBox);
+});
+
+container.addEventListener('pointerdown', (e) => {
+  const startX = e.clientX;
+  const startY = e.clientY;
+  
+  const onPointerUp = async (upEvent) => {
+    if (Math.abs(upEvent.clientX - startX) > 5 || Math.abs(upEvent.clientY - startY) > 5) return;
+    
+    mouse.x = (upEvent.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(upEvent.clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(clickableSeats);
+    
+    if (intersects.length > 0) {
+      const seatIdx = intersects[0].object.userData.seatIndex;
+      await fetch(`/api/study/${window.CLASS_ID}/move`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seat_index: seatIdx })
+      });
+      poll();
+    }
+    container.removeEventListener('pointerup', onPointerUp);
+  };
+  container.addEventListener('pointerup', onPointerUp);
+});
+
+let timeLeft = 1500;
 let isRunning = false;
-let mode = 'idle'; // idle, focus, break
+let mode = 'idle';
 let lastTime = performance.now();
 
 function updateTimerDisplay() {
@@ -277,36 +320,43 @@ function updateTimerDisplay() {
 }
 updateTimerDisplay();
 
-// アバターの呼吸アニメーション
-const avatars = []; // アバターを配列に保存しておく（今回は簡略化）
+async function startPomodoro(duration, nextMode) {
+  await fetch(`/api/pomodoro/${window.CLASS_ID}/start`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ duration })
+  });
+  poll();
+}
 
-function animate() {
-  requestAnimationFrame(animate);
-  
-  const now = performance.now();
-  const dt = (now - lastTime) / 1000;
-  lastTime = now;
-
+setInterval(() => {
   if (isRunning && timeLeft > 0) {
+    const now = performance.now();
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
     timeLeft -= dt;
+    
     if (timeLeft <= 0) {
       timeLeft = 0;
       isRunning = false;
-      mode = 'idle';
+      if (mode === 'focus') {
+        mode = 'break';
+        startPomodoro(300, 'break'); 
+      } else if (mode === 'break') {
+        mode = 'focus';
+        startPomodoro(1500, 'focus'); 
+      }
     }
     updateTimerDisplay();
   }
+}, 1000);
 
-  controls.update();
-  renderer.render(scene, camera);
-}
-animate();
+let lastMessageId = 0;
 
-// ===== 7. API連携とボタン =====
 async function poll() {
   try {
     const res = await fetch(`/api/poll/${window.CLASS_ID}`, { method: 'POST' });
     const data = await res.json();
+    
     if (data.pomodoro) {
       mode = data.pomodoro.state;
       if (mode !== 'idle' && data.pomodoro.ends_at) {
@@ -314,28 +364,53 @@ async function poll() {
         isRunning = true;
       } else {
         isRunning = false;
+        timeLeft = mode === 'break' ? 300 : 1500;
       }
       updateTimerDisplay();
     }
-  } catch (e) {}
+    
+    if (data.study_positions) {
+      updateAvatarPositions(data.study_positions);
+    }
+    
+    if (data.messages) {
+      const chatBox = document.getElementById('chat-messages');
+      data.messages.forEach(m => {
+        if (m.id > lastMessageId) {
+          lastMessageId = m.id;
+          const el = document.createElement('div');
+          el.className = 'chat-msg';
+          el.innerHTML = `<span class="name">${m.name}</span>${m.content}`;
+          chatBox.appendChild(el);
+          chatBox.scrollTop = chatBox.scrollHeight;
+        }
+      });
+    }
+  } catch (e) { console.error(e); }
 }
-setInterval(poll, 5000);
+setInterval(poll, 3000);
 poll();
 
-document.getElementById('btn-focus').onclick = async () => {
-  await fetch(`/api/pomodoro/${window.CLASS_ID}/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ duration: 1500 }) });
-  poll();
-};
-document.getElementById('btn-break').onclick = async () => {
-  await fetch(`/api/pomodoro/${window.CLASS_ID}/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ duration: 300 }) });
-  poll();
-};
+document.getElementById('btn-focus').onclick = () => startPomodoro(1500, 'focus');
+document.getElementById('btn-break').onclick = () => startPomodoro(300, 'break');
 document.getElementById('btn-stop').onclick = async () => {
   await fetch(`/api/pomodoro/${window.CLASS_ID}/stop`, { method: 'POST' });
   poll();
 };
 
-// リサイズ対応
+document.getElementById('chat-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  await fetch(`/api/announce/${window.CLASS_ID}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: text })
+  });
+  poll();
+};
+
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
