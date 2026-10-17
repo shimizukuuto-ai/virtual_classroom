@@ -2200,7 +2200,7 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
   }
 
     // ===== BULLETIN BOARD =====
-  const postsContainer = document.getElementById("posts-container");
+  
   const postListView = document.getElementById("post-list-view");
   const postDetailView = document.getElementById("post-detail-view");
   const postContentContainer = document.getElementById("post-content-container");
@@ -2232,6 +2232,7 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
   renderPosts(window.INITIAL_POSTS || []);
 
   async function loadPosts() {
+    const postsContainer = document.getElementById("posts-container");
     if (!postsContainer) return;
     try {
       const res = await fetch('/api/posts/' + CLASS_ID);
