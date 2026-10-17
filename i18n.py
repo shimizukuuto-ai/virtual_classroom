@@ -1,6 +1,7 @@
 STRINGS = {
     "ja": {
         "app_title": "仮想教室",
+        "leave_study_room": "退出する",
         "ai_teacher": "AI教師",
         "ask_placeholder": "AIに質問する",
         "home": "ホーム",

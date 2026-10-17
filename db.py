@@ -1441,8 +1441,21 @@ def get_study_positions(class_id):
 
 def set_study_position(class_id, user_id, seat_index):
     with _cursor() as c:
+        # 他の人がその席を使っていないか確認
+        row = c.execute(
+            "SELECT user_id FROM study_positions WHERE class_id=%s AND seat_index=%s AND user_id!=%s",
+            (class_id, seat_index, user_id)
+        ).fetchone()
+        if row:
+            return False  # 席は埋まっている
+            
         c.execute("""
             INSERT INTO study_positions (class_id, user_id, seat_index, updated_at)
             VALUES (%s, %s, %s, %s)
             ON CONFLICT (class_id, user_id) DO UPDATE SET seat_index=EXCLUDED.seat_index, updated_at=EXCLUDED.updated_at
         """, (class_id, user_id, seat_index, now()))
+        return True
+
+def leave_study_room(class_id, user_id):
+    with _cursor() as c:
+        c.execute("DELETE FROM study_positions WHERE class_id = %s AND user_id = %s", (class_id, user_id))

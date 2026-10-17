@@ -45,7 +45,7 @@ from db import (
     create_post, list_posts, get_post, update_post, delete_post,
     add_comment, list_comments,
     BADGES, SKINS, RANKS,
-    migrate_room_type, init_study_state, get_study_positions, set_study_position,
+    migrate_room_type, init_study_state, get_study_positions, set_study_position, leave_study_room,
 )
 from i18n import all_t, default_steps
 
@@ -1396,14 +1396,19 @@ async def api_study_move(request: Request, class_id: int):
     seat_index = int(data.get("seat_index", -1))
     if seat_index < 0:
         return JSONResponse({"error": "invalid seat"}, status_code=400)
-    set_study_position(class_id, user["id"], seat_index)
+    
+    success = set_study_position(class_id, user["id"], seat_index)
+    if not success:
+        return JSONResponse({"error": "seat_taken"}, status_code=409)
     return JSONResponse({"ok": True})
 
-# ============================================================
+@app.post("/api/study/{class_id}/leave")
+async def api_study_leave(request: Request, class_id: int):
+    user = current_user(request)
+    if user:
+        leave_study_room(class_id, user["id"])
+    return JSONResponse({"ok": True})
 
-# ============================================================
-# pomodoro
-# ============================================================
 @app.post("/api/pomodoro/{class_id}/start")
 async def pomodoro_start(request: Request, class_id: int):
     user = current_user(request)
