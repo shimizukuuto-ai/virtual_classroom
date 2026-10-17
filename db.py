@@ -5,6 +5,8 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
+import datetime
+
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is not set")
@@ -1269,3 +1271,126 @@ def list_comments(post_id):
         with conn.cursor(row_factory=dict_row) as c:
             c.execute("SELECT * FROM comments WHERE post_id=%s ORDER BY id ASC", (post_id,))
             return c.fetchall()
+
+def init_posts():
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS posts (
+                    id BIGSERIAL PRIMARY KEY,
+                    author_id BIGINT NOT NULL,
+                    author_name TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    tags TEXT DEFAULT '',
+                    class_id BIGINT,
+                    is_public INTEGER DEFAULT 1,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """)
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS post_comments (
+                    id BIGSERIAL PRIMARY KEY,
+                    post_id BIGINT NOT NULL,
+                    author_id BIGINT NOT NULL,
+                    author_name TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """)
+
+def create_post(author_id, author_name, title, body, tags="", class_id=None, is_public=1):
+    now = datetime.datetime.utcnow().isoformat()
+    with conn() as c:
+        cur = c.execute("""
+            INSERT INTO posts (author_id, author_name, title, body, tags, class_id, is_public, created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?)
+        """, (author_id, author_name, title, body, tags, class_id, is_public, now, now))
+        return cur.lastrowid
+
+def list_posts(q="", class_id=None, limit=50):
+    sql = "SELECT * FROM posts WHERE is_public = 1"
+    params = []
+    if q:
+        sql += " AND (title LIKE ? OR body LIKE ? OR tags LIKE ?)"
+        like = f"%{q}%"
+        params += [like, like, like]
+    if class_id is not None:
+        sql += " AND (class_id IS NULL OR class_id = ?)"
+        params.append(class_id)
+    sql += " ORDER BY id DESC LIMIT ?"
+    params.append(limit)
+    with conn() as c:
+        return c.execute(sql, params).fetchall()
+
+def get_post(pid):
+    with conn() as c:
+        return c.execute("SELECT * FROM posts WHERE id = ?", (pid,)).fetchone()
+
+def update_post(pid, author_id, title, body, tags):
+    now = datetime.datetime.utcnow().isoformat()
+    with conn() as c:
+        c.execute("""
+            UPDATE posts SET title=?, body=?, tags=?, updated_at=?
+            WHERE id=? AND author_id=?
+        """, (title, body, tags, now, pid, author_id))
+
+def delete_post(pid, author_id):
+    with conn() as c:
+        c.execute("DELETE FROM posts WHERE id=? AND author_id=?", (pid, author_id))
+
+def add_comment(post_id, author_id, author_name, body):
+    now = datetime.datetime.utcnow().isoformat()
+    with conn() as c:
+        cur = c.execute("""
+            INSERT INTO post_comments (post_id, author_id, author_name, body, created_at)
+            VALUES (?,?,?,?,?)
+        """, (post_id, author_id, author_name, body, now))
+        return cur.lastrowid
+
+def list_comments(post_id):
+    with conn() as c:
+        return c.execute("SELECT * FROM post_comments WHERE post_id=? ORDER BY id ASC", (post_id,)).fetchall()
+
+def init_room_state():
+    with conn() as c:
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS room_state (
+                class_id INTEGER PRIMARY KEY,
+                pomodoro_state TEXT DEFAULT 'idle',
+                pomodoro_started_at TEXT,
+                pomodoro_duration INTEGER DEFAULT 1500,
+                pomodoro_ends_at TEXT,
+                updated_at TEXT
+            )
+        """)
+
+def get_room_state(class_id):
+    with conn() as c:
+        row = c.execute("SELECT * FROM room_state WHERE class_id=?", (class_id,)).fetchone()
+        if row:
+            return row
+        c.execute(
+            "INSERT OR IGNORE INTO room_state (class_id, pomodoro_state, pomodoro_duration) "
+            "VALUES (?, 'idle', 1500)", (class_id,)
+        )
+        return c.execute("SELECT * FROM room_state WHERE class_id=?", (class_id,)).fetchone()
+
+def set_pomodoro(class_id, state, duration, ends_at):
+    with conn() as c:
+        c.execute("INSERT OR IGNORE INTO room_state (class_id) VALUES (?)", (class_id,))
+        c.execute("""
+            UPDATE room_state
+            SET pomodoro_state=?, pomodoro_duration=?, pomodoro_ends_at=?,
+                pomodoro_started_at=?, updated_at=?
+            WHERE class_id=?
+        """, (state, duration, ends_at,
+              _now() if state != "idle" else None, _now(), class_id))
+
+def migrate_room_type():
+    with conn() as c:
+        try:
+            c.execute("ALTER TABLE classes ADD COLUMN room_type TEXT DEFAULT 'class'")
+        except Exception:
+            pass
