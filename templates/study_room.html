@@ -177,7 +177,16 @@ const HAIR_COLORS = [0x2a1a0a, 0x4a2e15, 0x8b5a2b, 0xd2b48c, 0x1e293b, 0x94a3b8,
 const SKIN_COLORS = [0xffd8b0, 0xffe0bd, 0xe0ac69, 0x8d5524, 0x5c3a21, 0x2a1a0a];
 const SHIRT_COLORS = [0x3b82f6, 0xef4444, 0x10b981, 0xf59e0b, 0x8b5cf6, 0xec4899, 0x64748b, 0x14b8a6];
 
-function createChibiAvatar({ name, seated = false, customHair = -1, customSkin = -1, customShirt = -1 }) {
+function createChibiAvatar({ 
+        name: m.name, 
+        seated: isSeated, 
+        skinKey: m.skin || "default",
+        isTeacher: m.role === "teacher",
+        customHair: m.custom_hair ?? -1, 
+        customSkin: m.custom_skin ?? -1, 
+        customShirt: m.custom_shirt ?? -1,
+        customStyle: m.custom_style || ""
+      }) {
   const g = new THREE.Group();
   
   const hColor = customHair >= 0 ? HAIR_COLORS[customHair % HAIR_COLORS.length] : 0x2a1a0a;
@@ -252,9 +261,12 @@ function updateAvatarPositions(members, positions) {
       const av = createChibiAvatar({ 
         name: m.name, 
         seated: isSeated, 
+        skinKey: m.skin || "default",
+        isTeacher: m.role === "teacher",
         customHair: m.custom_hair ?? -1, 
         customSkin: m.custom_skin ?? -1, 
-        customShirt: m.custom_shirt ?? -1 
+        customShirt: m.custom_shirt ?? -1,
+        customStyle: m.custom_style || ""
       });
       av.position.set(targetX, 0, targetZ);
       scene.add(av);
