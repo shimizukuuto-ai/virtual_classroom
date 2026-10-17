@@ -9,8 +9,6 @@
     background: rgba(15, 23, 42, 0.8); padding: 15px 20px; border-radius: 12px;
     backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1); pointer-events: none;
   }
-  
-  /* タイマーをHTMLのオーバーレイとして上部中央に固定 */
   .timer-overlay {
     position: absolute; top: 40px; left: 50%; transform: translateX(-50%);
     z-index: 20; text-align: center; pointer-events: none;
@@ -23,7 +21,6 @@
   .state-focus #timer-digits { color: #60a5fa; }
   .state-break #timer-digits { color: #34d399; }
   .state-idle #timer-digits { color: #e2e8f0; }
-
   .ui-overlay {
     position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
     display: flex; gap: 15px; z-index: 10; background: rgba(15, 23, 42, 0.8);
@@ -38,7 +35,6 @@
   .btn-focus { background: #3b82f6; }
   .btn-break { background: #10b981; }
   .btn-stop { background: #ef4444; }
-
   .chat-panel {
     position: absolute; right: 20px; top: 20px; width: 300px; height: calc(100vh - 120px);
     background: rgba(30, 41, 59, 0.9); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
@@ -58,7 +54,6 @@
   <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">{{ T.room_study }} · {{ cls.subject }} ({{ members|length }}/12)</div>
 </div>
 
-<!-- HTMLタイマー -->
 <div class="timer-overlay state-idle" id="timer-container">
   <div id="timer-label">READY</div>
   <div id="timer-digits">25:00</div>
@@ -136,7 +131,7 @@ backWall.position.set(0, 5, -8);
 backWall.receiveShadow = true;
 scene.add(backWall);
 
-// 入口サークル
+// 入口
 const entranceMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.5 });
 const entrance = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.1, 32), entranceMat);
 entrance.position.set(0, 0.05, 6);
@@ -175,7 +170,7 @@ function createDeskAndChair(x, z) {
 
 seatPositions.forEach((p) => { scene.add(createDeskAndChair(p.x, p.z)); });
 
-// アバター生成
+// ★エラー回避のため roundRect を使わないアバター関数
 function createChibiAvatar({ name, seated = false, customHair = -1, customSkin = -1, customShirt = -1 }) {
   const g = new THREE.Group();
   const skinColors = [0xffd8b0, 0xffe0bd, 0xe0ac69, 0x8d5524, 0x5c3a21, 0x2a1a0a];
@@ -216,8 +211,9 @@ function createChibiAvatar({ name, seated = false, customHair = -1, customSkin =
 
   const c = document.createElement('canvas'); c.width = 256; c.height = 64;
   const cctx = c.getContext('2d');
-  cctx.fillStyle = "rgba(15,23,42,0.8)"; cctx.roundRect(8, 8, 240, 48, 24); cctx.fill();
-  cctx.fillStyle = "#fff"; cctx.font = "bold 26px 'Hiragino Sans', sans-serif"; cctx.textAlign = "center"; cctx.textBaseline = "middle";
+  // roundRectを使わずにfillRectで描画（互換性確保）
+  cctx.fillStyle = "rgba(15,23,42,0.8)"; cctx.fillRect(8, 8, 240, 48);
+  cctx.fillStyle = "#fff"; cctx.font = "bold 26px sans-serif"; cctx.textAlign = "center"; cctx.textBaseline = "middle";
   cctx.fillText(name, 128, 32);
   const tex = new THREE.CanvasTexture(c);
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true }));
@@ -229,15 +225,35 @@ function createChibiAvatar({ name, seated = false, customHair = -1, customSkin =
 const avatarMap = {}; 
 const targetPositions = {}; 
 
-// APIからのデータ(members)と座席(positions)を元にアバターを配置
+// ページロード直後に Jinja のデータからアバターを生成する
+function initAvatarsFromJinja() {
+  if (!window.MEMBERS) return;
+  window.MEMBERS.forEach((m) => {
+    if (m.role === 'teacher') return;
+    const uid = String(m.user_id);
+    if (!avatarMap[uid]) {
+      const av = createChibiAvatar({ 
+        name: m.name, 
+        seated: false, 
+        customHair: m.custom_hair, 
+        customSkin: m.custom_skin, 
+        customShirt: m.custom_shirt 
+      });
+      av.position.set(0, 0, 6); // まずは入口に立たせる
+      scene.add(av);
+      avatarMap[uid] = av;
+      targetPositions[uid] = { x: 0, z: 6, seated: false };
+    }
+  });
+}
+
 function updateAvatarPositions(members, positions) {
   members.forEach((m) => {
     if (m.role === 'teacher') return;
-    // pollからのデータは id キー、Jinjaからのデータは user_id キーのため両対応
     const uid = String(m.id !== undefined ? m.id : m.user_id);
     const seatIdx = positions[uid] !== undefined ? positions[uid] : -1;
     
-    let targetX = 0, targetZ = 6; // デフォルトは入口
+    let targetX = 0, targetZ = 6; 
     let isSeated = false;
     
     if (seatIdx >= 0 && seatIdx < seatPositions.length) {
@@ -261,23 +277,21 @@ function updateAvatarPositions(members, positions) {
       scene.add(av);
       avatarMap[uid] = av;
     } else {
-      // 既存のアバターの座り状態（高さ）を更新
       const av = avatarMap[uid];
       const body = av.children[0];
       const head = av.children[1];
       const hair = av.children[2];
       if (isSeated && body.position.y !== 0.55) {
-        body.position.y = 0.55;
-        head.position.y = 1.1;
-        hair.position.y = 1.12;
+        body.position.y = 0.55; head.position.y = 1.1; hair.position.y = 1.12;
       } else if (!isSeated && body.position.y !== 0.7) {
-        body.position.y = 0.7;
-        head.position.y = 1.25;
-        hair.position.y = 1.27;
+        body.position.y = 0.7; head.position.y = 1.25; hair.position.y = 1.27;
       }
     }
   });
 }
+
+// 初期化
+initAvatarsFromJinja();
 
 function animate() {
   requestAnimationFrame(animate);
@@ -285,7 +299,6 @@ function animate() {
     const av = avatarMap[uid];
     const target = targetPositions[uid];
     if (av && target) {
-      // 補間移動
       av.position.x += (target.x - av.position.x) * 0.1;
       av.position.z += (target.z - av.position.z) * 0.1;
     }
@@ -295,7 +308,7 @@ function animate() {
 }
 animate();
 
-// ==== 席のクリック判定 ====
+// 席のクリック判定
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 const clickableSeats = [];
@@ -333,7 +346,7 @@ container.addEventListener('pointerdown', (e) => {
   container.addEventListener('pointerup', onPointerUp);
 });
 
-// ==== タイマーロジック（HTML表示） ====
+// タイマーロジック
 let timeLeft = 1500;
 let isRunning = false;
 let mode = 'idle';
@@ -383,7 +396,6 @@ setInterval(() => {
   }
 }, 1000);
 
-// ==== API連携 ====
 let lastMessageId = 0;
 let hasAutoSeated = false;
 
@@ -404,13 +416,14 @@ async function poll() {
       updateTimerDisplay();
     }
     
-    const membersList = data.members || window.MEMBERS || [];
+    // APIからデータが来たらそれを使い、なければJinjaのデータを使う
+    const membersList = (data.members && data.members.length > 0) ? data.members : (window.MEMBERS || []);
     const studyPos = data.study_positions || {};
     
     if (membersList.length > 0) {
       updateAvatarPositions(membersList, studyPos);
       
-      // 自分がまだ席に座っていない場合、空いている席を探して自動で座る
+      // 自分の席が決まっていない場合、自動で空き席を探して座る
       if (!hasAutoSeated) {
         const mySeat = studyPos[String(window.USER_ID)];
         if (mySeat === undefined) {
@@ -422,6 +435,8 @@ async function poll() {
                 body: JSON.stringify({ seat_index: i })
               });
               hasAutoSeated = true;
+              // 移動APIが完了したら即座に再取得して座らせる
+              setTimeout(poll, 500); 
               break;
             }
           }
