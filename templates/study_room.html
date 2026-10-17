@@ -190,7 +190,16 @@ try {
   seatPositions.forEach((p) => { scene.add(createDeskAndChair(p.x, p.z)); });
 
   // ★ シンプルで確実に動くアバター生成（エラー要因を排除）
-  function createChibiAvatar({ name, seated = false, customHair = -1, customSkin = -1, customShirt = -1 }) {
+  function createChibiAvatar({
+          name: m.name,
+          seated: isSeated,
+          skinKey: m.skin || "default",
+          isTeacher: false,
+          customHair: m.custom_hair ?? -1,
+          customSkin: m.custom_skin ?? -1,
+          customShirt: m.custom_shirt ?? -1,
+          customStyle: m.custom_style || ""
+        }) {
     try {
       const g = new THREE.Group();
       const skinColors = [0xffd8b0, 0xffe0bd, 0xe0ac69, 0x8d5524, 0x5c3a21, 0x2a1a0a];
@@ -258,12 +267,15 @@ try {
     window.MEMBERS.forEach((m) => {
       const uid = String(m.user_id);
       if (!avatarMap[uid]) {
-        const av = createChibiAvatar({ 
-          name: m.name, 
-          seated: false, 
-          customHair: m.custom_hair, 
-          customSkin: m.custom_skin, 
-          customShirt: m.custom_shirt 
+        const av = createChibiAvatar({
+          name: m.name,
+          seated: isSeated,
+          skinKey: m.skin || "default",
+          isTeacher: false,
+          customHair: m.custom_hair ?? -1,
+          customSkin: m.custom_skin ?? -1,
+          customShirt: m.custom_shirt ?? -1,
+          customStyle: m.custom_style || ""
         });
         // 強制的に目立つ位置（カメラの目の前）に配置
         av.position.set(0, 0, 4); 
@@ -293,12 +305,15 @@ try {
       targetPositions[uid] = { x: targetX, z: targetZ, seated: isSeated };
       
       if (!avatarMap[uid]) {
-        const av = createChibiAvatar({ 
-          name: m.name, 
-          seated: isSeated, 
-          customHair: m.custom_hair, 
-          customSkin: m.custom_skin, 
-          customShirt: m.custom_shirt 
+        const av = createChibiAvatar({
+          name: m.name,
+          seated: isSeated,
+          skinKey: m.skin || "default",
+          isTeacher: false,
+          customHair: m.custom_hair ?? -1,
+          customSkin: m.custom_skin ?? -1,
+          customShirt: m.custom_shirt ?? -1,
+          customStyle: m.custom_style || ""
         });
         av.position.set(targetX, 0, targetZ);
         scene.add(av);
