@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 from db import get_room_state, set_pomodoro, init_room_state
 
 from db import (
-    init_pool, close_pool,
+    init_pool, close_pool, init_posts,
     create_user, get_user_by_name, get_user_by_id, set_user_lang,
     update_user_profile, set_user_skin, user_stats, calc_streak,
     list_classes_taught_by, list_weekly_classes,
@@ -44,6 +44,7 @@ from db import (
     create_post, list_posts, get_post, update_post, delete_post,
     add_comment, list_comments,
     BADGES, SKINS, RANKS,
+    migrate_room_type,
 )
 from i18n import all_t, default_steps
 
@@ -369,6 +370,7 @@ def create_class_submit(
             allow_anonymous=1 if allow_anonymous == "1" else 0,
             is_interview=1 if is_interview == "1" else 0,
             duration=int(duration) if duration.isdigit() else 30,
+            room_type=room_type,
         )
         if cid:
             break
@@ -1479,12 +1481,12 @@ def posts_delete(request: Request, pid: int):
     delete_post(pid, user["id"])
     return RedirectResponse("/posts", status_code=303)
 
-@app.get("/api/posts/recent")
+@app.get("/api/posts-recent")
 def api_posts_recent(limit: int = 6):
     rows = list_posts(limit=limit)
     return {"items": [dict(r) for r in rows]}
 
-@app.get("/api/posts/{pid}")
+@app.get("/api/posts-detail/{pid}")
 def api_post_detail(pid: int):
     p = get_post(pid)
     if not p:

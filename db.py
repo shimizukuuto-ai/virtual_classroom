@@ -222,26 +222,6 @@ def init_db():
                 UNIQUE(teacher_id, student_id, class_id)
             );""")
             c.execute("""
-            CREATE TABLE IF NOT EXISTS posts (
-                id SERIAL PRIMARY KEY,
-                class_id INTEGER NOT NULL,
-                author_id INTEGER NOT NULL,
-                author_name TEXT NOT NULL,
-                title TEXT NOT NULL,
-                content TEXT NOT NULL,
-                is_pinned INTEGER DEFAULT 0,
-                created_at TEXT NOT NULL
-            );""")
-            c.execute("""
-            CREATE TABLE IF NOT EXISTS comments (
-                id SERIAL PRIMARY KEY,
-                post_id INTEGER NOT NULL,
-                author_id INTEGER NOT NULL,
-                author_name TEXT NOT NULL,
-                content TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            );""")
-            c.execute("""
             CREATE TABLE IF NOT EXISTS magic_tokens (
                 id SERIAL PRIMARY KEY, token_hash TEXT NOT NULL UNIQUE, email TEXT NOT NULL,
                 expires_at TEXT NOT NULL, used_at TEXT, created_at TEXT NOT NULL
@@ -527,9 +507,8 @@ def list_user_cards(uid, limit=20):
 def create_class(title, subject, description, teacher_id, join_code,
                  is_public=1, taught_by="", is_weekly=0, weekly_time="",
                  next_session="", allow_anonymous=0, is_interview=0,
-                 duration=30):
-    from datetime import datetime, timedelta
-    ends_at = (datetime.datetime.now() + timedelta(minutes=duration)).isoformat(timespec="seconds")
+                 duration=30, room_type="class"):
+    ends_at = (datetime.datetime.now() + datetime.timedelta(minutes=duration)).isoformat(timespec="seconds")
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
             try:
@@ -537,11 +516,11 @@ def create_class(title, subject, description, teacher_id, join_code,
                     """INSERT INTO classes
                     (title, subject, description, teacher_id, join_code, is_public, created_at,
                      blackboard, stage, taught_by, is_weekly, weekly_time, next_session,
-                     allow_anonymous, is_interview, duration, ends_at)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,'',0,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                     allow_anonymous, is_interview, duration, ends_at, room_type)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,'',0,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
                     (title, subject, description, teacher_id, join_code, is_public, now(),
                      taught_by, is_weekly, weekly_time, next_session,
-                     allow_anonymous, is_interview, duration, ends_at),
+                     allow_anonymous, is_interview, duration, ends_at, room_type),
                 )
                 cid = c.fetchone()["id"]
                 c.execute(
@@ -1298,6 +1277,22 @@ def init_posts():
                     updated_at TEXT NOT NULL
                 )
             """)
+            for ddl in [
+                "ALTER TABLE posts ADD COLUMN IF NOT EXISTS author_id BIGINT",
+                "ALTER TABLE posts ADD COLUMN IF NOT EXISTS author_name TEXT",
+                "ALTER TABLE posts ADD COLUMN IF NOT EXISTS title TEXT",
+                "ALTER TABLE posts ADD COLUMN IF NOT EXISTS body TEXT",
+                "ALTER TABLE posts ADD COLUMN IF NOT EXISTS tags TEXT DEFAULT ''",
+                "ALTER TABLE posts ADD COLUMN IF NOT EXISTS class_id BIGINT",
+                "ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_public INTEGER DEFAULT 1",
+                "ALTER TABLE posts ADD COLUMN IF NOT EXISTS created_at TEXT",
+                "ALTER TABLE posts ADD COLUMN IF NOT EXISTS updated_at TEXT",
+                "ALTER TABLE posts ALTER COLUMN class_id DROP NOT NULL",
+            ]:
+                try:
+                    c.execute(ddl)
+                except Exception:
+                    pass
             c.execute("""
                 CREATE TABLE IF NOT EXISTS post_comments (
                     id BIGSERIAL PRIMARY KEY,
@@ -1312,55 +1307,55 @@ def init_posts():
 def create_post(author_id, author_name, title, body, tags="", class_id=None, is_public=1):
     now = datetime.datetime.utcnow().isoformat()
     with _cursor() as c:
-        cur = c.execute("""
+        row = c.execute("""
             INSERT INTO posts (author_id, author_name, title, body, tags, class_id, is_public, created_at, updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?)
-        """, (author_id, author_name, title, body, tags, class_id, is_public, now, now))
-        return cur.lastrowid
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
+        """, (author_id, author_name, title, body, tags, class_id, is_public, now, now)).fetchone()
+        return row["id"]
 
 def list_posts(q="", class_id=None, limit=50):
     sql = "SELECT * FROM posts WHERE is_public = 1"
     params = []
     if q:
-        sql += " AND (title LIKE ? OR body LIKE ? OR tags LIKE ?)"
+        sql += " AND (title LIKE %s OR body LIKE %s OR tags LIKE %s)"
         like = f"%{q}%"
         params += [like, like, like]
     if class_id is not None:
-        sql += " AND (class_id IS NULL OR class_id = ?)"
+        sql += " AND (class_id IS NULL OR class_id = %s)"
         params.append(class_id)
-    sql += " ORDER BY id DESC LIMIT ?"
+    sql += " ORDER BY id DESC LIMIT %s"
     params.append(limit)
     with _cursor() as c:
         return c.execute(sql, params).fetchall()
 
 def get_post(pid):
     with _cursor() as c:
-        return c.execute("SELECT * FROM posts WHERE id = ?", (pid,)).fetchone()
+        return c.execute("SELECT * FROM posts WHERE id = %s", (pid,)).fetchone()
 
 def update_post(pid, author_id, title, body, tags):
     now = datetime.datetime.utcnow().isoformat()
     with _cursor() as c:
         c.execute("""
-            UPDATE posts SET title=?, body=?, tags=?, updated_at=?
-            WHERE id=? AND author_id=?
+            UPDATE posts SET title=%s, body=%s, tags=%s, updated_at=%s
+            WHERE id=%s AND author_id=%s
         """, (title, body, tags, now, pid, author_id))
 
 def delete_post(pid, author_id):
     with _cursor() as c:
-        c.execute("DELETE FROM posts WHERE id=? AND author_id=?", (pid, author_id))
+        c.execute("DELETE FROM posts WHERE id=%s AND author_id=%s", (pid, author_id))
 
 def add_comment(post_id, author_id, author_name, body):
     now = datetime.datetime.utcnow().isoformat()
     with _cursor() as c:
-        cur = c.execute("""
+        row = c.execute("""
             INSERT INTO post_comments (post_id, author_id, author_name, body, created_at)
-            VALUES (?,?,?,?,?)
-        """, (post_id, author_id, author_name, body, now))
-        return cur.lastrowid
+            VALUES (%s,%s,%s,%s,%s) RETURNING id
+        """, (post_id, author_id, author_name, body, now)).fetchone()
+        return row["id"]
 
 def list_comments(post_id):
     with _cursor() as c:
-        return c.execute("SELECT * FROM post_comments WHERE post_id=? ORDER BY id ASC", (post_id,)).fetchall()
+        return c.execute("SELECT * FROM post_comments WHERE post_id=%s ORDER BY id ASC", (post_id,)).fetchall()
 
 def init_room_state():
     with _cursor() as c:
@@ -1377,25 +1372,25 @@ def init_room_state():
 
 def get_room_state(class_id):
     with _cursor() as c:
-        row = c.execute("SELECT * FROM room_state WHERE class_id=?", (class_id,)).fetchone()
+        row = c.execute("SELECT * FROM room_state WHERE class_id=%s", (class_id,)).fetchone()
         if row:
             return row
         c.execute(
-            "INSERT OR IGNORE INTO room_state (class_id, pomodoro_state, pomodoro_duration) "
-            "VALUES (?, 'idle', 1500)", (class_id,)
+            "INSERT INTO room_state (class_id, pomodoro_state, pomodoro_duration) "
+            "VALUES (%s, 'idle', 1500) ON CONFLICT (class_id) DO NOTHING", (class_id,)
         )
-        return c.execute("SELECT * FROM room_state WHERE class_id=?", (class_id,)).fetchone()
+        return c.execute("SELECT * FROM room_state WHERE class_id=%s", (class_id,)).fetchone()
 
 def set_pomodoro(class_id, state, duration, ends_at):
     with _cursor() as c:
-        c.execute("INSERT OR IGNORE INTO room_state (class_id) VALUES (?)", (class_id,))
+        c.execute("INSERT INTO room_state (class_id) VALUES (%s) ON CONFLICT (class_id) DO NOTHING", (class_id,))
         c.execute("""
             UPDATE room_state
             SET pomodoro_state=?, pomodoro_duration=?, pomodoro_ends_at=?,
                 pomodoro_started_at=?, updated_at=?
-            WHERE class_id=?
+            WHERE class_id=%s
         """, (state, duration, ends_at,
-              _now() if state != "idle" else None, _now(), class_id))
+              now() if state != "idle" else None, now(), class_id))
 
 def migrate_room_type():
     with _cursor() as c:
