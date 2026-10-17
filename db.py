@@ -1386,8 +1386,8 @@ def set_pomodoro(class_id, state, duration, ends_at):
         c.execute("INSERT INTO room_state (class_id) VALUES (%s) ON CONFLICT (class_id) DO NOTHING", (class_id,))
         c.execute("""
             UPDATE room_state
-            SET pomodoro_state=?, pomodoro_duration=?, pomodoro_ends_at=?,
-                pomodoro_started_at=?, updated_at=?
+            SET pomodoro_state=%s, pomodoro_duration=%s, pomodoro_ends_at=%s,
+                pomodoro_started_at=%s, updated_at=%s
             WHERE class_id=%s
         """, (state, duration, ends_at,
               now() if state != "idle" else None, now(), class_id))
