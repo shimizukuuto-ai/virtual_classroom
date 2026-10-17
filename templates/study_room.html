@@ -9,6 +9,21 @@
     background: rgba(15, 23, 42, 0.8); padding: 15px 20px; border-radius: 12px;
     backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1); pointer-events: none;
   }
+  
+  /* タイマーをHTMLのオーバーレイとして上部中央に固定 */
+  .timer-overlay {
+    position: absolute; top: 40px; left: 50%; transform: translateX(-50%);
+    z-index: 20; text-align: center; pointer-events: none;
+    background: rgba(15, 23, 42, 0.85); padding: 20px 60px; border-radius: 24px;
+    border: 2px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    backdrop-filter: blur(10px);
+  }
+  #timer-label { font-size: 20px; font-weight: bold; letter-spacing: 2px; color: #94a3b8; margin-bottom: 5px; }
+  #timer-digits { font-size: 100px; font-weight: 900; font-family: ui-monospace, 'Courier New', monospace; line-height: 1; text-shadow: 0 0 20px rgba(96,165,250,0.4); }
+  .state-focus #timer-digits { color: #60a5fa; }
+  .state-break #timer-digits { color: #34d399; }
+  .state-idle #timer-digits { color: #e2e8f0; }
+
   .ui-overlay {
     position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
     display: flex; gap: 15px; z-index: 10; background: rgba(15, 23, 42, 0.8);
@@ -23,6 +38,7 @@
   .btn-focus { background: #3b82f6; }
   .btn-break { background: #10b981; }
   .btn-stop { background: #ef4444; }
+
   .chat-panel {
     position: absolute; right: 20px; top: 20px; width: 300px; height: calc(100vh - 120px);
     background: rgba(30, 41, 59, 0.9); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
@@ -40,6 +56,12 @@
 <div class="room-info">
   <h2 style="margin: 0; font-size: 20px; color: #e2e8f0;">{{ cls.title }}</h2>
   <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">{{ T.room_study }} · {{ cls.subject }} ({{ members|length }}/12)</div>
+</div>
+
+<!-- HTMLタイマー -->
+<div class="timer-overlay state-idle" id="timer-container">
+  <div id="timer-label">READY</div>
+  <div id="timer-digits">25:00</div>
 </div>
 
 <div id="canvas-container"></div>
@@ -71,6 +93,7 @@ window.CLASS_ID = {{ cls.id }};
 window.USER_ID = {{ user.id }};
 window.MEMBERS = {{ members|tojson }};
 
+// ==== 3D Setup ====
 const container = document.getElementById('canvas-container');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1e293b);
@@ -113,53 +136,13 @@ backWall.position.set(0, 5, -8);
 backWall.receiveShadow = true;
 scene.add(backWall);
 
-// 入口（Entrance）の表現
-const entranceMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, emissive: 0x3b82f6, emissiveIntensity: 0.5 });
+// 入口サークル
+const entranceMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.5 });
 const entrance = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.1, 32), entranceMat);
 entrance.position.set(0, 0.05, 6);
 scene.add(entrance);
 
-// タイマー（壁掛け）
-const timerCanvas = document.createElement('canvas');
-timerCanvas.width = 1024;
-timerCanvas.height = 512;
-const ctx = timerCanvas.getContext('2d');
-const timerTexture = new THREE.CanvasTexture(timerCanvas);
-timerTexture.colorSpace = THREE.SRGBColorSpace;
-timerTexture.minFilter = THREE.LinearFilter;
-timerTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-
-function drawTimer(state, minutes, seconds, labelText) {
-  ctx.fillStyle = '#0f172a';
-  ctx.fillRect(0, 0, 1024, 512);
-  ctx.strokeStyle = '#334155';
-  ctx.lineWidth = 16;
-  ctx.strokeRect(8, 8, 1008, 496);
-
-  ctx.fillStyle = state === 'focus' ? '#60a5fa' : state === 'break' ? '#34d399' : '#94a3b8';
-  ctx.font = 'bold 60px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(labelText, 512, 130);
-
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 260px monospace';
-  ctx.fillText(`${minutes}:${seconds}`, 512, 320);
-
-  timerTexture.needsUpdate = true;
-}
-
-const timerBoard = new THREE.Mesh(
-  new THREE.PlaneGeometry(8, 4),
-  new THREE.MeshBasicMaterial({ map: timerTexture })
-);
-timerBoard.position.set(0, 4.5, -7.9);
-scene.add(timerBoard);
-
-const frame = new THREE.Mesh(new THREE.BoxGeometry(8.4, 4.4, 0.2), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
-frame.position.set(0, 4.5, -8.0);
-scene.add(frame);
-
+// 机と椅子
 const seatPositions = [];
 for (let row = 0; row < 3; row++) {
   for (let col = 0; col < 4; col++) {
@@ -172,35 +155,27 @@ for (let row = 0; row < 3; row++) {
 function createDeskAndChair(x, z) {
   const group = new THREE.Group();
   const deskTop = new THREE.Mesh(new THREE.BoxGeometry(2, 0.1, 1), new THREE.MeshStandardMaterial({ color: 0x8b5a2b }));
-  deskTop.position.y = 0.75;
-  deskTop.castShadow = true; deskTop.receiveShadow = true;
-  group.add(deskTop);
+  deskTop.position.y = 0.75; deskTop.castShadow = true; deskTop.receiveShadow = true; group.add(deskTop);
   
   const legGeo = new THREE.BoxGeometry(0.1, 0.75, 0.1);
   const legMat = new THREE.MeshStandardMaterial({ color: 0x5c3a21 });
   [[-0.9, -0.4], [0.9, -0.4], [-0.9, 0.4], [0.9, 0.4]].forEach(([lx, lz]) => {
-    const leg = new THREE.Mesh(legGeo, legMat);
-    leg.position.set(lx, 0.375, lz);
-    leg.castShadow = true; group.add(leg);
+    const leg = new THREE.Mesh(legGeo, legMat); leg.position.set(lx, 0.375, lz); leg.castShadow = true; group.add(leg);
   });
 
   const chairSeat = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.6), new THREE.MeshStandardMaterial({ color: 0x3b82f6 }));
-  chairSeat.position.set(0, 0.5, 0.8);
-  chairSeat.castShadow = true; group.add(chairSeat);
+  chairSeat.position.set(0, 0.5, 0.8); chairSeat.castShadow = true; group.add(chairSeat);
 
   const chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.1), new THREE.MeshStandardMaterial({ color: 0x3b82f6 }));
-  chairBack.position.set(0, 0.8, 1.1);
-  chairBack.castShadow = true; group.add(chairBack);
+  chairBack.position.set(0, 0.8, 1.1); chairBack.castShadow = true; group.add(chairBack);
 
   group.position.set(x, 0, z);
   return group;
 }
 
-seatPositions.forEach((p) => {
-  scene.add(createDeskAndChair(p.x, p.z));
-});
+seatPositions.forEach((p) => { scene.add(createDeskAndChair(p.x, p.z)); });
 
-// 教室と同じアバター関数
+// アバター生成
 function createChibiAvatar({ name, seated = false, customHair = -1, customSkin = -1, customShirt = -1 }) {
   const g = new THREE.Group();
   const skinColors = [0xffd8b0, 0xffe0bd, 0xe0ac69, 0x8d5524, 0x5c3a21, 0x2a1a0a];
@@ -254,14 +229,15 @@ function createChibiAvatar({ name, seated = false, customHair = -1, customSkin =
 const avatarMap = {}; 
 const targetPositions = {}; 
 
+// APIからのデータ(members)と座席(positions)を元にアバターを配置
 function updateAvatarPositions(members, positions) {
-  members.forEach((m, idx) => {
+  members.forEach((m) => {
     if (m.role === 'teacher') return;
-    const uid = String(m.id);
+    // pollからのデータは id キー、Jinjaからのデータは user_id キーのため両対応
+    const uid = String(m.id !== undefined ? m.id : m.user_id);
     const seatIdx = positions[uid] !== undefined ? positions[uid] : -1;
     
-    // 席が割り当てられていればそこへ、なければ入口へ
-    let targetX = 0, targetZ = 6; // 入口
+    let targetX = 0, targetZ = 6; // デフォルトは入口
     let isSeated = false;
     
     if (seatIdx >= 0 && seatIdx < seatPositions.length) {
@@ -271,7 +247,7 @@ function updateAvatarPositions(members, positions) {
       isSeated = true;
     }
     
-    targetPositions[uid] = { x: targetX, z: targetZ };
+    targetPositions[uid] = { x: targetX, z: targetZ, seated: isSeated };
     
     if (!avatarMap[uid]) {
       const av = createChibiAvatar({ 
@@ -285,15 +261,19 @@ function updateAvatarPositions(members, positions) {
       scene.add(av);
       avatarMap[uid] = av;
     } else {
-      // 既存のアバターの座り状態を更新
+      // 既存のアバターの座り状態（高さ）を更新
       const av = avatarMap[uid];
       const body = av.children[0];
-      if (isSeated) {
+      const head = av.children[1];
+      const hair = av.children[2];
+      if (isSeated && body.position.y !== 0.55) {
         body.position.y = 0.55;
-        av.children[1].position.y = 1.1; // head
-      } else {
+        head.position.y = 1.1;
+        hair.position.y = 1.12;
+      } else if (!isSeated && body.position.y !== 0.7) {
         body.position.y = 0.7;
-        av.children[1].position.y = 1.25; // head
+        head.position.y = 1.25;
+        hair.position.y = 1.27;
       }
     }
   });
@@ -305,6 +285,7 @@ function animate() {
     const av = avatarMap[uid];
     const target = targetPositions[uid];
     if (av && target) {
+      // 補間移動
       av.position.x += (target.x - av.position.x) * 0.1;
       av.position.z += (target.z - av.position.z) * 0.1;
     }
@@ -314,6 +295,7 @@ function animate() {
 }
 animate();
 
+// ==== 席のクリック判定 ====
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 const clickableSeats = [];
@@ -351,6 +333,7 @@ container.addEventListener('pointerdown', (e) => {
   container.addEventListener('pointerup', onPointerUp);
 });
 
+// ==== タイマーロジック（HTML表示） ====
 let timeLeft = 1500;
 let isRunning = false;
 let mode = 'idle';
@@ -360,9 +343,13 @@ function updateTimerDisplay() {
   const m = String(Math.floor(timeLeft / 60)).padStart(2, '0');
   const s = String(timeLeft % 60).padStart(2, '0');
   let label = 'READY';
-  if (mode === 'focus') label = 'FOCUS TIME';
-  if (mode === 'break') label = 'BREAK TIME';
-  drawTimer(mode, m, s, label);
+  let cls = 'state-idle';
+  if (mode === 'focus') { label = 'FOCUS TIME'; cls = 'state-focus'; }
+  if (mode === 'break') { label = 'BREAK TIME'; cls = 'state-break'; }
+  
+  document.getElementById('timer-label').textContent = label;
+  document.getElementById('timer-digits').textContent = `${m}:${s}`;
+  document.getElementById('timer-container').className = `timer-overlay ${cls}`;
 }
 updateTimerDisplay();
 
@@ -396,6 +383,7 @@ setInterval(() => {
   }
 }, 1000);
 
+// ==== API連携 ====
 let lastMessageId = 0;
 let hasAutoSeated = false;
 
