@@ -177,7 +177,7 @@ const HAIR_COLORS = [0x2a1a0a, 0x4a2e15, 0x8b5a2b, 0xd2b48c, 0x1e293b, 0x94a3b8,
 const SKIN_COLORS = [0xffd8b0, 0xffe0bd, 0xe0ac69, 0x8d5524, 0x5c3a21, 0x2a1a0a];
 const SHIRT_COLORS = [0x3b82f6, 0xef4444, 0x10b981, 0xf59e0b, 0x8b5cf6, 0xec4899, 0x64748b, 0x14b8a6];
 
-function createChibiAvatar({ name, seated = false, customHair = -1, customSkin = -1, customShirt = -1 }) {
+) {
   const g = new THREE.Group();
   
   const hColor = customHair >= 0 ? HAIR_COLORS[customHair % HAIR_COLORS.length] : 0x2a1a0a;
@@ -226,34 +226,20 @@ function createChibiAvatar({ name, seated = false, customHair = -1, customSkin =
   return g;
 }
 
-const avatarMap = {}; 
-const targetPositions = {}; 
 
-function updateAvatarPositions(members, positions) {
-  members.forEach((m) => {
-    const uid = String(m.id !== undefined ? m.id : m.user_id);
-    const seatIdx = positions[uid] !== undefined ? positions[uid] : -1;
-    
-    let targetX = 0, targetZ = 6; 
-    let isSeated = false;
-    
-    if (seatIdx >= 0 && seatIdx < seatPositions.length) {
-      const seat = seatPositions[seatIdx];
-      targetX = seat.x;
-      targetZ = seat.z + 0.8;
-      isSeated = true;
-    }
-    
-    targetPositions[uid] = { x: targetX, z: targetZ, seated: isSeated };
-    
-    if (!avatarMap[uid]) {
-      // DBから送られてくるスネークケースのキーを正しくマッピング
-      const av = createChibiAvatar({ 
+// ==== class_room.html から移植した完全なアバター生成コード ====
+const SHIRT_COLORS = [0x3b82f6, 0xef4444, 0x10b981, 0xf59e0b, 0x8b5cf6, 0xec4899, 0x14b8a6, 0xf97316, 0x6366f1, 0x0ea5e9, 0x84cc16, 0x06b6d4];
+const HAIR_COLORS = [0x1a1a1a, 0x2a1a0a, 0x3b2314, 0x5a3825, 0x8b4513, 0xd4a574, 0x1e293b, 0x6b3410];
+
+function createChibiAvatar({ 
         name: m.name, 
         seated: isSeated, 
+        skinKey: m.skin || "default",
+        isTeacher: m.role === "teacher",
         customHair: m.custom_hair ?? -1, 
         customSkin: m.custom_skin ?? -1, 
-        customShirt: m.custom_shirt ?? -1 
+        customShirt: m.custom_shirt ?? -1,
+        customStyle: m.custom_style || ""
       });
       av.position.set(targetX, 0, targetZ);
       scene.add(av);
