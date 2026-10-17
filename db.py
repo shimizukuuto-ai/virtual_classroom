@@ -1398,3 +1398,26 @@ def migrate_room_type():
             c.execute("ALTER TABLE classes ADD COLUMN room_type TEXT DEFAULT 'class'")
         except Exception:
             pass
+
+
+# ===== class-internal bulletin (安全版) =====
+def create_class_post(class_id, author_id, author_name, title, body, is_pinned=0):
+    with _cursor() as c:
+        row = c.execute("""
+            INSERT INTO posts (class_id, author_id, author_name, title, body, is_public, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, 0, %s, %s) RETURNING id
+        """, (class_id, author_id, author_name, title, body, now(), now())).fetchone()
+        return row["id"]
+
+
+def list_class_posts(class_id, limit=50):
+    with _cursor() as c:
+        rows = c.execute("""
+            SELECT p.*,
+                (SELECT COUNT(*) FROM post_comments pc WHERE pc.post_id = p.id) AS comment_count
+            FROM posts p
+            WHERE p.class_id = %s
+            ORDER BY p.created_at DESC
+            LIMIT %s
+        """, (class_id, limit)).fetchall()
+        return rows
