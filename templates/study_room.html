@@ -341,7 +341,7 @@ let lastTime = performance.now();
 
 function updateTimerDisplay() {
   const m = String(Math.floor(timeLeft / 60)).padStart(2, '0');
-  const s = String(timeLeft % 60).padStart(2, '0');
+  const s = String(Math.floor(timeLeft % 60)).padStart(2, '0');
   let label = 'READY';
   let cls = 'state-idle';
   if (mode === 'focus') { label = 'FOCUS TIME'; cls = 'state-focus'; }
@@ -404,14 +404,17 @@ async function poll() {
       updateTimerDisplay();
     }
     
-    if (data.members && data.study_positions) {
-      updateAvatarPositions(data.members, data.study_positions);
+    const membersList = data.members || window.MEMBERS || [];
+    const studyPos = data.study_positions || {};
+    
+    if (membersList.length > 0) {
+      updateAvatarPositions(membersList, studyPos);
       
       // 自分がまだ席に座っていない場合、空いている席を探して自動で座る
       if (!hasAutoSeated) {
-        const mySeat = data.study_positions[String(window.USER_ID)];
+        const mySeat = studyPos[String(window.USER_ID)];
         if (mySeat === undefined) {
-          const occupied = new Set(Object.values(data.study_positions));
+          const occupied = new Set(Object.values(studyPos));
           for (let i = 0; i < seatPositions.length; i++) {
             if (!occupied.has(i)) {
               await fetch(`/api/study/${window.CLASS_ID}/move`, {
