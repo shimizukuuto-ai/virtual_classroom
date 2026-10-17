@@ -171,7 +171,13 @@ function createDeskAndChair(x, z) {
 seatPositions.forEach((p) => { scene.add(createDeskAndChair(p.x, p.z)); });
 
 // =========================================================
-// ★ 教室から抽出した完全なアバター生成ロジック ★
+// ★ 教室から抽出した完全なアバター生成ロジック（依存関数含む） ★
+    function hashName(name) {
+      let h = 0;
+      for (let i = 0; i < name.length; i++) h = ((h<<5)-h + name.charCodeAt(i)) | 0;
+      return Math.abs(h);
+    }
+
     function paletteFor(name) {
       const h = hashName(name);
       const custom = CUSTOM_HANDLES[name] || { hair: -1, skin: -1, shirt: -1, style: "" };
@@ -369,12 +375,42 @@ seatPositions.forEach((p) => { scene.add(createDeskAndChair(p.x, p.z)); });
       };
       return g;
     }
+
+    function makeNameSprite(name, isTeacher) {
+      const c = document.createElement("canvas");
+      c.width = 256; c.height = 64;
+      const ctx = c.getContext("2d");
+      const bg = isTeacher ? "rgba(245,158,11,0.95)" : "rgba(15,23,42,0.92)";
+      const r = 22;
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.moveTo(8+r, 8); ctx.lineTo(248-r, 8);
+      ctx.quadraticCurveTo(248, 8, 248, 8+r);
+      ctx.lineTo(248, 56-r);
+      ctx.quadraticCurveTo(248, 56, 248-r, 56);
+      ctx.lineTo(8+r, 56);
+      ctx.quadraticCurveTo(8, 56, 8, 56-r);
+      ctx.lineTo(8, 8+r);
+      ctx.quadraticCurveTo(8, 8, 8+r, 8);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 26px 'Hiragino Sans', sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(name, 128, 34);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true });
+      const sp = new THREE.Sprite(mat);
+      sp.scale.set(1.5, 0.38, 1);
+      sp.renderOrder = 999;
+      return sp;
+    }
 // =========================================================
 
 const avatarMap = {}; 
 const targetPositions = {}; 
 
-// ★ 消えていたアバター配置更新関数を復元
+// アバター配置更新関数
 function updateAvatarPositions(members, positions) {
   members.forEach((m) => {
     const uid = String(m.id !== undefined ? m.id : m.user_id);
@@ -408,7 +444,6 @@ function updateAvatarPositions(members, positions) {
       avatarMap[uid] = av;
     } else {
       const av = avatarMap[uid];
-      // 座っているときと立っているときで高さを微調整（エラー防止のためtry-catch）
       try {
         const body = av.children.find(c => c.geometry && c.geometry.type === 'CylinderGeometry');
         const head = av.children.find(c => c.geometry && c.geometry.type === 'SphereGeometry');
@@ -614,7 +649,7 @@ document.getElementById('chat-form').onsubmit = async (e) => {
     body: JSON.stringify({ message: text })
   });
   poll();
-};
+});
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
