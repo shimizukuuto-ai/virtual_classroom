@@ -909,16 +909,8 @@ window.I18N = {
   share_record_agreed: {{ T.share_record_agreed|tojson }},
     remaining_ended: {{ T.remaining_ended|tojson }},
   share_text_template: {{ T.share_text_template|tojson }},
-  ai_teacher: {{ T.ai_teacher|tojson }},
-  system: {{ T.system|tojson }},
-  error: {{ T.error|tojson }},
-  thinking: {{ T.thinking|tojson }},
-  save: {{ T.save|tojson }},
-  ask_placeholder: {{ T.ask_placeholder|tojson }},
-  ai_teacher_mode: {{ (1 if cls.ai_teacher_mode else 0) }},
   // ↓ 追加
   posts: {{ T.posts|tojson }},
-  loading: {{ T.loading|tojson }},
   no_posts: {{ T.no_posts|tojson }},
   open_post: {{ T.open_post|tojson }},
     pomodoro_idle:     {{ T.pomodoro_idle|tojson }},
@@ -2212,6 +2204,7 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
   let currentPostId = null;
 
   function renderPosts(posts) {
+    const postsContainer = document.getElementById("posts-container");
     if (!postsContainer) return;
     if (!posts.length) {
       postsContainer.innerHTML = '<div style="color:#6b7280;font-size:12px;padding:8px;">' + I18N.no_posts + '</div>';
@@ -3691,3 +3684,13 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
 </div>
 
 {% endblock %}
+<script>
+if ({{ (cls.room_type or 'class')|tojson }} === "study") {
+  document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll(".controls-card").forEach(el => {
+      const s = el.querySelector("summary");
+      if (s && /ステップ|Steps/.test(s.textContent)) el.style.display = "none";
+    });
+  });
+}
+</script>

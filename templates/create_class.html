@@ -65,6 +65,11 @@
     <div class="hint">{{ T.steps_hint }}</div>
 
     <button type="submit" class="btn lg" style="width:100%; margin-top:20px;">{{ T.create }}</button>
-  </form>
+  <label>{{ T.room_type }}</label>
+<select name="room_type">
+  <option value="class">{{ T.room_class }}</option>
+  <option value="study">{{ T.room_study }}</option>
+</select>
+</form>
 </div>
 {% endblock %}
