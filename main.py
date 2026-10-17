@@ -41,6 +41,7 @@ from db import (
     add_student_note, list_student_notes, delete_student_note,
     save_upload, get_upload,    set_user_customization, get_unlock_tier, UNLOCK_TIERS,
     rate_teacher, get_teacher_rating, get_my_rating,    create_post, list_posts, get_post, delete_post, create_comment, list_comments,
+    create_class_post, list_class_posts,
     create_post, list_posts, get_post, update_post, delete_post,
     add_comment, list_comments,
     BADGES, SKINS, RANKS,
@@ -439,9 +440,10 @@ def class_room(request: Request, class_id: int):
     files = list_class_files(class_id, limit=30)
     groups = list_groups(class_id)
     my_group = get_user_group(class_id, user["id"]) if role == "student" else None
+    template_name = "study_room.html" if (cls.get("room_type") or "class") == "study" else "class_room.html"
     return templates.TemplateResponse(
     request,
-    "class_room.html",
+    template_name,
     ctx(
         request, user, cls=cls, role=role, members=members,
         messages=messages, steps=steps, questions=questions, bans=bans,
@@ -1298,7 +1300,7 @@ async def api_post_create(request: Request, class_id: int):
     if not title or not content:
         return JSONResponse({"error": "empty"}, status_code=400)
     is_pinned = 1 if role == "teacher" and data.get("is_pinned") else 0
-    create_post(class_id, user["id"], user["name"], title, content, is_pinned)
+    create_class_post(class_id, user["id"], user["name"], title, content, is_pinned)
     return JSONResponse({"ok": True})
 
 
@@ -1309,12 +1311,14 @@ async def api_post_list(request: Request, class_id: int):
         return JSONResponse({"error": "not logged in"}, status_code=401)
     if not get_role(class_id, user["id"]):
         return JSONResponse({"error": "not member"}, status_code=403)
-    rows = list_posts(class_id=class_id)
+    rows = list_class_posts(class_id)
     return JSONResponse({
         "posts": [
             {"id": r["id"], "title": r["title"], "author": r["author_name"],
-             "content": r["content"], "is_pinned": r["is_pinned"],
-             "comment_count": r["comment_count"], "created_at": r["created_at"]}
+             "content": r.get("body") or r.get("content") or "",
+             "is_pinned": r.get("is_pinned", 0),
+             "comment_count": r.get("comment_count", 0),
+             "created_at": r["created_at"]}
             for r in rows
         ]
     })
@@ -1351,7 +1355,8 @@ async def api_comment_list(request: Request, post_id: int):
     rows = list_comments(post_id)
     return JSONResponse({
         "comments": [
-            {"id": r["id"], "author": r["author_name"], "content": r["content"],
+            {"id": r["id"], "author": r["author_name"],
+             "content": r.get("body") or r.get("content") or "",
              "created_at": r["created_at"]}
             for r in rows
         ]

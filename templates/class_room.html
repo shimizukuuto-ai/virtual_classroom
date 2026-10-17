@@ -918,7 +918,6 @@ window.I18N = {
   pomodoro_break:    {{ T.pomodoro_break|tojson }},
 };
 window.CLASS_ID = {{ cls.id }};
-window.ROOM_TYPE = {{ (cls.room_type or 'class')|tojson }};
 window.CLASS_JOIN_CODE = {{ cls.join_code|tojson }};
 window.ROLE = {{ role|tojson }};
 window.USER_NAME = {{ user.name|tojson }};
@@ -969,8 +968,6 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
 <script>
 (function () {
   const I18N = window.I18N;
-  const ROOM_TYPE = window.ROOM_TYPE;
-  const IS_STUDY = ROOM_TYPE === 'study';
   const CLASS_ID = window.CLASS_ID;
   const ROLE = window.ROLE;
   const USER_NAME = window.USER_NAME;
@@ -2689,45 +2686,9 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
     const bbCtx = bbCanvas.getContext("2d");
     const bbTexture = new THREE.CanvasTexture(bbCanvas);
     bbTexture.colorSpace = THREE.SRGBColorSpace;
-    let studyTimerSeconds = 25 * 60;
-let studyTimerState = "idle";
-
-function drawStudyTimer() {
-  const W = bbCanvas.width, H = bbCanvas.height;
-  const grad = bbCtx.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, "#1a1a2e"); grad.addColorStop(1, "#0f172a");
-  bbCtx.fillStyle = grad; bbCtx.fillRect(0, 0, W, H);
-
-  // ラベル
-  bbCtx.textAlign = "center";
-  bbCtx.fillStyle = "#94a3b8";
-  bbCtx.font = "bold 56px 'Hiragino Sans', sans-serif";
-  const label = studyTimerState === "focus" ? "FOCUS TIME"
-              : studyTimerState === "break" ? "BREAK TIME"
-              : "STUDY ROOM";
-  bbCtx.fillText(label, W / 2, 140);
-
-  // 巨大タイマー
-  const m = String(Math.floor(studyTimerSeconds / 60)).padStart(2, "0");
-  const s = String(studyTimerSeconds % 60).padStart(2, "0");
-  bbCtx.fillStyle = studyTimerState === "focus" ? "#60a5fa"
-                  : studyTimerState === "break" ? "#4ade80"
-                  : "#e2e8f0";
-  bbCtx.font = "bold 380px 'Menlo', 'Courier New', monospace";
-  bbCtx.textBaseline = "middle";
-  bbCtx.fillText(m + ":" + s, W / 2, H / 2 + 40);
-
-  // 下の飾り
-  bbCtx.textBaseline = "alphabetic";
-  bbCtx.fillStyle = "#64748b";
-  bbCtx.font = "36px 'Hiragino Sans', sans-serif";
-  bbCtx.fillText(studyTimerState === "idle" ? "集中ボタンを押してスタート" : "お互いに集中しましょう", W / 2, H - 80);
-
-  bbTexture.needsUpdate = true;
-}
+    
 
 function drawBlackboardText(text) {
-  if (IS_STUDY) { drawStudyTimer(); return; }
       const W = bbCanvas.width, H = bbCanvas.height;
       const grad = bbCtx.createLinearGradient(0, 0, 0, H);
       grad.addColorStop(0, "#254a35"); grad.addColorStop(1, "#152a1d");
@@ -2818,7 +2779,7 @@ function drawBlackboardText(text) {
       chalk.rotation.z = Math.PI / 2;
       scene.add(chalk);
     });
-    if (IS_STUDY) { drawStudyTimer(); } else { drawBlackboardText(window.INITIAL_BB); }
+    drawBlackboardText(window.INITIAL_BB);
 
     /* =========================================================
        CLOCK
@@ -3404,15 +3365,13 @@ function drawBlackboardText(text) {
       const c2 = createChair(); c2.position.set(0.75, 0.15, -0.6); scene.add(c2);
 
       // 先生（左）
-      if (!IS_STUDY) {
-        const teacher = createChibiAvatar({
+      const teacher = createChibiAvatar({
           name: TEACHER_DISPLAY_NAME, seated: true, skinKey: teacherSkin, isTeacher: true,
         });
         teacher.position.set(-0.75, 0.15, -0.6);
         teacher.rotation.y = Math.PI;
         teacher.userData.baseHeadRotX = -0.05;
         if (teacher) scene.add(teacher);
-      }
       characterMap[TEACHER_DISPLAY_NAME] = teacher;
 
       // 生徒（右、1人だけ）
@@ -3429,15 +3388,13 @@ function drawBlackboardText(text) {
       }
     } else {
       // ===== 通常クラスモード =====
-      if (!IS_STUDY) {
-        const teacher = createChibiAvatar({
+      const teacher = createChibiAvatar({
           name: TEACHER_DISPLAY_NAME, seated: false, skinKey: teacherSkin, isTeacher: true,
         });
         teacher.position.set(0, 0.15, -4.2);
         teacher.rotation.y = 0;
         teacher.userData.baseHeadRotY = 0;
         if (teacher) scene.add(teacher);
-      }
       characterMap[TEACHER_DISPLAY_NAME] = teacher;
 
       const positions = [];

@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}{{ cls.title }} - {{ T.room_study }}{% endblock %}
+{% block content %}
+<style>
+  body { background: #0f172a !important; }
+  main { max-width: 1400px !important; }
+  #canvas-container { width: 100%; height: 60vh; position: relative; border-radius: 12px; overflow: hidden; cursor: grab; }
+  .hud { position: absolute; top: 10px; left: 10px; color: #fff; background: rgba(15,23,42,0.8); padding: 10px 14px; border-radius: 8px; z-index: 10; }
+  .timer-overlay {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center; color: #fff; pointer-events: none; z-index: 5;
+  }
+  .timer-label { font-size: 24px; letter-spacing: 4px; color: #94a3b8; margin-bottom: 10px; }
+  .timer-display { font-size: 120px; font-weight: bold; font-family: ui-monospace, monospace; text-shadow: 0 0 30px rgba(96,165,250,0.4); line-height: 1; }
+  .controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 10; }
+  .controls button { padding: 12px 24px; border-radius: 8px; border: none; font-size: 15px; font-weight: bold; cursor: pointer; color: #fff; }
+  .btn-focus { background: #3b82f6; }
+  .btn-break { background: #16a34a; }
+  .btn-stop { background: #dc2626; }
+  .side-panel { background: #1e293b; color: #e2e8f0; padding: 20px; border-radius: 12px; }
+</style>
+
+<div style="display:grid; grid-template-columns: 1fr 320px; gap: 16px;">
+  <div>
+    <div id="canvas-container">
+      <div class="hud">
+        <h2 style="margin:0; font-size:16px;">{{ cls.title }}</h2>
+        <div style="font-size:12px; color:#94a3b8;">{{ cls.subject }}</div>
+      </div>
+      <div class="timer-overlay">
+        <div class="timer-label" id="timer-label">READY</div>
+        <div class="timer-display" id="timer-display">25:00</div>
+      </div>
+      <div class="controls">
+        <button id="btn-focus" class="btn-focus">{{ T.focus }}</button>
+        <button id="btn-break" class="btn-break">{{ T.break_ }}</button>
+        <button id="btn-stop" class="btn-stop">{{ T.stop }}</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="side-panel">
+    <h3 style="margin-top:0; font-size:15px;">{{ T.members_label }}</h3>
+    <ul id="member-list" style="list-style:none; padding:0; margin:0;"></ul>
+  </div>
+</div>
+
+<script type="importmap">
+{"imports": {"three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+window.CLASS_ID = {{ cls.id }};
+window.MEMBERS = {{ members|tojson }};
+
+// 3D Setup
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, container.clientWidth / container.clientHeight, 0.1, 300);
+camera.position.set(0, 6, 14);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(container.clientWidth, container.clientHeight);
+renderer.shadowMap.enabled = true;
+container.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.5, -1);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI / 2.2;
+
+// 暖かい照明
+scene.add(new THREE.AmbientLight(0xffe4c4, 0.6));
+const warm = new THREE.PointLight(0xffb86b, 0.8, 30);
+warm.position.set(0, 6, -3);
+scene.add(warm);
+
+// 床
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(60, 60),
+  new THREE.MeshStandardMaterial({ color: 0x5a4530, roughness: 0.9 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// 机（島型）
+const deskGeo = new THREE.BoxGeometry(2, 0.1, 1);
+const deskMat = new THREE.MeshStandardMaterial({ color: 0xd9b78a });
+for (let i = -1; i <= 1; i+=2) {
+  for (let j = -1; j <= 1; j+=2) {
+    const desk = new THREE.Mesh(deskGeo, deskMat);
+    desk.position.set(i * 3, 0.75, j * 3);
+    desk.castShadow = true;
+    scene.add(desk);
+  }
+}
+
+// キャラクター
+function createAvatar(color, name) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 0.6, 16), new THREE.MeshStandardMaterial({ color }));
+  body.position.y = 0.7; body.castShadow = true; g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 24), new THREE.MeshStandardMaterial({ color: 0xffd8b0 }));
+  head.position.y = 1.25; head.castShadow = true; g.add(head);
+  
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = "rgba(15,23,42,0.9)"; ctx.fillRect(0,0,256,64);
+  ctx.fillStyle = "#fff"; ctx.font = "bold 24px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(name, 128, 32);
+  const tex = new THREE.CanvasTexture(c);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
+  sp.scale.set(1.5, 0.4, 1); sp.position.y = 1.8; g.add(sp);
+  
+  return g;
+}
+
+// メンバー配置
+window.MEMBERS.filter(m => m.role === 'student').forEach((m, i) => {
+  const avatar = createAvatar(0x3b82f6, m.name);
+  avatar.position.set((i % 3) * 2 - 2, 0.15, Math.floor(i / 3) * 2 - 1);
+  scene.add(avatar);
+});
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// ポモドーロタイマー
+let timerEndsAt = 0;
+let timerState = 'idle';
+
+function updateTimerDisplay() {
+  const el = document.getElementById('timer-display');
+  const label = document.getElementById('timer-label');
+  if (timerState === 'idle' || !timerEndsAt) {
+    el.textContent = '25:00';
+    label.textContent = 'READY';
+    return;
+  }
+  const diff = Math.max(0, Math.floor((timerEndsAt - Date.now()) / 1000));
+  const m = String(Math.floor(diff / 60)).padStart(2, '0');
+  const s = String(diff % 60).padStart(2, '0');
+  el.textContent = `${m}:${s}`;
+  label.textContent = timerState === 'focus' ? 'FOCUS' : 'BREAK';
+  if (diff === 0) { timerState = 'idle'; timerEndsAt = 0; }
+}
+setInterval(updateTimerDisplay, 500);
+
+async function poll() {
+  try {
+    const res = await fetch(`/api/poll/${window.CLASS_ID}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.pomodoro) {
+      timerState = data.pomodoro.state;
+      timerEndsAt = data.pomodoro.ends_at ? new Date(data.pomodoro.ends_at).getTime() : 0;
+      updateTimerDisplay();
+    }
+    const ul = document.getElementById('member-list');
+    ul.innerHTML = data.members.map(m => `<li style="padding:6px 0; border-bottom:1px solid #334155;">${m.name}</li>`).join('');
+  } catch (e) {}
+}
+setInterval(poll, 3000);
+poll();
+
+document.getElementById('btn-focus').onclick = async () => {
+  await fetch(`/api/pomodoro/${window.CLASS_ID}/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ duration: 1500 }) });
+  poll();
+};
+document.getElementById('btn-break').onclick = async () => {
+  await fetch(`/api/pomodoro/${window.CLASS_ID}/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ duration: 300 }) });
+  poll();
+};
+document.getElementById('btn-stop').onclick = async () => {
+  await fetch(`/api/pomodoro/${window.CLASS_ID}/stop`, { method: 'POST' });
+  poll();
+};
+</script>
+{% endblock %}
