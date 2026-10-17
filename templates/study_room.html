@@ -362,9 +362,14 @@ function hashName(name) {
       }
     }
 
-    function createChibiAvatar({ name, seated = false, skinKey = "default", isTeacher = false }
-
-// =========================================================
+    function hashName(name) {
+      let h = 0;
+      for (let i = 0; i < name.length; i++) h = ((h<<5)-h + name.charCodeAt(i)) | 0;
+      return Math.abs(h);
+    }
+    const SKIN_TONES = [0xffe0bd, 0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffd8b0];
+    const HAIR_COLORS = [0x1a1a1a, 0x2a1a0a, 0x3b2314, 0x5a3825, 0x8b4513, 0xd4a574, 0x1e293b, 0x6b3410];
+    const SHIRT_C
 
 const avatarMap = {}; 
 const targetPositions = {}; 
