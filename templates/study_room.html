@@ -171,10 +171,258 @@ function createDeskAndChair(x, z) {
 seatPositions.forEach((p) => { scene.add(createDeskAndChair(p.x, p.z)); });
 
 // =========================================================
-// 教室(class_room.html)から抽出した完全なアバター生成コード
+// ★ 教室から抽出した完全なアバター生成ロジック ★
+    function paletteFor(name) {
+      const h = hashName(name);
+      const custom = CUSTOM_HANDLES[name] || { hair: -1, skin: -1, shirt: -1, style: "" };
+      const base = {
+        skin: SKIN_TONES[h % SKIN_TONES.length],
+        hair: HAIR_COLORS[(h>>3) % HAIR_COLORS.length],
+        shirt: SHIRT_COLORS[(h>>6) % SHIRT_COLORS.length],
+        pants: PANTS_COLORS[(h>>9) % PANTS_COLORS.length],
+        style: HAIR_STYLES[(h>>12) % HAIR_STYLES.length],
+        headTilt: ((h>>15) % 10) / 200 - 0.025,
+        bodyScale: 0.95 + (((h>>18) % 10) / 100),
+      };
+      if (custom.hair >= 0 && custom.hair < HAIR_PALETTE.length) base.hair = HAIR_PALETTE[custom.hair];
+      if (custom.skin >= 0 && custom.skin < SKIN_PALETTE.length) base.skin = SKIN_PALETTE[custom.skin];
+      if (custom.shirt >= 0 && custom.shirt < SHIRT_PALETTE.length) base.shirt = SHIRT_PALETTE[custom.shirt];
+      if (custom.style) base.style = custom.style;
+      return base;
+    }
 
+    function createChibiAvatar({ name, seated = false, skinKey = "default", isTeacher = false }) {
+      const g = new THREE.Group();
+      const pal = paletteFor(name);
+      const skinColors = { default: 0x3b82f6, glasses: 0x6366f1, hat: 0xf59e0b, robe: 0x8b5cf6, crown: 0xfbbf24, aura: 0xef4444 };
+      const shirtColor = (skinKey !== "default" && skinColors[skinKey]) || pal.shirt;
+      const headY = seated ? 1.20 : 1.40;
+      const bodyY = seated ? 0.68 : 0.85;
+      const bs = pal.bodyScale;
 
+      // legs
+      const legMat = new THREE.MeshStandardMaterial({ color: pal.pants, roughness: 0.85 });
+      const lLeg = new THREE.Mesh(LEG_GEO, legMat);
+      lLeg.position.set(-0.17, 0.22, 0); lLeg.castShadow = true;
+      const rLeg = new THREE.Mesh(LEG_GEO, legMat);
+      rLeg.position.set(0.17, 0.22, 0); rLeg.castShadow = true;
+      g.add(lLeg, rLeg);
+
+      // shoes
+      const lShoe = new THREE.Mesh(SHOE_GEO, SHOE_MAT);
+      lShoe.position.set(-0.17, 0.07, 0.06); lShoe.scale.set(1, 0.7, 1.35); lShoe.castShadow = true;
+      const rShoe = new THREE.Mesh(SHOE_GEO, SHOE_MAT);
+      rShoe.position.set(0.17, 0.07, 0.06); rShoe.scale.set(1, 0.7, 1.35); rShoe.castShadow = true;
+      g.add(lShoe, rShoe);
+
+      // torso
+      const torsoMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.78 });
+      const torso = new THREE.Mesh(TORSO_GEO, torsoMat);
+      torso.position.y = bodyY;
+      torso.scale.set(bs, 1, bs);
+      torso.castShadow = true;
+      g.add(torso);
+
+      // collar / tie
+      const collarMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7 });
+      const collar = new THREE.Mesh(new THREE.RingGeometry(0.14, 0.20, 14, 1, 0, Math.PI), collarMat);
+      collar.position.set(0, bodyY + 0.36, 0.30);
+      collar.rotation.x = -Math.PI/6;
+      g.add(collar);
+      if (isTeacher) {
+        const tie = new THREE.Mesh(
+          new THREE.BoxGeometry(0.08, 0.35, 0.03),
+          new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.7 })
+        );
+        tie.position.set(0, bodyY + 0.15, 0.36);
+        g.add(tie);
+      }
+
+      // arms
+      const armMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.78 });
+      const handMat = new THREE.MeshStandardMaterial({ color: pal.skin, roughness: 0.6 });
+      const armY = bodyY + 0.04;
+
+      const lUpper = new THREE.Mesh(UPPER_ARM_GEO, armMat);
+      lUpper.position.set(-0.42, armY - 0.06, 0);
+      lUpper.rotation.z = 0.28; lUpper.castShadow = true;
+      const lLower = new THREE.Mesh(LOWER_ARM_GEO, armMat);
+      lLower.position.set(-0.52, armY - 0.32, 0.02);
+      lLower.rotation.z = 0.15; lLower.castShadow = true;
+      const lHand = new THREE.Mesh(HAND_GEO, handMat);
+      lHand.position.set(-0.56, armY - 0.5, 0.03);
+      g.add(lUpper, lLower, lHand);
+
+      const rArmGroup = new THREE.Group();
+      rArmGroup.position.set(0.42, armY - 0.06, 0);
+      const rUpper = new THREE.Mesh(UPPER_ARM_GEO, armMat);
+      rUpper.castShadow = true;
+      const rLower = new THREE.Mesh(LOWER_ARM_GEO, armMat);
+      rLower.position.set(0.10, -0.26, 0.02); rLower.castShadow = true;
+      const rHand = new THREE.Mesh(HAND_GEO, handMat);
+      rHand.position.set(0.14, -0.44, 0.03);
+      rArmGroup.add(rUpper, rLower, rHand);
+      g.add(rArmGroup);
+
+      // head group (so we can rotate separately)
+      const headGroup = new THREE.Group();
+      headGroup.position.y = headY;
+
+      const headMat = new THREE.MeshStandardMaterial({ color: pal.skin, roughness: 0.55 });
+      const head = new THREE.Mesh(HEAD_GEO, headMat);
+      head.scale.set(1, 1.06, 0.96);
+      head.castShadow = true;
+      headGroup.add(head);
+
+      // neck
+      const neck = new THREE.Mesh(NECK_GEO, headMat);
+      neck.position.y = -0.42;
+      headGroup.add(neck);
+
+      // ears
+      [-0.46, 0.46].forEach(x => {
+        const ear = new THREE.Mesh(EAR_GEO, headMat);
+        ear.position.set(x, 0, 0);
+        headGroup.add(ear);
+      });
+
+      // hair
+      buildHair(headGroup, head, pal.style, pal.hair);
+
+      // eyes (grouped for blink)
+      const eyeY = 0.02;
+      const eyeZ = 0.43;
+      const eyeOffset = 0.16;
+      const eyeGroups = [];
+      [-1, 1].forEach(side => {
+        const grp = new THREE.Group();
+        const white = new THREE.Mesh(EYE_WHITE_GEO, EYE_WHITE_MAT);
+        white.scale.set(1, 1, 0.55);
+        const pupil = new THREE.Mesh(EYE_PUPIL_GEO, EYE_PUPIL_MAT);
+        pupil.position.set(0, 0, 0.058);
+        const highlight = new THREE.Mesh(EYE_HIGHLIGHT_GEO, EYE_HIGHLIGHT_MAT);
+        highlight.position.set(0.026, 0.03, 0.085);
+        grp.add(white, pupil, highlight);
+        grp.position.set(side * eyeOffset, eyeY, eyeZ);
+        headGroup.add(grp);
+        eyeGroups.push(grp);
+      });
+
+      // eyebrows
+      const browMat = new THREE.MeshBasicMaterial({ color: pal.hair });
+      [-1, 1].forEach(side => {
+        const b = new THREE.Mesh(BROW_GEO, browMat);
+        b.position.set(side * eyeOffset, eyeY + 0.13, eyeZ);
+        b.rotation.z = side * 0.08;
+        headGroup.add(b);
+      });
+
+      // nose
+      const nose = new THREE.Mesh(NOSE_GEO, headMat);
+      nose.position.set(0, eyeY - 0.05, eyeZ + 0.02);
+      headGroup.add(nose);
+
+      // mouth
+      const mouth = new THREE.Mesh(MOUTH_GEO, MOUTH_MAT);
+      mouth.position.set(0, eyeY - 0.20, eyeZ + 0.02);
+      mouth.scale.set(1.4, 0.35, 0.6);
+      headGroup.add(mouth);
+
+      // blush
+      [-1, 1].forEach(side => {
+        const blush = new THREE.Mesh(BLUSH_GEO, BLUSH_MAT);
+        blush.position.set(side * 0.32, eyeY - 0.1, 0.37);
+        blush.rotation.y = side * 0.3;
+        headGroup.add(blush);
+      });
+
+      addSkinAccessory(headGroup, head, skinKey, seated);
+
+      g.add(headGroup);
+
+      if (name) {
+        const sp = makeNameSprite(name, isTeacher);
+        sp.position.y = seated ? 1.95 : 2.20;
+        g.add(sp);
+      }
+
+      g.userData = {
+        rArmGroup, headGroup, head, torso, mouth,
+        eyeL: eyeGroups[0], eyeR: eyeGroups[1],
+        baseY: g.position.y,
+        handRaised: false,
+        highlight: 0,
+        talkUntil: 0,
+        gestureUntil: 0,
+        nextBlink: performance.now() + 2000 + Math.random() * 3000,
+        blinkUntil: 0,
+        breathingOffset: Math.random() * Math.PI * 2,
+        lookOffset: Math.random() * Math.PI * 2,
+        swayPhase: Math.random() * Math.PI * 2,
+        fidgetPhase: Math.random() * Math.PI * 2,
+        baseHeadRotY: 0,
+        targetHeadRotY: 0,
+        baseHeadRotX: 0,
+        targetHeadRotX: 0,
+        lUpper, lLower, lHand,
+        name,
+      };
+      return g;
+    }
+// =========================================================
+
+const avatarMap = {}; 
+const targetPositions = {}; 
+
+// ★ 消えていたアバター配置更新関数を復元
+function updateAvatarPositions(members, positions) {
+  members.forEach((m) => {
+    const uid = String(m.id !== undefined ? m.id : m.user_id);
+    const seatIdx = positions[uid] !== undefined ? positions[uid] : -1;
     
+    let targetX = 0, targetZ = 6; 
+    let isSeated = false;
+    
+    if (seatIdx >= 0 && seatIdx < seatPositions.length) {
+      const seat = seatPositions[seatIdx];
+      targetX = seat.x;
+      targetZ = seat.z + 0.8;
+      isSeated = true;
+    }
+    
+    targetPositions[uid] = { x: targetX, z: targetZ, seated: isSeated };
+    
+    if (!avatarMap[uid]) {
+      const av = createChibiAvatar({ 
+        name: m.name, 
+        seated: isSeated, 
+        skinKey: m.skin || "default",
+        isTeacher: m.role === "teacher",
+        customHair: m.custom_hair ?? -1, 
+        customSkin: m.custom_skin ?? -1, 
+        customShirt: m.custom_shirt ?? -1,
+        customStyle: m.custom_style || ""
+      });
+      av.position.set(targetX, 0, targetZ);
+      scene.add(av);
+      avatarMap[uid] = av;
+    } else {
+      const av = avatarMap[uid];
+      // 座っているときと立っているときで高さを微調整（エラー防止のためtry-catch）
+      try {
+        const body = av.children.find(c => c.geometry && c.geometry.type === 'CylinderGeometry');
+        const head = av.children.find(c => c.geometry && c.geometry.type === 'SphereGeometry');
+        if (body && head) {
+           if (isSeated && body.position.y !== 0.55) {
+             body.position.y = 0.55; head.position.y = 1.1;
+           } else if (!isSeated && body.position.y !== 0.7) {
+             body.position.y = 0.7; head.position.y = 1.25;
+           }
+        }
+      } catch (e) {}
+    }
+  });
+}
 
 if (window.MEMBERS && window.MEMBERS.length > 0) {
   updateAvatarPositions(window.MEMBERS, {});
