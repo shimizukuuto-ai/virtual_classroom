@@ -430,15 +430,18 @@ def class_room(request: Request, class_id: int):
     groups = list_groups(class_id)
     my_group = get_user_group(class_id, user["id"]) if role == "student" else None
     return templates.TemplateResponse(
-        request, "class_room.html",
-        ctx(request, user, cls=cls, role=role, members=members,
-            messages=messages, steps=steps, questions=questions, bans=bans,
-            files=files, groups=groups, my_group=my_group,
-            allow_anonymous=bool(cls.get("allow_anonymous") or 0),
-            duration=cls.get("duration") or 30,
-            ends_at=cls.get("ends_at") or ""),
-            posts=list_posts(class_id),
-    )
+    request,
+    "class_room.html",
+    ctx(
+        request, user, cls=cls, role=role, members=members,
+        messages=messages, steps=steps, questions=questions, bans=bans,
+        files=files, groups=groups, my_group=my_group,
+        allow_anonymous=bool(cls.get("allow_anonymous") or 0),
+        duration=cls.get("duration") or 30,
+        ends_at=cls.get("ends_at") or "",
+        posts=list_posts(class_id),   # ← ctx の中へ移動
+    ),
+)
 
 
 # ============================================================
