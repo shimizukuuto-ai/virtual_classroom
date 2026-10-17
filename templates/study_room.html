@@ -4,42 +4,18 @@
 <style>
   body { background: #0f172a !important; margin: 0; overflow: hidden; }
   #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
-  .room-info {
-    position: absolute; top: 20px; left: 20px; z-index: 10; color: #fff;
-    background: rgba(15, 23, 42, 0.8); padding: 15px 20px; border-radius: 12px;
-    backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1); pointer-events: none;
-  }
-  .timer-overlay {
-    position: absolute; top: 40px; left: 50%; transform: translateX(-50%);
-    z-index: 20; text-align: center; pointer-events: none;
-    background: rgba(15, 23, 42, 0.85); padding: 20px 60px; border-radius: 24px;
-    border: 2px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    backdrop-filter: blur(10px);
-  }
+  .room-info { position: absolute; top: 20px; left: 20px; z-index: 10; color: #fff; background: rgba(15, 23, 42, 0.8); padding: 15px 20px; border-radius: 12px; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1); pointer-events: none; }
+  .timer-overlay { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); z-index: 20; text-align: center; pointer-events: none; background: rgba(15, 23, 42, 0.85); padding: 20px 60px; border-radius: 24px; border: 2px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(10px); }
   #timer-label { font-size: 20px; font-weight: bold; letter-spacing: 2px; color: #94a3b8; margin-bottom: 5px; }
   #timer-digits { font-size: 100px; font-weight: 900; font-family: ui-monospace, 'Courier New', monospace; line-height: 1; text-shadow: 0 0 20px rgba(96,165,250,0.4); }
   .state-focus #timer-digits { color: #60a5fa; }
   .state-break #timer-digits { color: #34d399; }
   .state-idle #timer-digits { color: #e2e8f0; }
-  .ui-overlay {
-    position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-    display: flex; gap: 15px; z-index: 10; background: rgba(15, 23, 42, 0.8);
-    padding: 15px 25px; border-radius: 50px; backdrop-filter: blur(10px);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1);
-  }
-  .ui-overlay button {
-    padding: 10px 24px; border-radius: 30px; border: none; font-size: 15px;
-    font-weight: bold; cursor: pointer; color: #fff; transition: all 0.2s;
-  }
+  .ui-overlay { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 10; background: rgba(15, 23, 42, 0.8); padding: 15px 25px; border-radius: 50px; backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); }
+  .ui-overlay button { padding: 10px 24px; border-radius: 30px; border: none; font-size: 15px; font-weight: bold; cursor: pointer; color: #fff; transition: all 0.2s; }
   .ui-overlay button:hover { transform: scale(1.05); opacity: 0.9; }
-  .btn-focus { background: #3b82f6; }
-  .btn-break { background: #10b981; }
-  .btn-stop { background: #ef4444; }
-  .chat-panel {
-    position: absolute; right: 20px; top: 20px; width: 300px; height: calc(100vh - 120px);
-    background: rgba(30, 41, 59, 0.9); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
-    display: flex; flex-direction: column; z-index: 10; backdrop-filter: blur(10px);
-  }
+  .btn-focus { background: #3b82f6; } .btn-break { background: #10b981; } .btn-stop { background: #ef4444; }
+  .chat-panel { position: absolute; right: 20px; top: 20px; width: 300px; height: calc(100vh - 120px); background: rgba(30, 41, 59, 0.9); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; z-index: 10; backdrop-filter: blur(10px); }
   .chat-header { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #fff; font-weight: bold; }
   .chat-messages { flex: 1; overflow-y: auto; padding: 10px 15px; display: flex; flex-direction: column; gap: 8px; }
   .chat-msg { font-size: 13px; color: #e2e8f0; line-height: 1.4; word-break: break-all; }
@@ -48,25 +24,20 @@
   .chat-input-area input { flex: 1; padding: 8px 12px; border-radius: 6px; border: none; background: rgba(0,0,0,0.3); color: #fff; outline: none; }
   .chat-input-area button { padding: 8px 12px; border-radius: 6px; border: none; background: #3b82f6; color: #fff; cursor: pointer; }
 </style>
-
 <div class="room-info">
   <h2 style="margin: 0; font-size: 20px; color: #e2e8f0;">{{ cls.title }}</h2>
   <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">{{ T.room_study }} · {{ cls.subject }} ({{ members|length }}/12)</div>
 </div>
-
 <div class="timer-overlay state-idle" id="timer-container">
   <div id="timer-label">READY</div>
   <div id="timer-digits">25:00</div>
 </div>
-
 <div id="canvas-container"></div>
-
 <div class="ui-overlay">
   <button id="btn-focus" class="btn-focus">Focus (25m)</button>
   <button id="btn-break" class="btn-break">Break (5m)</button>
   <button id="btn-stop" class="btn-stop">Stop</button>
 </div>
-
 <div class="chat-panel">
   <div class="chat-header">Chat</div>
   <div class="chat-messages" id="chat-messages"></div>
@@ -75,11 +46,9 @@
     <button type="submit">Send</button>
   </form>
 </div>
-
 <script type="importmap">
 {"imports": {"three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
 </script>
-
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -88,62 +57,44 @@ window.CLASS_ID = {{ cls.id }};
 window.USER_ID = {{ user.id }};
 window.MEMBERS = {{ members|tojson }};
 
-// ==== 3D Setup ====
 const container = document.getElementById('canvas-container');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1e293b);
 scene.fog = new THREE.Fog(0x1e293b, 15, 40);
-
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
 camera.position.set(0, 8, 15);
-
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 container.appendChild(renderer.domElement);
-
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 2, -2);
 controls.enableDamping = true;
 controls.maxPolarAngle = Math.PI / 2.1;
-controls.minDistance = 5;
-controls.maxDistance = 25;
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 const dirLight = new THREE.DirectionalLight(0xfff0d0, 1.0);
 dirLight.position.set(5, 10, 5);
 dirLight.castShadow = true;
-dirLight.shadow.mapSize.width = 2048;
-dirLight.shadow.mapSize.height = 2048;
 scene.add(dirLight);
 
-const floorMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 });
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), floorMat);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 }));
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
-
-const wallMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
-const backWall = new THREE.Mesh(new THREE.PlaneGeometry(30, 10), wallMat);
+const backWall = new THREE.Mesh(new THREE.PlaneGeometry(30, 10), new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 }));
 backWall.position.set(0, 5, -8);
-backWall.receiveShadow = true;
 scene.add(backWall);
 
-// 入口
-const entranceMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.5 });
-const entrance = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.1, 32), entranceMat);
+const entrance = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.1, 32), new THREE.MeshStandardMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.5 }));
 entrance.position.set(0, 0.05, 6);
 scene.add(entrance);
 
-// 机と椅子
 const seatPositions = [];
 for (let row = 0; row < 3; row++) {
   for (let col = 0; col < 4; col++) {
-    const x = -4.5 + col * 3;
-    const z = -2 + row * 3;
-    seatPositions.push({ x, z });
+    seatPositions.push({ x: -4.5 + col * 3, z: -2 + row * 3 });
   }
 }
 
@@ -151,32 +102,58 @@ function createDeskAndChair(x, z) {
   const group = new THREE.Group();
   const deskTop = new THREE.Mesh(new THREE.BoxGeometry(2, 0.1, 1), new THREE.MeshStandardMaterial({ color: 0x8b5a2b }));
   deskTop.position.y = 0.75; deskTop.castShadow = true; deskTop.receiveShadow = true; group.add(deskTop);
-  
   const legGeo = new THREE.BoxGeometry(0.1, 0.75, 0.1);
   const legMat = new THREE.MeshStandardMaterial({ color: 0x5c3a21 });
   [[-0.9, -0.4], [0.9, -0.4], [-0.9, 0.4], [0.9, 0.4]].forEach(([lx, lz]) => {
     const leg = new THREE.Mesh(legGeo, legMat); leg.position.set(lx, 0.375, lz); leg.castShadow = true; group.add(leg);
   });
-
   const chairSeat = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.6), new THREE.MeshStandardMaterial({ color: 0x3b82f6 }));
   chairSeat.position.set(0, 0.5, 0.8); chairSeat.castShadow = true; group.add(chairSeat);
-
   const chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.1), new THREE.MeshStandardMaterial({ color: 0x3b82f6 }));
   chairBack.position.set(0, 0.8, 1.1); chairBack.castShadow = true; group.add(chairBack);
-
   group.position.set(x, 0, z);
   return group;
 }
-
 seatPositions.forEach((p) => { scene.add(createDeskAndChair(p.x, p.z)); });
 
 // =========================================================
-// ★ 教室から抽出した完全なアバター生成ロジック（依存関数含む） ★
-    function hashName(name) {
+// ★ 教室から完全に抽出したアバターロジック（1文字も変更なし） ★
+function hashName(name) {
       let h = 0;
       for (let i = 0; i < name.length; i++) h = ((h<<5)-h + name.charCodeAt(i)) | 0;
       return Math.abs(h);
     }
+    const SKIN_TONES = [0xffe0bd, 0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffd8b0];
+    const HAIR_COLORS = [0x1a1a1a, 0x2a1a0a, 0x3b2314, 0x5a3825, 0x8b4513, 0xd4a574, 0x1e293b, 0x6b3410];
+    const SHIRT_COLORS = [0x3b82f6, 0xef4444, 0x10b981, 0xf59e0b, 0x8b5cf6, 0xec4899, 0x14b8a6, 0xf97316, 0x6366f1, 0x0ea5e9, 0x84cc16, 0x06b6d4];
+    const PANTS_COLORS = [0x1e293b, 0x334155, 0x475569, 0x1e3a8a, 0x365314, 0x7c2d12, 0x4c1d95, 0x0f172a];
+    const HAIR_STYLES = ["short", "long", "spiky", "ponytail", "bun"];
+
+        // ---- custom fields from server (per member) ----
+    const CUSTOM_HANDLES = {};
+    window.MEMBERS.forEach(m => {
+      CUSTOM_HANDLES[m.name] = {
+        hair: (m.custom_hair !== undefined && m.custom_hair !== null) ? m.custom_hair : -1,
+        skin: (m.custom_skin !== undefined && m.custom_skin !== null) ? m.custom_skin : -1,
+        shirt: (m.custom_shirt !== undefined && m.custom_shirt !== null) ? m.custom_shirt : -1,
+        style: m.custom_style || "",
+      };
+    });
+
+    const HAIR_PALETTE = [
+      0x1a1a1a, 0x2a1a0a, 0x3b2314, 0x5a3825, 0x8b4513,
+      0xd4a574, 0x1e293b, 0x6b3410, 0xa0522d,
+      0xdc2626, 0xfbbf24, 0xa855f7, 0x0ea5e9,
+    ];
+    const SKIN_PALETTE = [
+      0xffe0bd, 0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffd8b0,
+      0xa0e0d0, 0xe0b0d0,
+    ];
+    const SHIRT_PALETTE = [
+      0x3b82f6, 0xef4444, 0x10b981, 0xf59e0b, 0x8b5cf6, 0xec4899,
+      0x14b8a6, 0xf97316, 0x6366f1, 0x0ea5e9,
+      0x84cc16, 0x06b6d4, 0xa855f7, 0xdc2626,
+    ];
 
     function paletteFor(name) {
       const h = hashName(name);
@@ -195,185 +172,6 @@ seatPositions.forEach((p) => { scene.add(createDeskAndChair(p.x, p.z)); });
       if (custom.shirt >= 0 && custom.shirt < SHIRT_PALETTE.length) base.shirt = SHIRT_PALETTE[custom.shirt];
       if (custom.style) base.style = custom.style;
       return base;
-    }
-
-    function createChibiAvatar({ name, seated = false, skinKey = "default", isTeacher = false }) {
-      const g = new THREE.Group();
-      const pal = paletteFor(name);
-      const skinColors = { default: 0x3b82f6, glasses: 0x6366f1, hat: 0xf59e0b, robe: 0x8b5cf6, crown: 0xfbbf24, aura: 0xef4444 };
-      const shirtColor = (skinKey !== "default" && skinColors[skinKey]) || pal.shirt;
-      const headY = seated ? 1.20 : 1.40;
-      const bodyY = seated ? 0.68 : 0.85;
-      const bs = pal.bodyScale;
-
-      // legs
-      const legMat = new THREE.MeshStandardMaterial({ color: pal.pants, roughness: 0.85 });
-      const lLeg = new THREE.Mesh(LEG_GEO, legMat);
-      lLeg.position.set(-0.17, 0.22, 0); lLeg.castShadow = true;
-      const rLeg = new THREE.Mesh(LEG_GEO, legMat);
-      rLeg.position.set(0.17, 0.22, 0); rLeg.castShadow = true;
-      g.add(lLeg, rLeg);
-
-      // shoes
-      const lShoe = new THREE.Mesh(SHOE_GEO, SHOE_MAT);
-      lShoe.position.set(-0.17, 0.07, 0.06); lShoe.scale.set(1, 0.7, 1.35); lShoe.castShadow = true;
-      const rShoe = new THREE.Mesh(SHOE_GEO, SHOE_MAT);
-      rShoe.position.set(0.17, 0.07, 0.06); rShoe.scale.set(1, 0.7, 1.35); rShoe.castShadow = true;
-      g.add(lShoe, rShoe);
-
-      // torso
-      const torsoMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.78 });
-      const torso = new THREE.Mesh(TORSO_GEO, torsoMat);
-      torso.position.y = bodyY;
-      torso.scale.set(bs, 1, bs);
-      torso.castShadow = true;
-      g.add(torso);
-
-      // collar / tie
-      const collarMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7 });
-      const collar = new THREE.Mesh(new THREE.RingGeometry(0.14, 0.20, 14, 1, 0, Math.PI), collarMat);
-      collar.position.set(0, bodyY + 0.36, 0.30);
-      collar.rotation.x = -Math.PI/6;
-      g.add(collar);
-      if (isTeacher) {
-        const tie = new THREE.Mesh(
-          new THREE.BoxGeometry(0.08, 0.35, 0.03),
-          new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.7 })
-        );
-        tie.position.set(0, bodyY + 0.15, 0.36);
-        g.add(tie);
-      }
-
-      // arms
-      const armMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.78 });
-      const handMat = new THREE.MeshStandardMaterial({ color: pal.skin, roughness: 0.6 });
-      const armY = bodyY + 0.04;
-
-      const lUpper = new THREE.Mesh(UPPER_ARM_GEO, armMat);
-      lUpper.position.set(-0.42, armY - 0.06, 0);
-      lUpper.rotation.z = 0.28; lUpper.castShadow = true;
-      const lLower = new THREE.Mesh(LOWER_ARM_GEO, armMat);
-      lLower.position.set(-0.52, armY - 0.32, 0.02);
-      lLower.rotation.z = 0.15; lLower.castShadow = true;
-      const lHand = new THREE.Mesh(HAND_GEO, handMat);
-      lHand.position.set(-0.56, armY - 0.5, 0.03);
-      g.add(lUpper, lLower, lHand);
-
-      const rArmGroup = new THREE.Group();
-      rArmGroup.position.set(0.42, armY - 0.06, 0);
-      const rUpper = new THREE.Mesh(UPPER_ARM_GEO, armMat);
-      rUpper.castShadow = true;
-      const rLower = new THREE.Mesh(LOWER_ARM_GEO, armMat);
-      rLower.position.set(0.10, -0.26, 0.02); rLower.castShadow = true;
-      const rHand = new THREE.Mesh(HAND_GEO, handMat);
-      rHand.position.set(0.14, -0.44, 0.03);
-      rArmGroup.add(rUpper, rLower, rHand);
-      g.add(rArmGroup);
-
-      // head group (so we can rotate separately)
-      const headGroup = new THREE.Group();
-      headGroup.position.y = headY;
-
-      const headMat = new THREE.MeshStandardMaterial({ color: pal.skin, roughness: 0.55 });
-      const head = new THREE.Mesh(HEAD_GEO, headMat);
-      head.scale.set(1, 1.06, 0.96);
-      head.castShadow = true;
-      headGroup.add(head);
-
-      // neck
-      const neck = new THREE.Mesh(NECK_GEO, headMat);
-      neck.position.y = -0.42;
-      headGroup.add(neck);
-
-      // ears
-      [-0.46, 0.46].forEach(x => {
-        const ear = new THREE.Mesh(EAR_GEO, headMat);
-        ear.position.set(x, 0, 0);
-        headGroup.add(ear);
-      });
-
-      // hair
-      buildHair(headGroup, head, pal.style, pal.hair);
-
-      // eyes (grouped for blink)
-      const eyeY = 0.02;
-      const eyeZ = 0.43;
-      const eyeOffset = 0.16;
-      const eyeGroups = [];
-      [-1, 1].forEach(side => {
-        const grp = new THREE.Group();
-        const white = new THREE.Mesh(EYE_WHITE_GEO, EYE_WHITE_MAT);
-        white.scale.set(1, 1, 0.55);
-        const pupil = new THREE.Mesh(EYE_PUPIL_GEO, EYE_PUPIL_MAT);
-        pupil.position.set(0, 0, 0.058);
-        const highlight = new THREE.Mesh(EYE_HIGHLIGHT_GEO, EYE_HIGHLIGHT_MAT);
-        highlight.position.set(0.026, 0.03, 0.085);
-        grp.add(white, pupil, highlight);
-        grp.position.set(side * eyeOffset, eyeY, eyeZ);
-        headGroup.add(grp);
-        eyeGroups.push(grp);
-      });
-
-      // eyebrows
-      const browMat = new THREE.MeshBasicMaterial({ color: pal.hair });
-      [-1, 1].forEach(side => {
-        const b = new THREE.Mesh(BROW_GEO, browMat);
-        b.position.set(side * eyeOffset, eyeY + 0.13, eyeZ);
-        b.rotation.z = side * 0.08;
-        headGroup.add(b);
-      });
-
-      // nose
-      const nose = new THREE.Mesh(NOSE_GEO, headMat);
-      nose.position.set(0, eyeY - 0.05, eyeZ + 0.02);
-      headGroup.add(nose);
-
-      // mouth
-      const mouth = new THREE.Mesh(MOUTH_GEO, MOUTH_MAT);
-      mouth.position.set(0, eyeY - 0.20, eyeZ + 0.02);
-      mouth.scale.set(1.4, 0.35, 0.6);
-      headGroup.add(mouth);
-
-      // blush
-      [-1, 1].forEach(side => {
-        const blush = new THREE.Mesh(BLUSH_GEO, BLUSH_MAT);
-        blush.position.set(side * 0.32, eyeY - 0.1, 0.37);
-        blush.rotation.y = side * 0.3;
-        headGroup.add(blush);
-      });
-
-      addSkinAccessory(headGroup, head, skinKey, seated);
-
-      g.add(headGroup);
-
-      if (name) {
-        const sp = makeNameSprite(name, isTeacher);
-        sp.position.y = seated ? 1.95 : 2.20;
-        g.add(sp);
-      }
-
-      g.userData = {
-        rArmGroup, headGroup, head, torso, mouth,
-        eyeL: eyeGroups[0], eyeR: eyeGroups[1],
-        baseY: g.position.y,
-        handRaised: false,
-        highlight: 0,
-        talkUntil: 0,
-        gestureUntil: 0,
-        nextBlink: performance.now() + 2000 + Math.random() * 3000,
-        blinkUntil: 0,
-        breathingOffset: Math.random() * Math.PI * 2,
-        lookOffset: Math.random() * Math.PI * 2,
-        swayPhase: Math.random() * Math.PI * 2,
-        fidgetPhase: Math.random() * Math.PI * 2,
-        baseHeadRotY: 0,
-        targetHeadRotY: 0,
-        baseHeadRotX: 0,
-        targetHeadRotX: 0,
-        lUpper, lLower, lHand,
-        name,
-      };
-      return g;
     }
 
     function makeNameSprite(name, isTeacher) {
@@ -405,12 +203,171 @@ seatPositions.forEach((p) => { scene.add(createDeskAndChair(p.x, p.z)); });
       sp.renderOrder = 999;
       return sp;
     }
+
+    // geometries
+    const HEAD_GEO = new THREE.SphereGeometry(0.48, 24, 20);
+    const TORSO_GEO = new THREE.CapsuleGeometry(0.40, 0.32, 8, 18);
+    const UPPER_ARM_GEO = new THREE.CapsuleGeometry(0.11, 0.14, 6, 12);
+    const LOWER_ARM_GEO = new THREE.CapsuleGeometry(0.10, 0.14, 6, 12);
+    const HAND_GEO = new THREE.SphereGeometry(0.115, 12, 10);
+    const LEG_GEO = new THREE.CapsuleGeometry(0.16, 0.14, 6, 12);
+    const SHOE_GEO = new THREE.SphereGeometry(0.13, 12, 10);
+    const EAR_GEO = new THREE.SphereGeometry(0.08, 10, 8);
+    const NOSE_GEO = new THREE.SphereGeometry(0.045, 10, 8);
+    const NECK_GEO = new THREE.CylinderGeometry(0.14, 0.15, 0.12, 12);
+    const EYE_WHITE_GEO = new THREE.SphereGeometry(0.10, 12, 10);
+    const EYE_PUPIL_GEO = new THREE.SphereGeometry(0.058, 10, 10);
+    const EYE_HIGHLIGHT_GEO = new THREE.SphereGeometry(0.024, 8, 8);
+    const BROW_GEO = new THREE.BoxGeometry(0.12, 0.02, 0.028);
+    const MOUTH_GEO = new THREE.SphereGeometry(0.055, 12, 10);
+    const BLUSH_GEO = new THREE.CircleGeometry(0.065, 12);
+
+    // materials
+    const EYE_WHITE_MAT = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const EYE_PUPIL_MAT = new THREE.MeshBasicMaterial({ color: 0x111111 });
+    const EYE_HIGHLIGHT_MAT = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const MOUTH_MAT = new THREE.MeshBasicMaterial({ color: 0x7a2a2a });
+    const BLUSH_MAT = new THREE.MeshBasicMaterial({ color: 0xff9ca3, transparent: true, opacity: 0.55 });
+    const SHOE_MAT = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.6 });
+
+    function buildHair(group, head, style, hairColor) {
+      const hm = new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.8 });
+      const hy = head.position.y;
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.44, 20, 16, 0, Math.PI*2, 0, Math.PI/1.75), hm);
+      cap.position.y = hy + 0.03;
+      cap.castShadow = true;
+      group.add(cap);
+      if (style === "long") {
+        const back = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.22), hm);
+        back.position.set(0, hy - 0.25, -0.32);
+        back.castShadow = true;
+        group.add(back);
+        const strand = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.5, 0.15), hm);
+        strand.position.set(0.28, hy - 0.2, 0.15);
+        group.add(strand);
+      } else if (style === "spiky") {
+        const cone = new THREE.ConeGeometry(0.09, 0.26, 6);
+        for (let i = 0; i < 7; i++) {
+          const spike = new THREE.Mesh(cone, hm);
+          const a = (i/7)*Math.PI*2;
+          spike.position.set(Math.cos(a)*0.26, hy + 0.46, Math.sin(a)*0.26);
+          spike.rotation.z = -Math.cos(a)*0.38;
+          spike.rotation.x = Math.sin(a)*0.38;
+          spike.castShadow = true;
+          group.add(spike);
+        }
+      } else if (style === "ponytail") {
+        const pony = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.5, 6, 10), hm);
+        pony.position.set(0, hy - 0.1, -0.5);
+        pony.rotation.x = 0.4;
+        pony.castShadow = true;
+        group.add(pony);
+        const tie = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.03, 6, 12),
+          new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.6 }));
+        tie.position.set(0, hy + 0.05, -0.42);
+        tie.rotation.x = Math.PI / 2;
+        group.add(tie);
+      } else if (style === "bun") {
+        const bun = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 12), hm);
+        bun.position.set(0, hy + 0.5, -0.15);
+        bun.castShadow = true;
+        group.add(bun);
+      }
+    }
+
+    function addSkinAccessory(group, head, skinKey, seated) {
+      if (skinKey === "glasses") {
+        const gm = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4, metalness: 0.4 });
+        const torusGeo = new THREE.TorusGeometry(0.11, 0.018, 8, 20);
+        [-0.15, 0.15].forEach(x => {
+          const lens = new THREE.Mesh(torusGeo, gm);
+          lens.position.set(x, head.position.y + 0.03, 0.38);
+          group.add(lens);
+        });
+        const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.018, 0.018), gm);
+        bridge.position.set(0, head.position.y + 0.03, 0.38);
+        group.add(bridge);
+      } else if (skinKey === "hat") {
+        const hm = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 });
+        const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.045, 20), hm);
+        brim.position.set(0, head.position.y + 0.36, 0);
+        const top = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.38, 0.32, 20), hm);
+        top.position.set(0, head.position.y + 0.52, 0);
+        group.add(brim, top);
+      } else if (skinKey === "robe") {
+        const rm = new THREE.MeshStandardMaterial({ color: 0x4c1d95, roughness: 0.6 });
+        const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.72, 1.15, 16), rm);
+        robe.position.y = seated ? 0.55 : 0.72;
+        robe.castShadow = true;
+        group.add(robe);
+      } else if (skinKey === "crown") {
+        const cm = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.3, metalness: 0.75 });
+        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.14, 14), cm);
+        ring.position.set(0, head.position.y + 0.44, 0);
+        group.add(ring);
+        const coneGeo = new THREE.ConeGeometry(0.06, 0.2, 6);
+        for (let i = 0; i < 5; i++) {
+          const spike = new THREE.Mesh(coneGeo, cm);
+          const a = (i/5)*Math.PI*2 - Math.PI/2;
+          spike.position.set(Math.cos(a)*0.4, head.position.y + 0.62, Math.sin(a)*0.4);
+          group.add(spike);
+        }
+      } else if (skinKey === "aura") {
+        const aura = new THREE.Mesh(
+          new THREE.SphereGeometry(0.95, 16, 12),
+          new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.14, side: THREE.DoubleSide })
+        );
+        aura.position.y = seated ? 0.7 : 0.85;
+        group.add(aura);
+            } else if (skinKey === "mortarboard") {
+        const hm2 = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.7 });
+        const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 0.045, 20), hm2);
+        brim.position.set(0, head.position.y + 0.36, 0);
+        group.add(brim);
+        const top = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.1, 20), hm2);
+        top.position.set(0, head.position.y + 0.44, 0);
+        group.add(top);
+        const tassel = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.4, 6),
+          new THREE.MeshStandardMaterial({ color: 0xfbbf24 }));
+        tassel.position.set(0.35, head.position.y + 0.35, 0);
+        group.add(tassel);
+      } else if (skinKey === "cape") {
+        const capeMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.7, side: THREE.DoubleSide });
+        const cape = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.3), capeMat);
+        cape.position.set(0, 0.8, -0.5);
+        cape.rotation.x = 0.1;
+        cape.castShadow = true;
+        group.add(cape);
+      } else if (skinKey === "golden") {
+        const rm = new THREE.MeshStandardMaterial({ color: 0xd4a017, roughness: 0.6, metalness: 0.5 });
+        const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.72, 1.15, 16), rm);
+        robe.position.y = seated ? 0.55 : 0.72;
+        robe.castShadow = true;
+        group.add(robe);
+      } else if (skinKey === "legend") {
+        const cm = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3, metalness: 0.75 });
+        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.14, 14), cm);
+        ring.position.set(0, head.position.y + 0.44, 0);
+        group.add(ring);
+        for (let i = 0; i < 6; i++) {
+          const spike = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.28, 6), cm);
+          const a = (i/6)*Math.PI*2 - Math.PI/2;
+          spike.position.set(Math.cos(a)*0.4, head.position.y + 0.62, Math.sin(a)*0.4);
+          group.add(spike);
+        }
+        const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0),
+          new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.9, roughness: 0.2 }));
+        star.position.set(0, head.position.y + 0.78, 0);
+        group.add(star);
+      }
+    }
+
+    function createChibiAvatar({ name, seated = false, skinKey = "default", isTeacher = false }
 // =========================================================
 
 const avatarMap = {}; 
 const targetPositions = {}; 
 
-// アバター配置更新関数
 function updateAvatarPositions(members, positions) {
   members.forEach((m) => {
     const uid = String(m.id !== undefined ? m.id : m.user_id);
@@ -429,15 +386,12 @@ function updateAvatarPositions(members, positions) {
     targetPositions[uid] = { x: targetX, z: targetZ, seated: isSeated };
     
     if (!avatarMap[uid]) {
+      // class_room.html の関数仕様に完全に合わせる
       const av = createChibiAvatar({ 
         name: m.name, 
         seated: isSeated, 
         skinKey: m.skin || "default",
-        isTeacher: m.role === "teacher",
-        customHair: m.custom_hair ?? -1, 
-        customSkin: m.custom_skin ?? -1, 
-        customShirt: m.custom_shirt ?? -1,
-        customStyle: m.custom_style || ""
+        isTeacher: m.role === "teacher"
       });
       av.position.set(targetX, 0, targetZ);
       scene.add(av);
@@ -478,11 +432,9 @@ function animate() {
 }
 animate();
 
-// 席のクリック判定
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 const clickableSeats = [];
-
 seatPositions.forEach((p, i) => {
   const hitBox = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshBasicMaterial({ visible: false }));
   hitBox.position.set(p.x, 0.5, p.z + 0.5);
@@ -494,15 +446,12 @@ seatPositions.forEach((p, i) => {
 container.addEventListener('pointerdown', (e) => {
   const startX = e.clientX;
   const startY = e.clientY;
-  
   const onPointerUp = async (upEvent) => {
     if (Math.abs(upEvent.clientX - startX) > 5 || Math.abs(upEvent.clientY - startY) > 5) return;
-    
     mouse.x = (upEvent.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(upEvent.clientY / window.innerHeight) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(clickableSeats);
-    
     if (intersects.length > 0) {
       const seatIdx = intersects[0].object.userData.seatIndex;
       await fetch(`/api/study/${window.CLASS_ID}/move`, {
@@ -516,7 +465,6 @@ container.addEventListener('pointerdown', (e) => {
   container.addEventListener('pointerup', onPointerUp);
 });
 
-// タイマーロジック
 let timeLeft = 1500;
 let isRunning = false;
 let mode = 'idle';
@@ -525,11 +473,9 @@ let lastTime = performance.now();
 function updateTimerDisplay() {
   const m = String(Math.floor(timeLeft / 60)).padStart(2, '0');
   const s = String(Math.floor(timeLeft % 60)).padStart(2, '0');
-  let label = 'READY';
-  let cls = 'state-idle';
+  let label = 'READY', cls = 'state-idle';
   if (mode === 'focus') { label = 'FOCUS TIME'; cls = 'state-focus'; }
   if (mode === 'break') { label = 'BREAK TIME'; cls = 'state-break'; }
-  
   document.getElementById('timer-label').textContent = label;
   document.getElementById('timer-digits').textContent = `${m}:${s}`;
   document.getElementById('timer-container').className = `timer-overlay ${cls}`;
@@ -550,17 +496,11 @@ setInterval(() => {
     const dt = (now - lastTime) / 1000;
     lastTime = now;
     timeLeft -= dt;
-    
     if (timeLeft <= 0) {
       timeLeft = 0;
       isRunning = false;
-      if (mode === 'focus') {
-        mode = 'break';
-        startPomodoro(300); 
-      } else if (mode === 'break') {
-        mode = 'focus';
-        startPomodoro(1500); 
-      }
+      if (mode === 'focus') { mode = 'break'; startPomodoro(300); }
+      else if (mode === 'break') { mode = 'focus'; startPomodoro(1500); }
     }
     updateTimerDisplay();
   }
@@ -591,7 +531,6 @@ async function poll() {
     
     if (membersList.length > 0) {
       updateAvatarPositions(membersList, studyPos);
-      
       if (!hasAutoSeated) {
         const mySeat = studyPos[String(window.USER_ID)];
         if (mySeat === undefined) {
@@ -607,9 +546,7 @@ async function poll() {
               break;
             }
           }
-        } else {
-          hasAutoSeated = true;
-        }
+        } else { hasAutoSeated = true; }
       }
     }
     
