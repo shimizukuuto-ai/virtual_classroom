@@ -159,7 +159,6 @@ const frame = new THREE.Mesh(new THREE.BoxGeometry(8.4, 4.4, 0.2), new THREE.Mes
 frame.position.set(0, 4.5, -8.0);
 scene.add(frame);
 
-const SEATS = [];
 const seatPositions = [];
 for (let row = 0; row < 3; row++) {
   for (let col = 0; col < 4; col++) {
@@ -196,12 +195,88 @@ function createDeskAndChair(x, z) {
   return group;
 }
 
-seatPositions.forEach((p, i) => {
+seatPositions.forEach((p) => {
   scene.add(createDeskAndChair(p.x, p.z));
-  SEATS.push({ index: i, x: p.x, z: p.z, mesh: null });
 });
 
+function createChibiAvatar({ name, seated = false, customHair = -1, customSkin = -1, customShirt = -1 }) {
+  const g = new THREE.Group();
+  const skinColors = [0xffd8b0, 0xffe0bd, 0xe0ac69, 0x8d5524, 0x5c3a21, 0x2a1a0a];
+  const shirtColors = [0x3b82f6, 0xef4444, 0x10b981, 0xf59e0b, 0x8b5cf6, 0xec4899, 0x64748b, 0x14b8a6];
+  const hairColors = [0x2a1a0a, 0x4a2e15, 0x8b5a2b, 0xd2b48c, 0x1e293b, 0x94a3b8, 0xdc2626, 0xf59e0b, 0xec4899];
+  
+  const sColor = customSkin >= 0 ? skinColors[customSkin % skinColors.length] : 0xffd8b0;
+  const bColor = customShirt >= 0 ? shirtColors[customShirt % shirtColors.length] : 0x3b82f6;
+  const hColor = customHair >= 0 ? hairColors[customHair % hairColors.length] : 0x2a1a0a;
 
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.6, 16), new THREE.MeshStandardMaterial({ color: bColor, roughness: 0.7 }));
+  body.position.y = seated ? 0.55 : 0.7; body.castShadow = true; g.add(body);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 24), new THREE.MeshStandardMaterial({ color: sColor, roughness: 0.55 }));
+  head.position.y = seated ? 1.1 : 1.25; head.castShadow = true; g.add(head);
+
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.335, 24, 24, 0, Math.PI * 2, 0, Math.PI / 1.75), new THREE.MeshStandardMaterial({ color: hColor, roughness: 0.8 }));
+  hair.position.copy(head.position); hair.position.y += 0.02; g.add(hair);
+
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+  const eyeGeo = new THREE.SphereGeometry(0.05, 12, 12);
+  const eyeY = head.position.y + 0.02;
+  const lEye = new THREE.Mesh(eyeGeo, eyeMat); lEye.position.set(-0.11, eyeY, 0.28); g.add(lEye);
+  const rEye = new THREE.Mesh(eyeGeo, eyeMat); rEye.position.set(0.11, eyeY, 0.28); g.add(rEye);
+
+  const armMat = new THREE.MeshStandardMaterial({ color: bColor, roughness: 0.7 });
+  const armGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.55, 8);
+  const armY = seated ? 0.6 : 0.72;
+  const lArm = new THREE.Mesh(armGeo, armMat); lArm.position.set(-0.36, armY, 0); lArm.rotation.z = 0.3; lArm.castShadow = true; g.add(lArm);
+  const rArm = new THREE.Mesh(armGeo, armMat); rArm.position.set(0.36, armY, 0); rArm.rotation.z = -0.3; rArm.castShadow = true; g.add(rArm);
+
+  if (!seated) {
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x333a4a });
+    const legGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.42, 8);
+    const lLeg = new THREE.Mesh(legGeo, legMat); lLeg.position.set(-0.12, 0.21, 0); g.add(lLeg);
+    const rLeg = new THREE.Mesh(legGeo, legMat); rLeg.position.set(0.12, 0.21, 0); g.add(rLeg);
+  }
+
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+  const cctx = c.getContext('2d');
+  cctx.fillStyle = "rgba(15,23,42,0.8)"; cctx.roundRect(8, 8, 240, 48, 24); cctx.fill();
+  cctx.fillStyle = "#fff"; cctx.font = "bold 26px 'Hiragino Sans', sans-serif"; cctx.textAlign = "center"; cctx.textBaseline = "middle";
+  cctx.fillText(name, 128, 32);
+  const tex = new THREE.CanvasTexture(c);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true }));
+  sp.scale.set(1.5, 0.375, 1); sp.position.y = seated ? 1.72 : 1.9; sp.renderOrder = 999; g.add(sp);
+
+  return g;
+}
+
+const avatarMap = {}; 
+const targetPositions = {}; // ★ ここで宣言（エラー解消）
+
+function updateAvatarPositions(members, positions) {
+  members.forEach((m, idx) => {
+    if (m.role === 'teacher') return;
+    const uid = String(m.id);
+    const seatIdx = positions[uid] !== undefined ? positions[uid] : -1;
+    
+    if (seatIdx >= 0 && seatIdx < seatPositions.length) {
+      const seat = seatPositions[seatIdx];
+      targetPositions[uid] = { x: seat.x, z: seat.z + 0.8 }; 
+      
+      if (!avatarMap[uid]) {
+        const av = createChibiAvatar({ 
+          name: m.name, 
+          seated: true, 
+          customHair: m.custom_hair, 
+          customSkin: m.custom_skin, 
+          customShirt: m.custom_shirt 
+        });
+        av.position.set(seat.x, 0, seat.z + 0.8);
+        scene.add(av);
+        avatarMap[uid] = av;
+      }
+    }
+  });
+}
 
 function animate() {
   requestAnimationFrame(animate);
@@ -213,7 +288,6 @@ function animate() {
       av.position.z += (target.z - av.position.z) * 0.1;
     }
   });
-
   controls.update();
   renderer.render(scene, camera);
 }
@@ -271,7 +345,7 @@ function updateTimerDisplay() {
 }
 updateTimerDisplay();
 
-async function startPomodoro(duration, nextMode) {
+async function startPomodoro(duration) {
   await fetch(`/api/pomodoro/${window.CLASS_ID}/start`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ duration })
@@ -291,10 +365,10 @@ setInterval(() => {
       isRunning = false;
       if (mode === 'focus') {
         mode = 'break';
-        startPomodoro(300, 'break'); 
+        startPomodoro(300); 
       } else if (mode === 'break') {
         mode = 'focus';
-        startPomodoro(1500, 'focus'); 
+        startPomodoro(1500); 
       }
     }
     updateTimerDisplay();
@@ -342,8 +416,8 @@ async function poll() {
 setInterval(poll, 3000);
 poll();
 
-document.getElementById('btn-focus').onclick = () => startPomodoro(1500, 'focus');
-document.getElementById('btn-break').onclick = () => startPomodoro(300, 'break');
+document.getElementById('btn-focus').onclick = () => startPomodoro(1500);
+document.getElementById('btn-break').onclick = () => startPomodoro(300);
 document.getElementById('btn-stop').onclick = async () => {
   await fetch(`/api/pomodoro/${window.CLASS_ID}/stop`, { method: 'POST' });
   poll();
