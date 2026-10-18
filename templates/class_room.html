@@ -494,8 +494,9 @@ main { padding: 16px 20px; }
         </div>
       </div>
       
-      <a href="/dashboard" class="reset-view-btn" style="right: 130px; text-decoration: none; display: inline-flex; align-items: center; background: #ef4444; border-color: #ef4444; color: #fff;">{{ T.leave_room }}</a>
-      <button id="btn-view-toggle" class="view-toggle-btn" type="button">👁 {{ T.view_overview }}</button>
+      
+      <a href="/dashboard" class="reset-view-btn" style="right: 130px; text-decoration: none; display: flex; align-items: center; justify-content: center; background: #ef4444; color: white; font-weight: bold; border-color: #ef4444;">{{ T.leave_room }}</a>
+<button id="btn-view-toggle" class="view-toggle-btn" type="button">👁 {{ T.view_overview }}</button>
       
       <button id="btn-reset-view" class="reset-view-btn" type="button">{{ T.reset_view }}</button>
       <div class="hint">{{ T.drag_hint }}</div>
@@ -842,6 +843,8 @@ main { padding: 16px 20px; }
 </div>
 
 <script>
+window.I18N = {{ T | tojson }};
+
 window.addEventListener("error", (e) => {
   console.error("Global error:", e.message, e.filename, e.lineno);
 });

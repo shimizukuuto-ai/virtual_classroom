@@ -370,6 +370,15 @@ STRINGS = {
         "room_study": "自習室",
     },
     "en": {
+        "leave_room": "Leave Room",
+        "public_class": "Public",
+        "request_class": "Request",
+        "private_class": "Private",
+        "enter_class": "Join",
+        "enter_code": "Enter Code",
+        "qa_no_questions": "No questions yet",
+        "threed_fallback": "Couldn't load 3D view",
+
         "app_title": "Virtual Classroom",
         "articles": "Articles",
         "find_article": "Find an Article",

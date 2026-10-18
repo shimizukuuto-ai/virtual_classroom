@@ -85,13 +85,13 @@ async function requestJoin(classId) {
     <h3>{{ c.title }}</h3>
     <div style="font-size: 13px; color: #64748b; margin-bottom: 10px; flex: 1;">{{ c.description or "" }}</div>
     
-    <div style="margin-bottom: 10px;">
+    <div style="margin-bottom: 10px; display: flex; gap: 6px;">
       {% if c.is_public == 2 %}
-        <span style="font-size: 10px; background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 10px; font-weight: bold;">{{ T.public_class }}</span>
+        <span style="font-size: 11px; background: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-weight: bold;">{{ T.public_class }}</span>
       {% elif c.is_public == 1 %}
-        <span style="font-size: 10px; background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 10px; font-weight: bold;">{{ T.request_class }}</span>
+        <span style="font-size: 11px; background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 12px; font-weight: bold;">{{ T.request_class }}</span>
       {% else %}
-        <span style="font-size: 10px; background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 10px; font-weight: bold;">{{ T.private_class }}</span>
+        <span style="font-size: 11px; background: #f1f5f9; color: #475569; padding: 4px 10px; border-radius: 12px; font-weight: bold;">{{ T.private_class }}</span>
       {% endif %}
     </div>
 
