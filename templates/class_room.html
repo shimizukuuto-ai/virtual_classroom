@@ -502,7 +502,8 @@ main { padding: 16px 20px; }
       
       
 
-      <a href="/dashboard" id="btn-leave" class="btn" style="text-decoration:none;">{{ T.leave_room }}</a>
+      
+<a href="/dashboard" id="btn-leave" class="btn">{{ T.leave_room }}</a>
 <button id="btn-view-toggle" class="view-toggle-btn" type="button">👁 {{ T.view_overview }}</button>
       
       <button id="btn-reset-view" class="reset-view-btn" type="button">{{ T.reset_view }}</button>
@@ -854,15 +855,21 @@ main { padding: 16px 20px; }
 
 
 <script>
-  // グローバル変数の確実な初期化（ここでエラーが起きないようにする）
-  window.CLASS_ID = Number("{{ cls.id }}");
+  // ===== グローバル変数の確実な初期化 =====
+  window.I18N = {{ I18N_JSON|safe }};
+  window.CLASS_ID = {{ cls.id }};
   window.ROLE = "{{ role }}";
   window.USER_NAME = "{{ user.name }}";
   window.INITIAL_BB = {{ (cls.blackboard or '')|tojson }};
   window.MEMBERS = {{ members|tojson }};
-  window.I18N = Object.assign({}, {{ T | tojson }}, {
-    ai_teacher_mode: {{ (1 if cls.ai_teacher_mode else 0) }}
-  });
+
+  // グローバル変数の確実な初期化（ここでエラーが起きないようにする）
+  
+  
+  
+  window.INITIAL_BB = {{ (cls.blackboard or '')|tojson }};
+  window.MEMBERS = {{ members|tojson }};
+  
 </script>
 <script>
 
