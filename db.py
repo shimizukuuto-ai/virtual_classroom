@@ -1465,21 +1465,40 @@ def leave_study_room(class_id, user_id):
 def migrate_posts():
     with get_conn() as conn:
         with conn.cursor() as c:
-            # 既存のテーブルに不足している列を追加
-            for col, col_type in [
-                ("content", "TEXT"), ("body", "TEXT"), ("is_public", "INTEGER DEFAULT 1"),
-                ("tags", "TEXT DEFAULT ''"), ("updated_at", "TEXT")
-            ]:
+            # 存在しないカラムを確実に追加 (Postgres用)
+            columns = [
+                ("author_id", "BIGINT"),
+                ("author_name", "TEXT"),
+                ("title", "TEXT"),
+                ("body", "TEXT"),
+                ("content", "TEXT"),
+                ("tags", "TEXT DEFAULT ''"),
+                ("class_id", "BIGINT"),
+                ("is_pinned", "INTEGER DEFAULT 0"),
+                ("is_public", "INTEGER DEFAULT 1"),
+                ("helpful_count", "INTEGER DEFAULT 0"),
+                ("created_at", "TEXT"),
+                ("updated_at", "TEXT")
+            ]
+            for col, col_type in columns:
                 try:
                     c.execute(f"ALTER TABLE posts ADD COLUMN IF NOT EXISTS {col} {col_type}")
-                except Exception:
-                    pass
-            # 古いデータの埋め合わせ
+                except Exception as e:
+                    print(f"[migrate_posts] Failed to add {col}: {e}")
+                    conn.rollback()
+            
+            # 既存データの補正
             try:
                 c.execute("UPDATE posts SET content = body WHERE content IS NULL AND body IS NOT NULL")
                 c.execute("UPDATE posts SET body = content WHERE body IS NULL AND content IS NOT NULL")
-            except Exception:
-                pass
+                c.execute("UPDATE posts SET is_pinned = 0 WHERE is_pinned IS NULL")
+                c.execute("UPDATE posts SET is_public = 1 WHERE is_public IS NULL")
+                c.execute("UPDATE posts SET helpful_count = 0 WHERE helpful_count IS NULL")
+            except Exception as e:
+                print(f"[migrate_posts] Data update failed: {e}")
+                conn.rollback()
+            
+            conn.commit()
 
 def create_post(class_id, author_id, author_name, title, content, is_pinned=0, is_public=1):
     with get_conn() as conn:

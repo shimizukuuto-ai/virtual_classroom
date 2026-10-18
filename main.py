@@ -1,4 +1,5 @@
 import os
+import traceback
 import random
 import string
 import shutil
@@ -1305,7 +1306,12 @@ async def api_post_create(request: Request, class_id: int):
     role = get_role(class_id, user["id"])
     if not role:
         return JSONResponse({"error": "not member"}, status_code=403)
-    data = await request.json()
+    
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid json"}, status_code=400)
+        
     title = (data.get("title") or "").strip()
     content = (data.get("content") or "").strip()
     if not title or not content:
@@ -1319,6 +1325,8 @@ async def api_post_create(request: Request, class_id: int):
         create_post(class_id, user["id"], user["name"], title, content, is_pinned, is_public)
         return JSONResponse({"ok": True})
     except Exception as e:
+        # ★ここでエラーの詳細をログに出力する
+        traceback.print_exc()
         return JSONResponse({"error": str(e)}, status_code=500)
 
 @app.get("/api/posts/{class_id}")
