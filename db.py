@@ -285,11 +285,272 @@ def create_user(name, email=None, lang="en"):
                 return None
 
 
-def _apply_display_name(user):
-    if user and user.get("display_name"):
-        user = dict(user)
-        user["name"] = user["display_name"]
-    return user
+def get_user_by_name(name):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("SELECT * FROM users WHERE name = %s", (name,))
+            row = c.fetchone()
+    if row and row.get("display_name"):
+        row = dict(row)
+        row["name"] = row["display_name"]
+    return row
+
+
+def get_user_by_email(email):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("SELECT * FROM users WHERE email = %s", (email,))
+            return c.fetchone()
+
+
+def get_user_by_id(uid):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("SELECT * FROM users WHERE id = %s", (uid,))
+            row = c.fetchone()
+    if row and row.get("display_name"):
+        row = dict(row)
+        row["name"] = row["display_name"]
+    return row
+
+
+def set_user_lang(uid, lang):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("UPDATE users SET lang = %s WHERE id = %s", (lang, uid))
+        conn.commit()
+
+
+def update_user_profile(uid, title, bio):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("UPDATE users SET title = %s, bio = %s WHERE id = %s", (title or "", bio or "", uid))
+        conn.commit()
+
+
+def set_user_skin(uid, skin_key):
+    if skin_key not in SKINS:
+        return False
+    info = SKINS[skin_key]
+    xp = calc_xp(uid)
+    s = user_stats(uid) or {}
+    if xp < info[2]:
+        return False
+    if info[4] > 0 and s.get("taught", 0) < info[4]:
+        return False
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("UPDATE users SET skin = %s WHERE id = %s", (skin_key, uid))
+        conn.commit()
+    return True
+
+
+def add_bonus_xp(uid, amount):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("UPDATE users SET bonus_xp = COALESCE(bonus_xp, 0) + %s WHERE id = %s", (int(amount), uid))
+        conn.commit()
+    check_badges(uid)
+    return True
+
+
+def reset_bonus_xp(uid):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("UPDATE users SET bonus_xp = 0 WHERE id = %s", (uid,))
+        conn.commit()
+
+
+def list_all_users(limit=200):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("SELECT * FROM users ORDER BY id DESC LIMIT %s", (limit,))
+            return c.fetchall()
+
+
+def delete_user(uid):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            for t in ("enrollments", "join_requests", "class_bans", "user_badges", "attendance", "learning_cards", "group_members"):
+                c.execute(f"DELETE FROM {t} WHERE user_id = %s", (uid,))
+            c.execute("DELETE FROM users WHERE id = %s", (uid,))
+        conn.commit()
+
+
+# ===== stats =====
+def user_stats(uid):
+    user = get_user_by_id(uid)
+    if not user:
+        return None
+    name = user["name"]
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("""
+            SELECT
+              (SELECT COALESCE(SUM(helpful_count),0) FROM messages WHERE sender_name=%s AND sender_type='user') AS helpful,
+              (SELECT COUNT(*) FROM messages WHERE sender_name=%s AND sender_type='user') AS msg_count,
+              (SELECT COUNT(*) FROM classes WHERE teacher_id=%s) AS taught,
+              (SELECT COUNT(*) FROM classes WHERE teacher_id=%s AND is_weekly=1) AS weekly_hosted,
+              (SELECT COUNT(*) FROM enrollments WHERE user_id=%s AND role='student') AS joined,
+              (SELECT COUNT(*) FROM questions WHERE answered_by=%s) AS answers,
+              (SELECT COUNT(*) FROM enrollments e JOIN classes c ON c.id=e.class_id WHERE c.teacher_id=%s AND e.role='student') AS students_total
+            """, (name, name, uid, uid, uid, uid, uid))
+            row = c.fetchone()
+    bonus = user["bonus_xp"] if user["bonus_xp"] is not None else 0
+    xp = row["helpful"]*5 + row["answers"]*20 + row["taught"]*50 + row["weekly_hosted"]*30 + row["students_total"]*2 + bonus
+    return {
+        "helpful": row["helpful"], "messages": row["msg_count"], "taught": row["taught"],
+        "joined": row["joined"], "answers": row["answers"], "weekly_hosted": row["weekly_hosted"],
+        "students_total": row["students_total"], "xp": xp,
+        "rank": rank_for_xp(xp), "next_rank": next_rank(xp),
+    }
+
+
+def calc_xp(uid):
+    s = user_stats(uid)
+    return s["xp"] if s else 0
+
+
+def calc_streak(uid):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("SELECT DISTINCT date FROM attendance WHERE user_id=%s ORDER BY date DESC LIMIT 60", (uid,))
+            rows = c.fetchall()
+    if not rows:
+        return 0
+    streak = 0
+    expected = datetime.datetime.now().date()
+    for r in rows:
+        try:
+            d = datetime.strptime(r["date"], "%Y-%m-%d").date()
+        except Exception:
+            continue
+        if d == expected:
+            streak += 1
+            expected -= timedelta(days=1)
+        elif d == expected - timedelta(days=1) and streak == 0:
+            streak += 1
+            expected = d - timedelta(days=1)
+        else:
+            break
+    return streak
+
+
+def record_attendance(uid, class_id):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            try:
+                c.execute("INSERT INTO attendance (user_id, class_id, date) VALUES (%s, %s, %s)", (uid, class_id, today()))
+                conn.commit()
+                return True
+            except psycopg.errors.UniqueViolation:
+                conn.rollback()
+                return False
+
+
+# ===== badges =====
+def list_user_badges(uid):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("SELECT * FROM user_badges WHERE user_id=%s ORDER BY earned_at DESC", (uid,))
+            return c.fetchall()
+
+
+def grant_badge(uid, key):
+    if key not in BADGES:
+        return False
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            try:
+                c.execute("INSERT INTO user_badges (user_id, badge_key, earned_at) VALUES (%s, %s, %s)", (uid, key, now()))
+                conn.commit()
+                return True
+            except psycopg.errors.UniqueViolation:
+                conn.rollback()
+                return False
+
+
+def check_badges(uid):
+    s = user_stats(uid)
+    if not s:
+        return
+    streak = calc_streak(uid)
+    conds = [
+        ("first_class", s["taught"] >= 1), ("class_10", s["taught"] >= 10), ("class_50", s["taught"] >= 50),
+        ("first_answer", s["answers"] >= 1), ("answer_20", s["answers"] >= 20),
+        ("helpful_10", s["helpful"] >= 10), ("helpful_100", s["helpful"] >= 100),
+        ("streak_3", streak >= 3), ("streak_7", streak >= 7), ("streak_30", streak >= 30),
+        ("first_weekly", s["weekly_hosted"] >= 1), ("weekly_10", s["weekly_hosted"] >= 10),
+        ("students_10", s["students_total"] >= 10), ("students_100", s["students_total"] >= 100),
+    ]
+    for key, ok in conds:
+        if ok:
+            grant_badge(uid, key)
+
+
+def count_badges(uid):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("SELECT COUNT(*) AS n FROM user_badges WHERE user_id=%s", (uid,))
+            r = c.fetchone()
+    return r["n"] if r else 0
+
+
+# ===== cards =====
+def create_card(uid, class_id, content):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("INSERT INTO learning_cards (user_id, class_id, content, created_at) VALUES (%s,%s,%s,%s)", (uid, class_id, content, now()))
+        conn.commit()
+
+
+def list_user_cards(uid, limit=20):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("""SELECT lc.*, c.title AS class_title, c.subject AS class_subject
+                FROM learning_cards lc JOIN classes c ON c.id=lc.class_id
+                WHERE lc.user_id=%s ORDER BY lc.id DESC LIMIT %s""", (uid, limit))
+            return c.fetchall()
+
+
+# ===== classes =====
+def create_class(title, subject, description, teacher_id, join_code,
+                 is_public=1, taught_by="", is_weekly=0, weekly_time="",
+                 next_session="", allow_anonymous=0, is_interview=0,
+                 duration=30, room_type="class"):
+    ends_at = (datetime.datetime.now() + datetime.timedelta(minutes=duration)).isoformat(timespec="seconds")
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            try:
+                c.execute(
+                    """INSERT INTO classes
+                    (title, subject, description, teacher_id, join_code, is_public, created_at,
+                     blackboard, stage, taught_by, is_weekly, weekly_time, next_session,
+                     allow_anonymous, is_interview, duration, ends_at, room_type)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,'',0,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                    (title, subject, description, teacher_id, join_code, is_public, now(),
+                     taught_by, is_weekly, weekly_time, next_session,
+                     allow_anonymous, is_interview, duration, ends_at, room_type),
+                )
+                cid = c.fetchone()["id"]
+                c.execute(
+                    "INSERT INTO enrollments (class_id, user_id, role, joined_at) VALUES (%s,%s,'teacher',%s)",
+                    (cid, teacher_id, now()),
+                )
+                conn.commit()
+            except psycopg.errors.UniqueViolation:
+                conn.rollback()
+                return None
+    check_badges(teacher_id)
+    return cid
+
+
+def get_class_by_code(code):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("SELECT * FROM classes WHERE join_code=%s", (code,))
+            return c.fetchone()
+
 
 def get_class_by_id(cid):
     with get_conn() as conn:
@@ -830,6 +1091,7 @@ def save_upload(data_b64, mime, size=0, kind="image"):
         conn.commit()
     return uid
 
+
 def get_upload(upload_id):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
@@ -940,15 +1202,18 @@ def set_share_record(class_id, role, share):
 
 
 # ===== bulletin board (posts / comments) =====
-def create_post(class_id, author_id, author_name, title, content, is_pinned=0, is_public=1):
+def create_post(class_id, author_id, author_name, title, content, is_pinned=0):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
             c.execute(
-                """INSERT INTO posts (class_id, author_id, author_name, title, content, is_pinned, is_public, created_at, updated_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-                (class_id, author_id, author_name, title, content, is_pinned, is_public, now(), now())
+                """INSERT INTO posts (class_id, author_id, author_name, title, content, is_pinned, created_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (class_id, author_id, author_name, title, content, is_pinned, now()),
             )
-            return c.fetchone()["id"]
+            pid = c.fetchone()["id"]
+        conn.commit()
+    return pid
+
 
 def list_posts(class_id=None):
     with get_conn() as conn:
@@ -1032,7 +1297,6 @@ def init_posts():
                 "ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_public INTEGER DEFAULT 1",
                 "ALTER TABLE posts ADD COLUMN IF NOT EXISTS created_at TEXT",
                 "ALTER TABLE posts ADD COLUMN IF NOT EXISTS updated_at TEXT",
-                "ALTER TABLE posts ADD COLUMN IF NOT EXISTS helpful_count INTEGER DEFAULT 0",
                 "ALTER TABLE posts ALTER COLUMN class_id DROP NOT NULL",
             ]:
                 try:
@@ -1050,16 +1314,14 @@ def init_posts():
                 )
             """)
 
-def create_post(class_id, author_id, author_name, title, content, is_pinned=0, is_public=1):
-    with get_conn() as conn:
-        with conn.cursor(row_factory=dict_row) as c:
-            c.execute(
-                """INSERT INTO posts (class_id, author_id, author_name, title, content, is_pinned, is_public, created_at, updated_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-                (class_id, author_id, author_name, title, content, is_pinned, is_public, now(), now())
-            )
-            return c.fetchone()["id"]
-
+def create_post(author_id, author_name, title, body, tags="", class_id=None, is_public=1):
+    now = datetime.datetime.utcnow().isoformat()
+    with _cursor() as c:
+        row = c.execute("""
+            INSERT INTO posts (author_id, author_name, title, body, tags, class_id, is_public, created_at, updated_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
+        """, (author_id, author_name, title, body, tags, class_id, is_public, now, now)).fetchone()
+        return row["id"]
 
 def list_posts(q="", class_id=None, limit=50):
     sql = "SELECT * FROM posts WHERE is_public = 1"
@@ -1212,51 +1474,31 @@ def leave_study_room(class_id, user_id):
 def migrate_posts():
     with get_conn() as conn:
         with conn.cursor() as c:
-            # 存在しないカラムを確実に追加 (Postgres用)
-            columns = [
-                ("author_id", "BIGINT"),
-                ("author_name", "TEXT"),
-                ("title", "TEXT"),
-                ("body", "TEXT"),
-                ("content", "TEXT"),
-                ("tags", "TEXT DEFAULT ''"),
-                ("class_id", "BIGINT"),
-                ("is_pinned", "INTEGER DEFAULT 0"),
-                ("is_public", "INTEGER DEFAULT 1"),
-                ("helpful_count", "INTEGER DEFAULT 0"),
-                ("created_at", "TEXT"),
-                ("updated_at", "TEXT")
-            ]
-            for col, col_type in columns:
+            # 既存のテーブルに不足している列を追加
+            for col, col_type in [
+                ("content", "TEXT"), ("body", "TEXT"), ("is_public", "INTEGER DEFAULT 1"),
+                ("tags", "TEXT DEFAULT ''"), ("updated_at", "TEXT")
+            ]:
                 try:
                     c.execute(f"ALTER TABLE posts ADD COLUMN IF NOT EXISTS {col} {col_type}")
-                except Exception as e:
-                    print(f"[migrate_posts] Failed to add {col}: {e}")
-                    conn.rollback()
-            
-            # 既存データの補正
+                except Exception:
+                    pass
+            # 古いデータの埋め合わせ
             try:
                 c.execute("UPDATE posts SET content = body WHERE content IS NULL AND body IS NOT NULL")
                 c.execute("UPDATE posts SET body = content WHERE body IS NULL AND content IS NOT NULL")
-                c.execute("UPDATE posts SET is_pinned = 0 WHERE is_pinned IS NULL")
-                c.execute("UPDATE posts SET is_public = 1 WHERE is_public IS NULL")
-                c.execute("UPDATE posts SET helpful_count = 0 WHERE helpful_count IS NULL")
-            except Exception as e:
-                print(f"[migrate_posts] Data update failed: {e}")
-                conn.rollback()
-            
-            conn.commit()
+            except Exception:
+                pass
 
 def create_post(class_id, author_id, author_name, title, content, is_pinned=0, is_public=1):
     with get_conn() as conn:
-        with conn.cursor(row_factory=dict_row) as c:
+        with conn.cursor() as c:
             c.execute(
-                """INSERT INTO posts (class_id, author_id, author_name, title, content, is_pinned, is_public, created_at, updated_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-                (class_id, author_id, author_name, title, content, is_pinned, is_public, now(), now())
+                """INSERT INTO posts (class_id, author_id, author_name, title, content, is_pinned, is_public, created_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (class_id, author_id, author_name, title, content, is_pinned, is_public, now())
             )
             return c.fetchone()["id"]
-
 
 def list_public_posts(query="", limit=50):
     with get_conn() as conn:
@@ -1275,186 +1517,8 @@ def list_public_posts(query="", limit=50):
             return c.fetchall()
 
 
-def list_public_classes(query="", subject="", teacher="", limit=20):
-    with get_conn() as conn:
-        with conn.cursor(row_factory=dict_row) as c:
-            where = ["c.is_public IN (1, 2)"]
-            params = []
-            if query:
-                like = f"%{query}%"
-                where.append("(c.title ILIKE %s OR c.subject ILIKE %s OR c.description ILIKE %s)")
-                params += [like, like, like]
-            if subject:
-                where.append("c.subject = %s")
-                params.append(subject)
-            if teacher:
-                where.append("u.name ILIKE %s")
-                params.append(f"%{teacher}%")
-            
-            sql = f"""SELECT c.*, u.name AS teacher_name FROM classes c
-                JOIN users u ON u.id=c.teacher_id
-                WHERE {' AND '.join(where)}
-                ORDER BY c.is_weekly DESC, c.created_at DESC LIMIT %s"""
-            params.append(limit)
-            c.execute(sql, params)
-            return c.fetchall()
 
-def list_popular_teachers(limit=5):
-    with get_conn() as conn:
-        with conn.cursor(row_factory=dict_row) as c:
-            c.execute("""SELECT u.id, u.name, COUNT(e.id) AS student_count, COUNT(c.id) AS class_count
-                FROM users u
-                JOIN classes c ON c.teacher_id = u.id
-                LEFT JOIN enrollments e ON e.class_id = c.id AND e.role = 'student'
-                WHERE c.is_public IN (1, 2)
-                GROUP BY u.id, u.name
-                ORDER BY student_count DESC, class_count DESC
-                LIMIT %s""", (limit,))
-            return c.fetchall()
-
-def list_popular_classes(limit=5):
-    with get_conn() as conn:
-        with conn.cursor(row_factory=dict_row) as c:
-            c.execute("""SELECT c.*, u.name AS teacher_name, COUNT(e.id) AS student_count
-                FROM classes c
-                JOIN users u ON u.id = c.teacher_id
-                LEFT JOIN enrollments e ON e.class_id = c.id AND e.role = 'student'
-                WHERE c.is_public IN (1, 2)
-                GROUP BY c.id, u.name
-                ORDER BY student_count DESC, c.created_at DESC
-                LIMIT %s""", (limit,))
-            return c.fetchall()
-
-def increment_post_helpful(post_id):
-    with get_conn() as conn:
-        with conn.cursor() as c:
-            c.execute("UPDATE posts SET helpful_count = helpful_count + 1 WHERE id = %s", (post_id,))
-        conn.commit()
-
-
-def migrate_posts():
-    with get_conn() as conn:
-        with conn.cursor() as c:
-            for col, col_type in [
-                ("content", "TEXT"), ("body", "TEXT"), ("is_public", "INTEGER DEFAULT 1"),
-                ("tags", "TEXT DEFAULT ''"), ("updated_at", "TEXT"), ("helpful_count", "INTEGER DEFAULT 0")
-            ]:
-                try:
-                    c.execute(f"ALTER TABLE posts ADD COLUMN IF NOT EXISTS {col} {col_type}")
-                except Exception:
-                    pass
-            try:
-                c.execute("UPDATE posts SET content = body WHERE content IS NULL AND body IS NOT NULL")
-                c.execute("UPDATE posts SET body = content WHERE body IS NULL AND content IS NOT NULL")
-            except Exception:
-                pass
-
-def create_post(class_id, author_id, author_name, title, content, is_pinned=0, is_public=1):
-    with get_conn() as conn:
-        with conn.cursor(row_factory=dict_row) as c:
-            c.execute(
-                """INSERT INTO posts (class_id, author_id, author_name, title, content, is_pinned, is_public, created_at, updated_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-                (class_id, author_id, author_name, title, content, is_pinned, is_public, now(), now())
-            )
-            return c.fetchone()["id"]
-
-
-def list_public_posts(query="", limit=20):
-    with get_conn() as conn:
-        with conn.cursor(row_factory=dict_row) as c:
-            sql = """SELECT p.*, c.title AS class_title, c.join_code, c.is_public AS class_is_public 
-                     FROM posts p JOIN classes c ON p.class_id = c.id 
-                     WHERE p.is_public = 1"""
-            params = []
-            if query:
-                sql += " AND (p.title ILIKE %s OR p.content ILIKE %s)"
-                like = f"%{query}%"
-                params += [like, like]
-            sql += " ORDER BY p.created_at DESC LIMIT %s"
-            params.append(limit)
-            c.execute(sql, params)
-            return c.fetchall()
-
-def list_public_classes(query="", subject="", teacher="", limit=20):
-    with get_conn() as conn:
-        with conn.cursor(row_factory=dict_row) as c:
-            where = ["c.is_public IN (1, 2)"]
-            params = []
-            if query:
-                like = f"%{query}%"
-                where.append("(c.title ILIKE %s OR c.subject ILIKE %s OR c.description ILIKE %s)")
-                params += [like, like, like]
-            if subject:
-                where.append("c.subject = %s")
-                params.append(subject)
-            if teacher:
-                where.append("u.name ILIKE %s")
-                params.append(f"%{teacher}%")
-            
-            sql = f"""SELECT c.*, u.name AS teacher_name FROM classes c
-                JOIN users u ON u.id=c.teacher_id
-                WHERE {' AND '.join(where)}
-                ORDER BY c.is_weekly DESC, c.created_at DESC LIMIT %s"""
-            params.append(limit)
-            c.execute(sql, params)
-            return c.fetchall()
-
-def list_popular_teachers(limit=5):
-    with get_conn() as conn:
-        with conn.cursor(row_factory=dict_row) as c:
-            c.execute("""SELECT u.id, u.name, COUNT(e.id) AS student_count
-                FROM users u
-                JOIN classes c ON c.teacher_id = u.id
-                LEFT JOIN enrollments e ON e.class_id = c.id AND e.role = 'student'
-                WHERE c.is_public IN (1, 2)
-                GROUP BY u.id, u.name
-                ORDER BY student_count DESC LIMIT %s""", (limit,))
-            return c.fetchall()
-
-def list_popular_classes(limit=5):
-    with get_conn() as conn:
-        with conn.cursor(row_factory=dict_row) as c:
-            c.execute("""SELECT c.*, u.name AS teacher_name, COUNT(e.id) AS student_count
-                FROM classes c
-                JOIN users u ON u.id = c.teacher_id
-                LEFT JOIN enrollments e ON e.class_id = c.id AND e.role = 'student'
-                WHERE c.is_public IN (1, 2)
-                GROUP BY c.id, u.name
-                ORDER BY student_count DESC LIMIT %s""", (limit,))
-            return c.fetchall()
-
-def increment_post_helpful(post_id):
-    with get_conn() as conn:
-        with conn.cursor() as c:
-            c.execute("UPDATE posts SET helpful_count = helpful_count + 1 WHERE id = %s", (post_id,))
-        conn.commit()
-
-
-
-
-def get_user_by_name(name):
-    with get_conn() as conn:
-        with conn.cursor(row_factory=dict_row) as c:
-            c.execute("SELECT * FROM users WHERE name = %s", (name,))
-            row = c.fetchone()
-    if row and row.get("display_name"):
-        row = dict(row)
-        row["name"] = row["display_name"]
-    return row
-
-
-def get_user_by_id(uid):
-    with get_conn() as conn:
-        with conn.cursor(row_factory=dict_row) as c:
-            c.execute("SELECT * FROM users WHERE id = %s", (uid,))
-            row = c.fetchone()
-    if row and row.get("display_name"):
-        row = dict(row)
-        row["name"] = row["display_name"]
-    return row
-
-
+# ===== Google OAuth =====
 def get_user_by_email(email):
     if not email:
         return None
@@ -1481,6 +1545,20 @@ def get_user_by_google_id(google_id):
     return row
 
 
+def link_google_id(uid, google_id):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("UPDATE users SET google_id = %s WHERE id = %s", (google_id, uid))
+        conn.commit()
+
+
+def set_display_name(uid, name):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("UPDATE users SET display_name = %s WHERE id = %s", (name, uid))
+        conn.commit()
+
+
 def create_user_with_google(name, email, google_id):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
@@ -1500,17 +1578,3 @@ def create_user_with_google(name, email, google_id):
             uid = c.fetchone()["id"]
             conn.commit()
             return uid
-
-
-def link_google_id(uid, google_id):
-    with get_conn() as conn:
-        with conn.cursor() as c:
-            c.execute("UPDATE users SET google_id = %s WHERE id = %s", (google_id, uid))
-        conn.commit()
-
-
-def set_display_name(uid, name):
-    with get_conn() as conn:
-        with conn.cursor() as c:
-            c.execute("UPDATE users SET display_name = %s WHERE id = %s", (name, uid))
-        conn.commit()
