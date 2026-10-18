@@ -1439,6 +1439,39 @@ async def pomodoro_stop(request: Request, class_id: int):
 
 # dev
 # ============================================================
+
+# ============================================================
+# articles
+# ============================================================
+@app.get("/articles", response_class=HTMLResponse)
+def articles_page(request: Request, q: str = ""):
+    user = current_user(request)
+    posts = list_public_posts(query=q)
+    my_class_ids = []
+    if user:
+        my_class_ids = [c["id"] for c in list_classes_for_user(user["id"])]
+    return templates.TemplateResponse(
+        request, "articles.html",
+        ctx(request, user, posts=posts, q=q, my_class_ids=my_class_ids)
+    )
+
+@app.get("/api/articles")
+def api_articles(q: str = "", limit: int = 50):
+    posts = list_public_posts(query=q, limit=limit)
+    return {"items": [dict(p) for p in posts]}
+
+@app.post("/api/study/{class_id}/leave")
+async def api_study_leave(request: Request, class_id: int):
+    user = current_user(request)
+    if user:
+        from db import leave_study_room
+        leave_study_room(class_id, user["id"])
+    return JSONResponse({"ok": True})
+
+# ============================================================
+# dev
+# ============================================================
+
 if os.environ.get("ENABLE_DEV") == "1":
     @app.get("/dev/users", response_class=HTMLResponse)
     def dev_users(request: Request):

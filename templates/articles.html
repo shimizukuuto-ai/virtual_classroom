@@ -3,11 +3,12 @@
 {% block content %}
 <style>
   .article-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
-  .article-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; text-decoration: none; color: inherit; display: flex; flex-direction: column; transition: all 0.2s; }
+  .article-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; transition: all 0.2s; cursor: pointer; }
   .article-card:hover { border-color: #3b82f6; box-shadow: 0 4px 12px rgba(59,130,246,0.1); }
   .article-meta { font-size: 12px; color: #64748b; margin-bottom: 8px; display: flex; justify-content: space-between; }
   .article-title { font-size: 16px; font-weight: bold; color: #1e293b; margin-bottom: 10px; }
-  .article-excerpt { font-size: 13px; color: #475569; line-height: 1.6; flex: 1; margin-bottom: 14px; }
+  .article-content { font-size: 13px; color: #475569; line-height: 1.6; flex: 1; margin-bottom: 14px; max-height: 100px; overflow: hidden; position: relative; }
+  .article-content img { max-width: 100%; border-radius: 6px; margin-top: 8px; }
   .article-footer { border-top: 1px solid #f1f5f9; padding-top: 12px; display: flex; justify-content: space-between; align-items: center; }
   .class-tag { font-size: 11px; background: #eff6ff; color: #2563eb; padding: 4px 10px; border-radius: 12px; }
 </style>
@@ -29,8 +30,8 @@
       <span>{{ p.created_at[:10] }}</span>
     </div>
     <div class="article-title">{{ p.title }}</div>
-    <div class="article-excerpt">
-      {{ p.content[:100] }}{% if p.content|length > 100 %}...{% endif %}
+    <div class="article-content">
+      {{ p.content|safe }}
     </div>
     <div class="article-footer">
       <span class="class-tag">{{ p.class_title }}</span>
@@ -52,14 +53,11 @@
 <script>
 async function joinFromArticle(classId, isPublic, joinCode) {
   if (isPublic === 2) {
-    // 誰でも参加OK
     window.location.href = `/classes/${classId}/open`;
   } else if (isPublic === 1) {
-    // リクエスト送信
     const res = await fetch(`/classes/${classId}/request`, { method: 'POST' });
     if (res.ok) alert('{{ T.request_sent }}');
   } else {
-    // 非公開（コード入力へ）
     window.location.href = `/join_class`;
   }
 }
