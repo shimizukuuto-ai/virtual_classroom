@@ -12,6 +12,16 @@
 
 
 <script>
+  
+  
+  
+  
+  window.MEMBERS = {{ members|tojson }};
+  
+</script>
+
+{% block content %}
+<script>
   window.CLASS_ID = Number("{{ cls.id }}");
   window.ROLE = "{{ role }}";
   window.USER_NAME = "{{ user.name }}";
@@ -19,7 +29,6 @@
   window.MEMBERS = {{ members|tojson }};
   window.I18N = {{ T | tojson }};
 </script>
-{% block content %}
 <style>
 body { background: #0f1117 !important; }
 main { padding: 16px 20px; }
@@ -2254,9 +2263,6 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
   const btnPostCancel = document.getElementById("btn-post-cancel");
   if (btnPostCancel) btnPostCancel.addEventListener("click", () => postDrawer.classList.remove("open"));
 
-  );
-
-  
   document.getElementById("btn-post-submit").addEventListener("click", async () => {
     const titleEl = document.getElementById("new-post-title");
     const contentEl = document.getElementById("new-post-content");
@@ -2267,11 +2273,13 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
     if (!title || !content) return;
     
     const btn = document.getElementById("btn-post-submit");
-    btn.disabled = true; btn.textContent = "...";
+    btn.disabled = true;
+    btn.textContent = "...";
     
     try {
       const res = await fetch('/api/posts/' + window.CLASS_ID, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, content })
       });
       if (res.ok) {
@@ -2283,9 +2291,12 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
         const d = await res.json().catch(() => ({}));
         alert("Error: " + (d.error || res.status));
       }
-    } catch (e) { alert("Error: " + e); }
+    } catch (e) {
+      alert("Error: " + e);
+    }
     
-    btn.disabled = false; btn.textContent = "Post";
+    btn.disabled = false;
+    btn.textContent = "Post";
   });
 
 
