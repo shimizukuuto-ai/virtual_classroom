@@ -1,6 +1,7 @@
 STRINGS = {
     "ja": {
         "app_title": "仮想教室",
+        "or": "または",
         "setup_name_submit": "決定して始める",
         "setup_name_desc": "アプリ内で表示される名前を決めてください。",
         "setup_name_welcome": "ようこそ！",
