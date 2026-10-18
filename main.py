@@ -545,7 +545,7 @@ def class_room(request: Request, class_id: int):
             allow_anonymous=bool(cls.get("allow_anonymous") or 0),
             duration=cls.get("duration") or 30,
             ends_at=cls.get("ends_at") or "",
-            posts=list_posts(class_id=class_id),
+            posts=list_class_posts(class_id),
             
         ),
     )

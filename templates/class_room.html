@@ -36,7 +36,7 @@
 <script>window.STEPS = [{% for s in steps %}{id: {{ s.id }}, title: {{ s.title|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];</script>
 <script>window.INITIAL_QUESTIONS = [{% for q in questions %}{id: {{ q.id }}, content: {{ q.content|tojson }}, answer: {{ (q.answer or '')|tojson }}, is_anonymous: {{ q.is_anonymous }}, asker: {{ (q.asker_name or '')|tojson }}, answerer: {{ (q.answerer_name or '')|tojson }}, created_at: {{ q.created_at|tojson }}, answered_at: {{ (q.answered_at or '')|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];</script>
 <script>window.INITIAL_FILES = [{% for f in files %}{id: {{ f.id }}, filename: {{ f.filename|tojson }}, url: {{ f.url|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];</script>
-<script>window.INITIAL_POSTS = [{% for p in posts %}{id: {{ p.id }}, title: {{ p.title|tojson }}, author: {{ p.author_name|tojson }}, content: {{ p.content|tojson }}, is_pinned: {{ p.is_pinned }}, comment_count: {{ p.comment_count }}, created_at: {{ p.created_at|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];</script>
+<script>window.INITIAL_POSTS = [{% for p in posts %}{id: {{ p.id }}, title: {{ p.title|tojson }}, author: {{ p.author_name|tojson }}, content: {{ p.content|tojson }}, is_pinned: {{ p.is_pinned }}, comment_count: {{ p.comment_count or 0 }}, created_at: {{ p.created_at|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];</script>
 <script>window.INITIAL_GROUPS = {{ groups|tojson }};</script>
 <script>window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};</script>
 <script>
@@ -954,7 +954,7 @@ window.INITIAL_POSTS = [
     author: {{ p.author_name|tojson }},
     content: {{ p.content|tojson }},
     is_pinned: {{ p.is_pinned }},
-    comment_count: {{ p.comment_count }},
+    comment_count: {{ p.comment_count or 0 }},
     created_at: {{ p.created_at|tojson }}
   },{% endfor %}
 ];
