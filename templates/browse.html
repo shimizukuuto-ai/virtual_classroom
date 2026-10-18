@@ -1,5 +1,18 @@
 {% extends "base.html" %}
-{% block title %}{{ T.search_class }}{% endblock %}
+{% block title %}{{ T.search_class }}
+<script>
+async function requestJoin(classId) {
+  try {
+    const res = await fetch(`/classes/${classId}/request`, { method: 'POST' });
+    if (res.ok) {
+      alert('{{ T.request_sent }}');
+    } else {
+      alert('Error sending request');
+    }
+  } catch (e) { alert(e); }
+}
+</script>
+{% endblock %}
 {% block content %}
 <style>
   .search-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -67,18 +80,50 @@
 {% if results %}
 <div class="class-grid">
   {% for c in results %}
-  <a class="class-card" href="{% if c.id in my_classes %}/class/{{ c.id }}{% else %}/classes/{{ c.id }}/open{% endif %}">
+  <div class="class-card" onclick="{% if c.id in my_classes %}window.location.href='/class/{{ c.id }}'{% elif c.is_public == 2 %}window.location.href='/classes/{{ c.id }}/open'{% elif c.is_public == 1 %}requestJoin({{ c.id }}){% else %}window.location.href='/join_class'{% endif %}">
     <span class="subject">{{ c.subject }}</span>
     <h3>{{ c.title }}</h3>
-    <div style="font-size: 13px; color: #64748b; margin-bottom: 10px;">{{ c.description or "" }}</div>
-    <div class="footer">
-      <div style="font-size: 12px; color: #64748b;">Teacher: {{ c.teacher_name }}</div>
-      <div style="font-size: 12px; font-weight: bold; color: #10b981;">{{ c.student_count }} Students</div>
+    <div style="font-size: 13px; color: #64748b; margin-bottom: 10px; flex: 1;">{{ c.description or "" }}</div>
+    
+    <div style="margin-bottom: 10px;">
+      {% if c.is_public == 2 %}
+        <span style="font-size: 10px; background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 10px; font-weight: bold;">{{ T.public_class }}</span>
+      {% elif c.is_public == 1 %}
+        <span style="font-size: 10px; background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 10px; font-weight: bold;">{{ T.request_class }}</span>
+      {% else %}
+        <span style="font-size: 10px; background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 10px; font-weight: bold;">{{ T.private_class }}</span>
+      {% endif %}
     </div>
-  </a>
+
+    <div class="footer" style="border-top: 1px solid #f1f5f9; padding-top: 12px; display: flex; justify-content: space-between; align-items: center;">
+      <div style="font-size: 12px; color: #64748b;">Teacher: {{ c.teacher_name }}</div>
+      {% if c.id in my_classes %}
+        <span style="font-size: 12px; font-weight: bold; color: #3b82f6;">{{ T.enter_class }}</span>
+      {% elif c.is_public == 2 %}
+        <span style="font-size: 12px; font-weight: bold; color: #10b981;">{{ T.join }}</span>
+      {% elif c.is_public == 1 %}
+        <span style="font-size: 12px; font-weight: bold; color: #d97706;">{{ T.request_join }}</span>
+      {% else %}
+        <span style="font-size: 12px; font-weight: bold; color: #64748b;">{{ T.enter_code }}</span>
+      {% endif %}
+    </div>
+  </div>
   {% endfor %}
 </div>
 {% else %}
 <div class="card empty-state">{{ T.no_public_classes }}</div>
 {% endif %}
+
+<script>
+async function requestJoin(classId) {
+  try {
+    const res = await fetch(`/classes/${classId}/request`, { method: 'POST' });
+    if (res.ok) {
+      alert('{{ T.request_sent }}');
+    } else {
+      alert('Error sending request');
+    }
+  } catch (e) { alert(e); }
+}
+</script>
 {% endblock %}

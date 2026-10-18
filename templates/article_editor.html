@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ T.new_article }} - {{ T.app_title }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ T.new_article }}</h1>
+  <form method="post" action="/articles/new" id="article-form">
+    <label>{{ T.class_name }}</label>
+    <select name="class_id" required style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #cbd5e1; border-radius: 6px;">
+      {% for c in classes %}
+        <option value="{{ c.id }}">{{ c.title }} ({{ c.subject }})</option>
+      {% endfor %}
+    </select>
+
+    <label>{{ T.post_title }}</label>
+    <input type="text" name="title" required style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #cbd5e1; border-radius: 6px;">
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <label>{{ T.post_content }}</label>
+      <div>
+        <button type="button" class="btn sm gray" id="btn-upload-img">📷 {{ T.attach_image }}</button>
+        <input type="file" id="img-file" accept="image/*" style="display: none;">
+      </div>
+    </div>
+    <textarea name="content" id="article-content" rows="15" required style="width: 100%; padding: 15px; border: 1px solid #cbd5e1; border-radius: 8px; font-family: inherit; line-height: 1.6; margin-bottom: 20px;" placeholder="{{ T.post_placeholder }}"></textarea>
+
+    <div style="display: flex; gap: 10px;">
+      <button type="submit" class="btn">{{ T.submit_post }}</button>
+      <a href="/articles" class="btn gray">{{ T.cancel }}</a>
+    </div>
+  </form>
+</div>
+
+<script>
+document.getElementById('btn-upload-img').addEventListener('click', () => {
+  document.getElementById('img-file').click();
+});
+
+document.getElementById('img-file').addEventListener('change', async () => {
+  const file = document.getElementById('img-file').files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  
+  const res = await fetch('/api/upload_global', { method: 'POST', body: fd });
+  const d = await res.json();
+  if (res.ok) {
+    const ta = document.getElementById('article-content');
+    // カーソル位置に挿入
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const text = ta.value;
+    const insert = `\n[img]${d.url}[/img]\n`;
+    ta.value = text.substring(0, start) + insert + text.substring(end);
+    ta.focus();
+    ta.setSelectionRange(start + insert.length, start + insert.length);
+  } else {
+    alert('Upload failed: ' + (d.error || 'Unknown error'));
+  }
+  document.getElementById('img-file').value = '';
+});
+</script>
+{% endblock %}

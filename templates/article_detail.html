@@ -16,7 +16,12 @@
 </div>
 
 <div class="card">
-  <h3>{{ T.comments }}</h3>
+  
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+    <h3 style="margin: 0;">{{ T.comments }}</h3>
+    <button type="button" class="btn sm gray" id="btn-comment-img">📷 {{ T.attach_image }}</button>
+  </div>
+
   <div id="comment-list">
     {% for c in comments %}
     <div style="padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
@@ -30,7 +35,7 @@
 
   {% if user %}
   <form method="post" action="/articles/{{ post.id }}/comment" style="margin-top: 16px;">
-    <textarea name="body" rows="3" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 8px; font-family: inherit;" placeholder="HTMLや画像タグも使えます"></textarea>
+    <textarea name="body" rows="3" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 8px; font-family: inherit;" placeholder="{{ T.post_placeholder }}"></textarea>
     <button type="submit" class="btn">{{ T.send }}</button>
   </form>
   {% endif %}

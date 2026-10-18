@@ -1,6 +1,15 @@
 STRINGS = {
     "ja": {
         "app_title": "仮想教室",
+        "enter_code": "コードで参加",
+        "enter_class": "参加する",
+        "private_class": "非公開",
+        "request_class": "リクエスト制",
+        "public_class": "公開",
+        "post_placeholder": "ここに本文を書きます。画像も挿入できます。",
+        "attach_image": "画像を添付",
+        "article_editor": "記事エディタ",
+        "new_article": "新規記事作成",
         "post_failed": "投稿に失敗しました",
         "submit_post": "投稿する",
         "search_subject_class": "科目・クラス名で探す",

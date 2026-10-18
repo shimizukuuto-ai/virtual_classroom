@@ -567,6 +567,23 @@ async def api_blackboard_clear(request: Request, class_id: int):
 # ============================================================
 # image serving (persistent, DB-backed)
 # ============================================================
+
+@app.post("/api/upload_global")
+async def api_upload_global(request: Request, file: UploadFile = File(...)):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    ext = os.path.splitext(file.filename or "")[1].lower().lstrip(".")
+    if ext not in ("png", "jpg", "jpeg", "gif", "webp"):
+        return JSONResponse({"error": "unsupported"}, status_code=400)
+    raw = await file.read()
+    if len(raw) > 5 * 1024 * 1024:
+        return JSONResponse({"error": "too large"}, status_code=400)
+    mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif", "webp": "image/webp"}[ext]
+    b64 = base64.b64encode(raw).decode("ascii")
+    uid = save_upload(b64, mime, len(raw), kind="image")
+    return JSONResponse({"ok": True, "url": f"/api/image/{uid}"})
+
 @app.get("/api/image/{upload_id}")
 def serve_image(upload_id: int):
     row = get_upload(upload_id)
@@ -1498,6 +1515,32 @@ def articles_page(request: Request, q: str = ""):
         ctx(request, user, posts=posts, q=q, my_class_ids=my_class_ids)
     )
 
+
+@app.get("/articles/new", response_class=HTMLResponse)
+def articles_new_page(request: Request):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    classes = list_classes_for_user(user["id"])
+    return templates.TemplateResponse(
+        request, "article_editor.html",
+        ctx(request, user, classes=classes)
+    )
+
+@app.post("/articles/new")
+def articles_new_submit(request: Request, class_id: int = Form(...), title: str = Form(...), content: str = Form(...)):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    
+    cls = get_class_by_id(class_id)
+    if not cls or not get_role(class_id, user["id"]):
+        return RedirectResponse("/articles")
+        
+    is_public = 1 if cls["is_public"] in (1, 2) else 0
+    pid = create_post(class_id, user["id"], user["name"], title, content, is_pinned=0, is_public=is_public)
+    return RedirectResponse(f"/articles/{pid}", status_code=303)
+
 @app.get("/articles/{pid}", response_class=HTMLResponse)
 def article_detail(request: Request, pid: int):
     user = current_user(request)
@@ -1535,6 +1578,32 @@ def articles_page(request: Request, q: str = ""):
         request, "articles.html",
         ctx(request, user, posts=posts, q=q, my_class_ids=my_class_ids)
     )
+
+
+@app.get("/articles/new", response_class=HTMLResponse)
+def articles_new_page(request: Request):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    classes = list_classes_for_user(user["id"])
+    return templates.TemplateResponse(
+        request, "article_editor.html",
+        ctx(request, user, classes=classes)
+    )
+
+@app.post("/articles/new")
+def articles_new_submit(request: Request, class_id: int = Form(...), title: str = Form(...), content: str = Form(...)):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    
+    cls = get_class_by_id(class_id)
+    if not cls or not get_role(class_id, user["id"]):
+        return RedirectResponse("/articles")
+        
+    is_public = 1 if cls["is_public"] in (1, 2) else 0
+    pid = create_post(class_id, user["id"], user["name"], title, content, is_pinned=0, is_public=is_public)
+    return RedirectResponse(f"/articles/{pid}", status_code=303)
 
 @app.get("/articles/{pid}", response_class=HTMLResponse)
 def article_detail(request: Request, pid: int):
