@@ -1,6 +1,9 @@
 STRINGS = {
     "ja": {
         "app_title": "仮想教室",
+        "post_failed": "投稿に失敗しました",
+        "submit_post": "投稿する",
+        "search_subject_class": "科目・クラス名で探す",
         "submit": "投稿する",
         "search_teacher": "講師名で探す",
         "back_to_articles": "記事一覧に戻る",

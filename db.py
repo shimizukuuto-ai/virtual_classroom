@@ -1483,11 +1483,11 @@ def migrate_posts():
 
 def create_post(class_id, author_id, author_name, title, content, is_pinned=0, is_public=1):
     with get_conn() as conn:
-        with conn.cursor() as c:
+        with conn.cursor(row_factory=dict_row) as c:
             c.execute(
-                """INSERT INTO posts (class_id, author_id, author_name, title, content, is_pinned, is_public, created_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-                (class_id, author_id, author_name, title, content, is_pinned, is_public, now())
+                """INSERT INTO posts (class_id, author_id, author_name, title, content, is_pinned, is_public, created_at, updated_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (class_id, author_id, author_name, title, content, is_pinned, is_public, now(), now())
             )
             return c.fetchone()["id"]
 

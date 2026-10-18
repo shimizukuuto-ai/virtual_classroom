@@ -52,15 +52,15 @@
 
 <div class="card" style="margin-bottom: 20px;">
   <form method="get" action="/classes" class="search-bar">
-    <input type="text" name="q" value="{{ q }}" placeholder="{{ T.subject }} / {{ T.class_name }}">
-    <input type="text" name="teacher" value="{{ teacher }}" placeholder="{{ T.search_teacher }}">
+    <input type="text" name="q" value="{{ q }}" placeholder="{{ T.search_subject_class }}" style="flex: 2;">
+    <input type="text" name="teacher" value="{{ teacher }}" placeholder="{{ T.search_teacher }}" style="flex: 1; border-color: #93c5fd;">
     <select name="subject">
       <option value="">{{ T.all_subjects }}</option>
       {% for s in subjects %}
       <option value="{{ s.subject }}" {% if subject == s.subject %}selected{% endif %}>{{ s.subject }} ({{ s.n }})</option>
       {% endfor %}
     </select>
-    <button type="submit" class="btn" style="margin: 0;">{{ T.search }}</button>
+    <button type="submit" class="btn" style="margin: 0; background: #6366f1;">{{ T.search }}</button>
   </form>
 </div>
 
