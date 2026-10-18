@@ -816,10 +816,14 @@ main { padding: 16px 20px; }
 <div class="drawer" id="post-drawer">
   <h3>{{ T.new_post }}</h3>
   <input type="text" id="new-post-title" placeholder="{{ T.post_title }}" style="width:100%;margin-bottom:10px;background:#232733;border:1px solid #2a2e3a;color:#e5e7eb;border-radius:8px;padding:10px;box-sizing:border-box;">
+  <div style="display:flex; gap:8px; margin-bottom:8px;">
+    <button type="button" id="btn-post-img-upload" class="btn sm gray">📷 {{ T.upload_image }}</button>
+    <input type="file" id="post-img-file" accept="image/*" style="display:none;">
+  </div>
   <textarea id="new-post-content" placeholder="{{ T.post_content }}" style="width:100%;min-height:160px;background:#0f1117;color:#e5e7eb;border:1px solid #2a2e3a;border-radius:8px;padding:14px;box-sizing:border-box;line-height:1.6;resize:vertical;"></textarea>
   <div style="margin-top:10px;display:flex;gap:8px;">
-    <button id="btn-post-submit" class="btn green">{{ T.post_submit }}</button>
-    <button id="btn-post-cancel" class="btn ghost" style="background:#232733;color:#e5e7eb;border-color:#2a2e3a;">{{ T.post_cancel }}</button>
+    <button id="btn-post-submit" class="btn green">{{ T.submit }}</button>
+    <button id="btn-post-cancel" class="btn ghost" style="background:#232733;color:#e5e7eb;border-color:#2a2e3a;">{{ T.cancel }}</button>
   </div>
 </div>
 

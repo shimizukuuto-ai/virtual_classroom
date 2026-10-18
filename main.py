@@ -1312,12 +1312,14 @@ async def api_post_create(request: Request, class_id: int):
         return JSONResponse({"error": "empty"}, status_code=400)
     is_pinned = 1 if role == "teacher" and data.get("is_pinned") else 0
     
-    # クラスが公開されているか確認して、投稿の公開設定を決める
     cls = get_class_by_id(class_id)
     is_public = 1 if (cls and cls["is_public"] in (1, 2)) else 0
 
-    create_post(class_id, user["id"], user["name"], title, content, is_pinned, is_public)
-    return JSONResponse({"ok": True})
+    try:
+        create_post(class_id, user["id"], user["name"], title, content, is_pinned, is_public)
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 @app.get("/api/posts/{class_id}")
 async def api_post_list(request: Request, class_id: int):
@@ -1508,6 +1510,53 @@ async def api_article_helpful(request: Request, pid: int):
     increment_post_helpful(pid)
     p = get_post(pid)
     return JSONResponse({"ok": True, "count": p["helpful_count"]})
+
+
+
+# ============================================================
+# articles
+# ============================================================
+@app.get("/articles", response_class=HTMLResponse)
+def articles_page(request: Request, q: str = ""):
+    user = current_user(request)
+    posts = list_public_posts(query=q)
+    my_class_ids = []
+    if user:
+        my_class_ids = [c["id"] for c in list_classes_for_user(user["id"])]
+    return templates.TemplateResponse(
+        request, "articles.html",
+        ctx(request, user, posts=posts, q=q, my_class_ids=my_class_ids)
+    )
+
+@app.get("/articles/{pid}", response_class=HTMLResponse)
+def article_detail(request: Request, pid: int):
+    user = current_user(request)
+    post = get_post(pid)
+    if not post:
+        return RedirectResponse("/articles")
+    comments = list_comments(pid)
+    return templates.TemplateResponse(
+        request, "article_detail.html",
+        ctx(request, user, post=post, comments=comments)
+    )
+
+@app.post("/api/articles/{pid}/helpful")
+async def api_article_helpful(request: Request, pid: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    increment_post_helpful(pid)
+    p = get_post(pid)
+    return JSONResponse({"ok": True, "count": p["helpful_count"]})
+
+@app.post("/articles/{pid}/comment")
+def article_comment(request: Request, pid: int, body: str = Form(...)):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    if body.strip():
+        add_comment(pid, user["id"], user["name"], body.strip())
+    return RedirectResponse(f"/articles/{pid}", status_code=303)
 
 
 if os.environ.get("ENABLE_DEV") == "1":

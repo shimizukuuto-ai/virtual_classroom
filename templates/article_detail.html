@@ -10,7 +10,7 @@
     {{ post.content|safe }}
   </div>
   <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 16px;">
-    <button id="btn-helpful" class="btn" style="background: #f59e0b;">👍 {{ T.helpful_count }} (<span id="helpful-count">{{ post.helpful_count }}</span>)</button>
+    <button id="btn-helpful" class="btn" style="background: #f59e0b;">👍 {{ T.helpful_count }} (<span id="helpful-count">{{ post.helpful_count or 0 }}</span>)</button>
     <a href="/articles" class="btn gray">{{ T.back_to_articles }}</a>
   </div>
 </div>

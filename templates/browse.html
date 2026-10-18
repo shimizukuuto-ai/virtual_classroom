@@ -1,104 +1,84 @@
 {% extends "base.html" %}
-{% block title %}{{ T.search_classes }}{% endblock %}
+{% block title %}{{ T.search_class }}{% endblock %}
 {% block content %}
 <style>
-.search-h { margin-bottom: 16px; }
-.search-h h1 { margin: 0 0 16px; font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
-.search-bar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
-.search-bar input { margin: 0; flex: 1; min-width: 200px; }
-.subject-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
-.subject-tab {
-  padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600;
-  background: var(--surface); border: 1.5px solid var(--border);
-  color: var(--text-muted); text-decoration: none; transition: all .15s;
-}
-.subject-tab:hover { border-color: var(--primary); color: var(--primary); }
-.subject-tab.active { background: var(--primary); border-color: var(--primary); color: #fff; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
-@media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
-.class-card {
-  background: var(--surface); border: 1.5px solid var(--border);
-  border-radius: var(--radius); padding: 20px;
-  display: flex; flex-direction: column; gap: 10px; transition: all .15s;
-}
-.class-card:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: var(--shadow-lg); }
-.class-card h3 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
-.class-card .desc { font-size: 13px; color: var(--text-muted); line-height: 1.5; min-height: 20px; }
-.class-card .next {
-  background: #eef2ff; color: #4338ca; border-radius: 8px;
-  padding: 6px 10px; font-size: 12px; font-weight: 700;
-}
-.class-card .foot {
-  display: flex; justify-content: space-between; align-items: center;
-  padding-top: 12px; border-top: 1px solid var(--border); margin-top: auto;
-  gap: 8px; flex-wrap: wrap;
-}
-.class-card .teacher { font-size: 12px; color: var(--text-muted); }
-.class-card .count {
-  display: inline-flex; align-items: center; gap: 4px;
-  background: var(--student-soft); color: #047857;
-  padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700;
-}
-.badge-open {
-  display: inline-block; padding: 2px 8px; border-radius: 10px;
-  background: #d1fae5; color: #047857; font-size: 10px; font-weight: 700;
-  margin-left: 6px;
-}
-.empty { grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: var(--text-soft); }
+  .search-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  .search-bar input, .search-bar select { margin: 0; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
+  .search-bar input[type="text"] { flex: 1; min-width: 200px; }
+  .search-bar select { width: 200px; }
+  .class-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+  .class-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; transition: all 0.2s; text-decoration: none; color: inherit; }
+  .class-card:hover { border-color: #3b82f6; box-shadow: 0 4px 12px rgba(59,130,246,0.1); }
+  .class-card .subject { font-size: 11px; background: #eff6ff; color: #2563eb; padding: 2px 8px; border-radius: 10px; align-self: flex-start; margin-bottom: 10px; }
+  .class-card h3 { margin: 0 0 10px 0; font-size: 16px; color: #1e293b; }
+  .class-card .footer { margin-top: auto; border-top: 1px solid #f1f5f9; padding-top: 12px; display: flex; justify-content: space-between; align-items: center; }
+  .popular-section { display: flex; gap: 20px; margin-bottom: 20px; }
+  .popular-col { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; }
+  .popular-col h3 { margin-top: 0; font-size: 14px; color: #475569; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }
+  .popular-item { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px dashed #e2e8f0; cursor: pointer; }
+  .popular-item:hover { color: #2563eb; }
+  @media (max-width: 768px) { .popular-section { flex-direction: column; } }
 </style>
 
-<div class="search-h">
-  <h1>{{ T.search_classes }}</h1>
-  <form method="get" action="/classes" class="search-bar">
-    <input type="text" name="q" value="{{ q }}" placeholder="{{ T.search_placeholder }}">
-    {% if subject %}<input type="hidden" name="subject" value="{{ subject }}">{% endif %}
-    <button class="btn" type="submit">{{ T.search }}</button>
-  </form>
+<h1>{{ T.search_class }}</h1>
 
-  <div class="subject-tabs">
-    <a class="subject-tab {% if not subject %}active{% endif %}"
-       href="/classes{% if q %}?q={{ q }}{% endif %}">{{ T.all_subjects }}</a>
-    {% for s in subjects %}
-      <a class="subject-tab {% if subject == s.subject %}active{% endif %}"
-         href="/classes?subject={{ s.subject }}{% if q %}&q={{ q }}{% endif %}">{{ s.subject }} ({{ s.n }})</a>
+{% if popular_teachers or popular_classes %}
+<div class="popular-section">
+  {% if popular_teachers %}
+  <div class="popular-col">
+    <h3>🏆 {{ T.popular_teachers }}</h3>
+    {% for t in popular_teachers %}
+    <div class="popular-item" onclick="document.querySelector('input[name=teacher]').value='{{ t.name }}'; document.querySelector('form').submit();">
+      <span>👨‍🏫 {{ t.name }}</span>
+      <span style="color: #64748b; font-size: 11px;">{{ t.student_count }} Students</span>
+    </div>
     {% endfor %}
   </div>
+  {% endif %}
+  
+  {% if popular_classes %}
+  <div class="popular-col">
+    <h3>🔥 {{ T.popular_classes }}</h3>
+    {% for c in popular_classes %}
+    <div class="popular-item" onclick="location.href='/class/{{ c.id }}'">
+      <span>📖 {{ c.title }}</span>
+      <span style="color: #64748b; font-size: 11px;">{{ c.student_count }} Students</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="card" style="margin-bottom: 20px;">
+  <form method="get" action="/classes" class="search-bar">
+    <input type="text" name="q" value="{{ q }}" placeholder="{{ T.subject }} / {{ T.class_name }}">
+    <input type="text" name="teacher" value="{{ teacher }}" placeholder="{{ T.search_teacher }}">
+    <select name="subject">
+      <option value="">{{ T.all_subjects }}</option>
+      {% for s in subjects %}
+      <option value="{{ s.subject }}" {% if subject == s.subject %}selected{% endif %}>{{ s.subject }} ({{ s.n }})</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn" style="margin: 0;">{{ T.search }}</button>
+  </form>
 </div>
 
 {% if results %}
-<div class="grid">
+<div class="class-grid">
   {% for c in results %}
-  <div class="class-card">
-    <div>
-      <span class="pill">{{ c.subject }}</span>
-      {% if c.is_public == 2 %}<span class="badge-open">誰でも参加OK</span>{% endif %}
-    </div>
+  <a class="class-card" href="{% if c.id in my_classes %}/class/{{ c.id }}{% else %}/classes/{{ c.id }}/open{% endif %}">
+    <span class="subject">{{ c.subject }}</span>
     <h3>{{ c.title }}</h3>
-    <div class="desc">{{ c.description or "" }}</div>
-    {% if c.next_session %}<div class="next">{{ T.next_session }}: {{ c.next_session }}</div>{% endif %}
-    <div class="foot">
-      <div>
-        <div class="teacher">{{ T.teacher }}: <strong>{{ c.teacher_name }}</strong></div>
-        <div class="count" style="margin-top:4px;">{{ c.student_count }} {{ T.student }}</div>
-      </div>
-            {% if c.id in my_classes %}
-        <a class="btn sm ghost" href="/class/{{ c.id }}">{{ T.open }}</a>
-      {% elif c.is_public == 2 %}
-        <a class="btn sm" href="/classes/{{ c.id }}/open">{{ T.join_open }} →</a>
-      {% else %}
-        <form method="post" action="/classes/{{ c.id }}/request">
-          <button class="btn sm" type="submit">{{ T.request_join }}</button>
-        </form>
-      {% endif %}
+    <div style="font-size: 13px; color: #64748b; margin-bottom: 10px;">{{ c.description or "" }}</div>
+    <div class="footer">
+      <div style="font-size: 12px; color: #64748b;">Teacher: {{ c.teacher_name }}</div>
+      <div style="font-size: 12px; font-weight: bold; color: #10b981;">{{ c.student_count }} Students</div>
     </div>
-  </div>
+  </a>
   {% endfor %}
 </div>
 {% else %}
-<div class="grid">
-  <div class="empty">
-    <div style="font-weight:600;color:var(--text);margin-bottom:6px;">{{ T.no_public_classes }}</div>
-  </div>
-</div>
+<div class="card empty-state">{{ T.no_public_classes }}</div>
 {% endif %}
 {% endblock %}

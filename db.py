@@ -1563,3 +1563,101 @@ def increment_post_helpful(post_id):
         with conn.cursor() as c:
             c.execute("UPDATE posts SET helpful_count = helpful_count + 1 WHERE id = %s", (post_id,))
         conn.commit()
+
+
+def migrate_posts():
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            for col, col_type in [
+                ("content", "TEXT"), ("body", "TEXT"), ("is_public", "INTEGER DEFAULT 1"),
+                ("tags", "TEXT DEFAULT ''"), ("updated_at", "TEXT"), ("helpful_count", "INTEGER DEFAULT 0")
+            ]:
+                try:
+                    c.execute(f"ALTER TABLE posts ADD COLUMN IF NOT EXISTS {col} {col_type}")
+                except Exception:
+                    pass
+            try:
+                c.execute("UPDATE posts SET content = body WHERE content IS NULL AND body IS NOT NULL")
+                c.execute("UPDATE posts SET body = content WHERE body IS NULL AND content IS NOT NULL")
+            except Exception:
+                pass
+
+def create_post(class_id, author_id, author_name, title, content, is_pinned=0, is_public=1):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute(
+                """INSERT INTO posts (class_id, author_id, author_name, title, content, is_pinned, is_public, created_at, updated_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (class_id, author_id, author_name, title, content, is_pinned, is_public, now(), now())
+            )
+            return c.fetchone()["id"]
+
+def list_public_posts(query="", limit=20):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            sql = """SELECT p.*, c.title AS class_title, c.join_code, c.is_public AS class_is_public 
+                     FROM posts p JOIN classes c ON p.class_id = c.id 
+                     WHERE p.is_public = 1"""
+            params = []
+            if query:
+                sql += " AND (p.title ILIKE %s OR p.content ILIKE %s)"
+                like = f"%{query}%"
+                params += [like, like]
+            sql += " ORDER BY p.created_at DESC LIMIT %s"
+            params.append(limit)
+            c.execute(sql, params)
+            return c.fetchall()
+
+def list_public_classes(query="", subject="", teacher="", limit=20):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            where = ["c.is_public IN (1, 2)"]
+            params = []
+            if query:
+                like = f"%{query}%"
+                where.append("(c.title ILIKE %s OR c.subject ILIKE %s OR c.description ILIKE %s)")
+                params += [like, like, like]
+            if subject:
+                where.append("c.subject = %s")
+                params.append(subject)
+            if teacher:
+                where.append("u.name ILIKE %s")
+                params.append(f"%{teacher}%")
+            
+            sql = f"""SELECT c.*, u.name AS teacher_name FROM classes c
+                JOIN users u ON u.id=c.teacher_id
+                WHERE {' AND '.join(where)}
+                ORDER BY c.is_weekly DESC, c.created_at DESC LIMIT %s"""
+            params.append(limit)
+            c.execute(sql, params)
+            return c.fetchall()
+
+def list_popular_teachers(limit=5):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("""SELECT u.id, u.name, COUNT(e.id) AS student_count
+                FROM users u
+                JOIN classes c ON c.teacher_id = u.id
+                LEFT JOIN enrollments e ON e.class_id = c.id AND e.role = 'student'
+                WHERE c.is_public IN (1, 2)
+                GROUP BY u.id, u.name
+                ORDER BY student_count DESC LIMIT %s""", (limit,))
+            return c.fetchall()
+
+def list_popular_classes(limit=5):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("""SELECT c.*, u.name AS teacher_name, COUNT(e.id) AS student_count
+                FROM classes c
+                JOIN users u ON u.id = c.teacher_id
+                LEFT JOIN enrollments e ON e.class_id = c.id AND e.role = 'student'
+                WHERE c.is_public IN (1, 2)
+                GROUP BY c.id, u.name
+                ORDER BY student_count DESC LIMIT %s""", (limit,))
+            return c.fetchall()
+
+def increment_post_helpful(post_id):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("UPDATE posts SET helpful_count = helpful_count + 1 WHERE id = %s", (post_id,))
+        conn.commit()
