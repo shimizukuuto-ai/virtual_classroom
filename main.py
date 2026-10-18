@@ -573,16 +573,20 @@ async def api_upload_global(request: Request, file: UploadFile = File(...)):
     user = current_user(request)
     if not user:
         return JSONResponse({"error": "not logged in"}, status_code=401)
-    ext = os.path.splitext(file.filename or "")[1].lower().lstrip(".")
-    if ext not in ("png", "jpg", "jpeg", "gif", "webp"):
-        return JSONResponse({"error": "unsupported"}, status_code=400)
-    raw = await file.read()
-    if len(raw) > 5 * 1024 * 1024:
-        return JSONResponse({"error": "too large"}, status_code=400)
-    mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif", "webp": "image/webp"}[ext]
-    b64 = base64.b64encode(raw).decode("ascii")
-    uid = save_upload(b64, mime, len(raw), kind="image")
-    return JSONResponse({"ok": True, "url": f"/api/image/{uid}"})
+    try:
+        ext = os.path.splitext(file.filename or "")[1].lower().lstrip(".")
+        if ext not in ("png", "jpg", "jpeg", "gif", "webp"):
+            return JSONResponse({"error": "unsupported file type"}, status_code=400)
+        raw = await file.read()
+        if len(raw) > 5 * 1024 * 1024:
+            return JSONResponse({"error": "too large (max 5MB)"}, status_code=400)
+        mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif", "webp": "image/webp"}[ext]
+        b64 = base64.b64encode(raw).decode("ascii")
+        uid = save_upload(b64, mime, len(raw), kind="image")
+        return JSONResponse({"ok": True, "url": f"/api/image/{uid}"})
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 @app.get("/api/image/{upload_id}")
 def serve_image(upload_id: int):

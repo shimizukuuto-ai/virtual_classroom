@@ -1,6 +1,11 @@
 STRINGS = {
     "ja": {
         "app_title": "仮想教室",
+        "math_hint": "LaTeX記法（$...$ や $$...$$）が使えます",
+        "rich_editor": "リッチエディタ（数式・HTML対応）",
+        "class_schedule": "授業スケジュール",
+        "start_now": "今すぐ参加",
+        "upcoming_classes": "今後の授業予定",
         "enter_code": "コードで参加",
         "enter_class": "参加する",
         "private_class": "非公開",

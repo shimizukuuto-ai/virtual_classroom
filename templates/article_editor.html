@@ -1,5 +1,14 @@
 {% extends "base.html" %}
 {% block title %}{{ T.new_article }} - {{ T.app_title }}{% endblock %}
+
+<script>
+  MathJax = {
+    tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
+    svg: { fontCache: 'global' }
+  };
+</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
 {% block content %}
 <div class="card">
   <h1>{{ T.new_article }}</h1>
@@ -21,6 +30,7 @@
         <input type="file" id="img-file" accept="image/*" style="display: none;">
       </div>
     </div>
+    <div style="margin-bottom: 5px; font-size: 12px; color: #64748b;">{{ T.math_hint }}</div>
     <textarea name="content" id="article-content" rows="15" required style="width: 100%; padding: 15px; border: 1px solid #cbd5e1; border-radius: 8px; font-family: inherit; line-height: 1.6; margin-bottom: 20px;" placeholder="{{ T.post_placeholder }}"></textarea>
 
     <div style="display: flex; gap: 10px;">
