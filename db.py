@@ -574,7 +574,7 @@ def list_public_classes(query="", subject="", teacher=""):
             if teacher:
                 where.append("u.name ILIKE %s")
                 params.append(f"%{teacher}%")
-            sql = f"""SELECT c.*, u.name AS teacher_name FROM classes c
+            sql = f"""SELECT c.*, COALESCE(u.display_name, u.name) AS teacher_name FROM classes c
                 JOIN users u ON u.id=c.teacher_id
                 WHERE {' AND '.join(where)}
                 ORDER BY c.is_weekly DESC, c.created_at DESC LIMIT 20"""
@@ -592,7 +592,7 @@ def list_subjects(limit=30):
 def list_weekly_classes(limit=20):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
-            c.execute("""SELECT c.*, u.name AS teacher_name FROM classes c
+            c.execute("""SELECT c.*, COALESCE(u.display_name, u.name) AS teacher_name FROM classes c
                 JOIN users u ON u.id=c.teacher_id
                 WHERE c.is_weekly=1 AND c.is_public IN (1,2) ORDER BY c.created_at DESC LIMIT %s""", (limit,))
             return c.fetchall()
@@ -1570,7 +1570,7 @@ def increment_post_helpful(post_id):
 def list_popular_teachers(limit=5):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
-            c.execute("""SELECT u.id, u.name, COUNT(e.id) AS student_count, COUNT(c.id) AS class_count
+            c.execute("""SELECT u.id, COALESCE(u.display_name, u.name) AS name, COUNT(e.id) AS student_count, COUNT(c.id) AS class_count
                 FROM users u
                 JOIN classes c ON c.teacher_id = u.id
                 LEFT JOIN enrollments e ON e.class_id = c.id AND e.role = 'student'
@@ -1584,7 +1584,7 @@ def list_popular_teachers(limit=5):
 def list_popular_classes(limit=5):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
-            c.execute("""SELECT c.*, u.name AS teacher_name, COUNT(e.id) AS student_count
+            c.execute("""SELECT c.*, COALESCE(u.display_name, u.name) AS teacher_name, COUNT(e.id) AS student_count
                 FROM classes c
                 JOIN users u ON u.id = c.teacher_id
                 LEFT JOIN enrollments e ON e.class_id = c.id AND e.role = 'student'
