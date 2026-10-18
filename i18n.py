@@ -1,6 +1,10 @@
 STRINGS = {
     "ja": {
         "app_title": "仮想教室",
+        "articles": "記事・ノート",
+        "find_article": "記事を探す",
+        "read_article": "記事を読む",
+        "join_class_from_article": "このクラスに参加する",
         "leave_study_room": "退出する",
         "ai_teacher": "AI教師",
         "ask_placeholder": "AIに質問する",
@@ -345,6 +349,10 @@ STRINGS = {
     },
     "en": {
         "app_title": "Virtual Classroom",
+        "articles": "Articles",
+        "find_article": "Find an Article",
+        "read_article": "Read Article",
+        "join_class_from_article": "Join this Class",
         "ai_teacher": "AI Teacher",
         "ask_placeholder": "Ask the AI",
         "home": "Home",

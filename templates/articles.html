@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ T.articles }} - {{ T.app_title }}{% endblock %}
+{% block content %}
+<style>
+  .article-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+  .article-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; text-decoration: none; color: inherit; display: flex; flex-direction: column; transition: all 0.2s; }
+  .article-card:hover { border-color: #3b82f6; box-shadow: 0 4px 12px rgba(59,130,246,0.1); }
+  .article-meta { font-size: 12px; color: #64748b; margin-bottom: 8px; display: flex; justify-content: space-between; }
+  .article-title { font-size: 16px; font-weight: bold; color: #1e293b; margin-bottom: 10px; }
+  .article-excerpt { font-size: 13px; color: #475569; line-height: 1.6; flex: 1; margin-bottom: 14px; }
+  .article-footer { border-top: 1px solid #f1f5f9; padding-top: 12px; display: flex; justify-content: space-between; align-items: center; }
+  .class-tag { font-size: 11px; background: #eff6ff; color: #2563eb; padding: 4px 10px; border-radius: 12px; }
+</style>
+
+<div class="card" style="margin-bottom: 20px;">
+  <h1>{{ T.articles }}</h1>
+  <form method="get" action="/articles" style="display: flex; gap: 10px;">
+    <input type="text" name="q" value="{{ q }}" placeholder="{{ T.find_article }}" style="margin: 0; flex: 1;">
+    <button type="submit">{{ T.search }}</button>
+  </form>
+</div>
+
+{% if posts %}
+<div class="article-grid">
+  {% for p in posts %}
+  <div class="article-card" onclick="window.location.href='/class/{{ p.class_id }}'">
+    <div class="article-meta">
+      <span>{{ p.author_name }}</span>
+      <span>{{ p.created_at[:10] }}</span>
+    </div>
+    <div class="article-title">{{ p.title }}</div>
+    <div class="article-excerpt">
+      {{ p.content[:100] }}{% if p.content|length > 100 %}...{% endif %}
+    </div>
+    <div class="article-footer">
+      <span class="class-tag">{{ p.class_title }}</span>
+      {% if p.class_id not in my_class_ids %}
+        <button class="btn" style="padding: 4px 10px; font-size: 12px;" onclick="event.stopPropagation(); joinFromArticle({{ p.class_id }}, {{ p.class_is_public }}, '{{ p.join_code }}')">{{ T.join_class }}</button>
+      {% else %}
+        <span style="font-size: 11px; color: #10b981;">✓ {{ T.already_member }}</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card empty-state">
+  <p>{{ T.no_posts }}</p>
+</div>
+{% endif %}
+
+<script>
+async function joinFromArticle(classId, isPublic, joinCode) {
+  if (isPublic === 2) {
+    // 誰でも参加OK
+    window.location.href = `/classes/${classId}/open`;
+  } else if (isPublic === 1) {
+    // リクエスト送信
+    const res = await fetch(`/classes/${classId}/request`, { method: 'POST' });
+    if (res.ok) alert('{{ T.request_sent }}');
+  } else {
+    // 非公開（コード入力へ）
+    window.location.href = `/join_class`;
+  }
+}
+</script>
+{% endblock %}

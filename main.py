@@ -40,7 +40,7 @@ from db import (
     remove_member_from_group, get_user_group, set_group_board,
     add_student_note, list_student_notes, delete_student_note,
     save_upload, get_upload,    set_user_customization, get_unlock_tier, UNLOCK_TIERS,
-    rate_teacher, get_teacher_rating, get_my_rating,    create_post, list_posts, get_post, delete_post, create_comment, list_comments,
+    rate_teacher, get_teacher_rating, get_my_rating,    create_post, list_posts, get_post, delete_post, create_comment, list_comments, list_public_posts, migrate_posts,
     create_class_post, list_class_posts,
     create_post, list_posts, get_post, update_post, delete_post,
     add_comment, list_comments,
@@ -135,6 +135,7 @@ def ctx(request, user, **extra):
 def startup():
     init_pool()
     init_posts()
+    migrate_posts()
     init_room_state()
     migrate_room_type()
     init_study_state() 
@@ -1305,9 +1306,13 @@ async def api_post_create(request: Request, class_id: int):
     if not title or not content:
         return JSONResponse({"error": "empty"}, status_code=400)
     is_pinned = 1 if role == "teacher" and data.get("is_pinned") else 0
-    create_class_post(class_id, user["id"], user["name"], title, content, is_pinned)
-    return JSONResponse({"ok": True})
+    
+    # クラスが公開されているか確認して、投稿の公開設定を決める
+    cls = get_class_by_id(class_id)
+    is_public = 1 if (cls and cls["is_public"] in (1, 2)) else 0
 
+    create_post(class_id, user["id"], user["name"], title, content, is_pinned, is_public)
+    return JSONResponse({"ok": True})
 
 @app.get("/api/posts/{class_id}")
 async def api_post_list(request: Request, class_id: int):
