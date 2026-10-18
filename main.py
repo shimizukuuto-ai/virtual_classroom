@@ -177,22 +177,6 @@ def login_page(request: Request):
     return templates.TemplateResponse(request, "login.html", ctx(request, None))
 
 
-@app.post("/login")
-def login_submit(request: Request, name: str = Form(...)):
-    name = name.strip()
-    if not name:
-        return RedirectResponse("/login", status_code=303)
-    user = get_user_by_name(name)
-    if not user:
-        create_user(name)
-        user = get_user_by_name(name)
-    request.session["user_id"] = int(user["id"])
-    accept = request.headers.get("accept", "")
-    if "application/json" in accept:
-        return JSONResponse({"ok": True, "id": int(user["id"]), "name": user["name"]})
-    return RedirectResponse("/dashboard", status_code=303)
-
-
 @app.get("/logout")
 def logout(request: Request):
     request.session.clear()
