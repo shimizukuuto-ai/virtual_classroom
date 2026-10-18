@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}名前の設定 - {{ T.app_title }}{% endblock %}
+{% block title %}{{ T.setup_name_title }} - {{ T.app_title }}{% endblock %}
 {% block content %}
 <div class="card" style="max-width: 400px; margin: 40px auto;">
-  <h1>ようこそ！</h1>
-  <p class="muted">アプリ内で表示される名前を決めてください。</p>
+  <h1>{{ T.setup_name_welcome }}</h1>
+  <p class="muted">{{ T.setup_name_desc }}</p>
   <form method="post" action="/setup-name">
     <input type="text" name="display_name" value="{{ user.display_name or user.name }}" required autofocus style="margin-bottom: 16px;">
-    <button type="submit" class="btn" style="width: 100%;">決定して始める</button>
+    <button type="submit" class="btn" style="width: 100%;">{{ T.setup_name_submit }}</button>
   </form>
 </div>
 {% endblock %}
