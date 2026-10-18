@@ -1528,6 +1528,10 @@ def create_user_with_google(name, email, google_id):
 def migrate_posts():
     with get_conn() as conn:
         with conn.cursor() as c:
+            c.execute("ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_pinned INTEGER DEFAULT 0")
+            conn.commit()
+    with get_conn() as conn:
+        with conn.cursor() as c:
             # 既存のテーブルに不足している列を追加
             for col, col_type in [
                 ("content", "TEXT"), ("body", "TEXT"), ("is_public", "INTEGER DEFAULT 1"),
