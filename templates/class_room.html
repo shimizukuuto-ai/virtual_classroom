@@ -19,52 +19,31 @@
 
 
 {% block content %}
+<script>window.CLASS_ID = {{ cls.id }};</script>
+<script>window.ROLE = {{ role|tojson }};</script>
+<script>window.USER_NAME = {{ user.name|tojson }};</script>
+<script>window.INITIAL_BB = {{ (cls.blackboard or '')|tojson }};</script>
+<script>window.MEMBERS = {{ members|tojson }};</script>
+<script>window.I18N = {{ T|tojson }};</script>
+<script>window.TEACHER_DISPLAY_NAME = {{ (cls.taught_by or T.teacher)|tojson }};</script>
+<script>window.IS_INTERVIEW = {{ (1 if cls.get("is_interview") else 0)|tojson }};</script>
+<script>window.RECORD_T = {{ (1 if cls.get("record_shared_teacher") else 0)|tojson }};</script>
+<script>window.RECORD_S = {{ (1 if cls.get("record_shared_student") else 0)|tojson }};</script>
+<script>window.CLASS_JOIN_CODE = {{ cls.join_code|tojson }};</script>
+<script>window.CLASS_TITLE = {{ cls.title|tojson }};</script>
+<script>window.CLASS_SUBJECT = {{ cls.subject|tojson }};</script>
+<script>window.ALLOW_ANONYMOUS = {{ (1 if allow_anonymous else 0)|tojson }};</script>
+<script>window.STEPS = [{% for s in steps %}{id: {{ s.id }}, title: {{ s.title|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];</script>
+<script>window.INITIAL_QUESTIONS = [{% for q in questions %}{id: {{ q.id }}, content: {{ q.content|tojson }}, answer: {{ (q.answer or '')|tojson }}, is_anonymous: {{ q.is_anonymous }}, asker: {{ (q.asker_name or '')|tojson }}, answerer: {{ (q.answerer_name or '')|tojson }}, created_at: {{ q.created_at|tojson }}, answered_at: {{ (q.answered_at or '')|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];</script>
+<script>window.INITIAL_FILES = [{% for f in files %}{id: {{ f.id }}, filename: {{ f.filename|tojson }}, url: {{ f.url|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];</script>
+<script>window.INITIAL_POSTS = [{% for p in posts %}{id: {{ p.id }}, title: {{ p.title|tojson }}, author: {{ p.author_name|tojson }}, content: {{ p.content|tojson }}, is_pinned: {{ p.is_pinned }}, comment_count: {{ p.comment_count }}, created_at: {{ p.created_at|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];</script>
+<script>window.INITIAL_GROUPS = {{ groups|tojson }};</script>
+<script>window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};</script>
 <script>
-  window.CLASS_ID = Number("{{ cls.id }}");
-  window.ROLE = "{{ role }}";
-  window.USER_NAME = "{{ user.name }}";
-  window.INITIAL_BB = {{ (cls.blackboard or '')|tojson }};
-  window.MEMBERS = {{ members|tojson }};
-  window.I18N = {{ T | tojson }};
-  window.TEACHER_DISPLAY_NAME = {{ (cls.taught_by or T.teacher)|tojson }};
-  window.TEACHER_ID = {{ (members|selectattr('role','equalto','teacher')|map(attribute='user_id')|list|first) if members else 0 }};
-  window.IS_INTERVIEW = {{ (1 if cls.is_interview else 0)|tojson }};
-  window.RECORD_T = {{ (1 if cls.record_shared_teacher else 0)|tojson }};
-  window.RECORD_S = {{ (1 if cls.record_shared_student else 0)|tojson }};
-  window.CLASS_JOIN_CODE = {{ cls.join_code|tojson }};
-  window.CLASS_TITLE = {{ cls.title|tojson }};
-  window.CLASS_SUBJECT = {{ cls.subject|tojson }};
-  window.ALLOW_ANONYMOUS = {{ (1 if allow_anonymous else 0)|tojson }};
-  window.STEPS = [
-    {% for s in steps %}{id: {{ s.id }}, title: {{ s.title|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}
-  ];
-  window.INITIAL_QUESTIONS = [
-    {% for q in questions %}{
-      id: {{ q.id }}, content: {{ q.content|tojson }},
-      answer: {{ (q.answer or '')|tojson }},
-      is_anonymous: {{ q.is_anonymous }},
-      asker: {{ (q.asker_name or '')|tojson }},
-      answerer: {{ (q.answerer_name or '')|tojson }},
-      created_at: {{ q.created_at|tojson }},
-      answered_at: {{ (q.answered_at or '')|tojson }}
-    }{% if not loop.last %},{% endif %}{% endfor %}
-  ];
-  window.INITIAL_FILES = [
-    {% for f in files %}{id: {{ f.id }}, filename: {{ f.filename|tojson }}, url: {{ f.url|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}
-  ];
-  window.INITIAL_POSTS = [
-    {% for p in posts %}{
-      id: {{ p.id }}, title: {{ p.title|tojson }},
-      author: {{ p.author_name|tojson }},
-      content: {{ p.content|tojson }},
-      is_pinned: {{ p.is_pinned }},
-      comment_count: {{ p.comment_count }},
-      created_at: {{ p.created_at|tojson }}
-    }{% if not loop.last %},{% endif %}{% endfor %}
-  ];
-  window.INITIAL_GROUPS = {{ groups|tojson }};
-  window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
+  if (window.IS_INTERVIEW === undefined) window.IS_INTERVIEW = 0;
+  console.log("[3D DEBUG] CLASS_ID=" + window.CLASS_ID + " IS_INTERVIEW=" + window.IS_INTERVIEW + " TEACHER=" + window.TEACHER_DISPLAY_NAME);
 </script>
+
 
 <script>
   window.CLASS_ID = Number("{{ cls.id }}");
@@ -3000,6 +2979,9 @@ function drawBlackboardText(text) {
     ];
 
     function paletteFor(name) {
+    if (name === window.TEACHER_DISPLAY_NAME) {
+      console.log("[3D] paletteFor teacher:", name, "custom:", CUSTOM_HANDLES[name], "custom_shirt:", CUSTOM_HANDLES[name]?.shirt);
+    }
       const h = hashName(name);
       const custom = CUSTOM_HANDLES[name] || { hair: -1, skin: -1, shirt: -1, style: "" };
       const base = {
