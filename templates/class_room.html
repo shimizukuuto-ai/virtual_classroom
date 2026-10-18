@@ -2238,21 +2238,77 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
   const btnPostCancel = document.getElementById("btn-post-cancel");
   if (btnPostCancel) btnPostCancel.addEventListener("click", () => postDrawer.classList.remove("open"));
 
-  const btnPostSubmit = document.getElementById("btn-post-submit");
-  if (btnPostSubmit) btnPostSubmit.addEventListener("click", async () => {
-    const title = newPostTitle.value.trim();
-    const content = newPostContent.value.trim();
-    if (!title || !content) return;
+  // Quillエディタの初期化
+  const postEditorContainer = document.getElementById('post-editor-container');
+  let postQuill = null;
+  if (postEditorContainer) {
+    postQuill = new Quill('#post-editor-container', {
+      theme: 'snow',
+      modules: {
+        toolbar: [
+          [{ 'header': [1, 2, 3, false] }],
+          ['bold', 'italic', 'underline', 'strike'],
+          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+          ['blockquote', 'code-block'],
+          ['link', 'image'],
+          ['clean']
+        ]
+      },
+      placeholder: 'ここに本文を書きます...'
+    });
+
+    // 画像アップロード
+    const toolbar = postQuill.getModule('toolbar');
+    toolbar.addHandler('image', () => {
+      const input = document.createElement('input');
+      input.setAttribute('type', 'file');
+      input.setAttribute('accept', 'image/*');
+      input.click();
+      input.onchange = async () => {
+        const file = input.files[0];
+        if (file) {
+          const fd = new FormData(); fd.append('file', file);
+          try {
+            const res = await fetch('/api/upload_global', { method: 'POST', body: fd });
+            const d = await res.json();
+            if (res.ok) {
+              const range = postQuill.getSelection(true);
+              postQuill.insertEmbed(range.index, 'image', d.url);
+            } else {
+              alert("Upload failed: " + d.error);
+            }
+          } catch(e) { alert("Error: " + e); }
+        }
+      };
+    });
+  }
+
+  document.getElementById("btn-post-submit").addEventListener("click", async () => {
+    const title = document.getElementById("new-post-title").value.trim();
+    if (!title || !postQuill) return;
+    
+    const content = postQuill.root.innerHTML;
+    if (postQuill.getText().trim().length === 0) return;
+
+    const btn = document.getElementById("btn-post-submit");
+    btn.disabled = true; btn.textContent = "...";
+
     try {
-      const res = await fetch('/api/posts/' + CLASS_ID, {
+      const res = await fetch('/api/posts/' + window.CLASS_ID, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, content })
       });
       if (res.ok) {
-        postDrawer.classList.remove("open");
+        document.getElementById("post-drawer").classList.remove("open");
+        postQuill.root.innerHTML = "";
         await loadPosts();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        alert("Error: " + (d.error || res.status));
       }
-    } catch (e) {}
+    } catch (e) { alert("Error: " + e); }
+    
+    btn.disabled = false; btn.textContent = "Post";
   });
 
   const btnSubmitComment = document.getElementById("btn-submit-comment");
