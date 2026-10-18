@@ -1521,23 +1521,25 @@ def create_user_with_google(name, email, google_id):
             return uid
 
 
-
 def migrate_posts():
     with get_conn() as conn:
         with conn.cursor() as c:
+            # 既存のテーブルに不足している列を追加
             for col, col_type in [
                 ("content", "TEXT"), ("body", "TEXT"), ("is_public", "INTEGER DEFAULT 1"),
-                ("tags", "TEXT DEFAULT ''"), ("updated_at", "TEXT"), ("helpful_count", "INTEGER DEFAULT 0")
+                ("tags", "TEXT DEFAULT ''"), ("updated_at", "TEXT")
             ]:
                 try:
                     c.execute(f"ALTER TABLE posts ADD COLUMN IF NOT EXISTS {col} {col_type}")
                 except Exception:
                     pass
+            # 古いデータの埋め合わせ
             try:
                 c.execute("UPDATE posts SET content = body WHERE content IS NULL AND body IS NOT NULL")
                 c.execute("UPDATE posts SET body = content WHERE body IS NULL AND content IS NOT NULL")
             except Exception:
                 pass
+
 
 def list_public_posts(query="", limit=50):
     with get_conn() as conn:
@@ -1555,23 +1557,27 @@ def list_public_posts(query="", limit=50):
             c.execute(sql, params)
             return c.fetchall()
 
+
 def increment_post_helpful(post_id):
     with get_conn() as conn:
         with conn.cursor() as c:
-            c.execute("UPDATE posts SET helpful_count = COALESCE(helpful_count, 0) + 1 WHERE id = %s", (post_id,))
+            c.execute("UPDATE posts SET helpful_count = helpful_count + 1 WHERE id = %s", (post_id,))
         conn.commit()
+
 
 def list_popular_teachers(limit=5):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
-            c.execute("""SELECT u.id, u.name, COUNT(e.id) AS student_count
+            c.execute("""SELECT u.id, u.name, COUNT(e.id) AS student_count, COUNT(c.id) AS class_count
                 FROM users u
                 JOIN classes c ON c.teacher_id = u.id
                 LEFT JOIN enrollments e ON e.class_id = c.id AND e.role = 'student'
                 WHERE c.is_public IN (1, 2)
                 GROUP BY u.id, u.name
-                ORDER BY student_count DESC LIMIT %s""", (limit,))
+                ORDER BY student_count DESC, class_count DESC
+                LIMIT %s""", (limit,))
             return c.fetchall()
+
 
 def list_popular_classes(limit=5):
     with get_conn() as conn:
@@ -1582,11 +1588,11 @@ def list_popular_classes(limit=5):
                 LEFT JOIN enrollments e ON e.class_id = c.id AND e.role = 'student'
                 WHERE c.is_public IN (1, 2)
                 GROUP BY c.id, u.name
-                ORDER BY student_count DESC LIMIT %s""", (limit,))
+                ORDER BY student_count DESC, c.created_at DESC
+                LIMIT %s""", (limit,))
             return c.fetchall()
 
+
 def leave_study_room(class_id, user_id):
-    with get_conn() as conn:
-        with conn.cursor() as c:
-            c.execute("DELETE FROM study_positions WHERE class_id = %s AND user_id = %s", (class_id, user_id))
-        conn.commit()
+    with _cursor() as c:
+        c.execute("DELETE FROM study_positions WHERE class_id = %s AND user_id = %s", (class_id, user_id))
