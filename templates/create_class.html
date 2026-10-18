@@ -35,6 +35,18 @@
       <option value="0" selected>{{ T.room_class }}</option>
       <option value="1">個人面談モード（1対1・非公開）</option>
     </select>
+<div id="study-voice-row" style="display:none; margin-top: 12px; padding: 12px; background: #f8fafc; border-radius: 8px;">
+  <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+    <input type="checkbox" name="study_voice" value="1" style="width:auto; margin:0;">
+    {{ T.study_voice_enable }}
+  </label>
+  <p class="muted" style="margin:6px 0 0 0; font-size:12px;">{{ T.study_voice_desc }}</p>
+</div>
+<script>
+document.querySelector('select[name="room_type"]').addEventListener('change', function() {
+  document.getElementById('study-voice-row').style.display = this.value === 'study' ? 'block' : 'none';
+});
+</script>
     <div class="hint">個人面談モードでは、先生と生徒が1対1で話せます。音声は双方向、記録は双方の許可で共有されます。</div>
     
     <label>{{ T.visibility_label }}</label>

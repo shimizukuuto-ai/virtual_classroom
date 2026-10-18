@@ -1619,3 +1619,19 @@ def delete_class_and_related(class_id):
                     pass
             c.execute("DELETE FROM classes WHERE id = %s", (class_id,))
         conn.commit()
+
+
+def migrate_study_voice():
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            try:
+                c.execute("ALTER TABLE classes ADD COLUMN IF NOT EXISTS study_voice_enabled INTEGER DEFAULT 0")
+            except Exception:
+                pass
+        conn.commit()
+
+def set_study_voice_enabled(class_id, enabled):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("UPDATE classes SET study_voice_enabled = %s WHERE id = %s", (1 if enabled else 0, class_id))
+        conn.commit()

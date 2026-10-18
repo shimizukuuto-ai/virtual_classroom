@@ -50,6 +50,7 @@ from db import (
     add_comment, list_comments,
     BADGES, SKINS, RANKS,
     migrate_room_type, init_study_state, get_study_positions, set_study_position, leave_study_room,
+    migrate_study_voice, set_study_voice_enabled,
 )
 from i18n import all_t, default_steps
 
@@ -152,7 +153,8 @@ def startup():
     migrate_posts()
     init_room_state()
     migrate_room_type()
-    init_study_state() 
+    init_study_state()
+    migrate_study_voice() 
 
 
 @app.on_event("shutdown")
@@ -443,6 +445,7 @@ def create_class_submit(
     is_interview: str = Form("0"),
     duration: str = Form("30"),
     room_type: str = Form("class"),
+    study_voice: str = Form("0"),
 ):
     user = current_user(request)
     if not user:
@@ -468,6 +471,8 @@ def create_class_submit(
             break
     if not cid:
         return HTMLResponse("Failed to create class", status_code=500)
+    if room_type == "study" and study_voice == "1":
+        set_study_voice_enabled(cid, 1)
     for line in steps_text.splitlines():
         line = line.strip()
         if line:
@@ -576,6 +581,7 @@ async def api_poll(request: Request, class_id: int, since_id: int = 0):
         "stage": cls["stage"] or 0,
         "allow_anonymous": bool(cls.get("allow_anonymous") or 0),
                 "is_interview": bool(cls.get("is_interview") or 0),
+        "study_voice_enabled": bool(cls.get("study_voice_enabled") or 0),
         "record_shared_teacher": bool(cls.get("record_shared_teacher") or 0),
         "record_shared_student": bool(cls.get("record_shared_student") or 0),
         "steps": [{"id": s["id"], "title": s["title"]} for s in steps],
@@ -1263,6 +1269,8 @@ async def audio_ws(websocket: WebSocket, class_id: int):
         return
 
     is_interview = bool(cls.get("is_interview"))
+    is_study = (cls.get("room_type") or "class") == "study"
+    study_voice = bool(cls.get("study_voice_enabled"))
 
     await websocket.accept()
     audio_rooms.setdefault(class_id, [])
@@ -1272,8 +1280,12 @@ async def audio_ws(websocket: WebSocket, class_id: int):
         while True:
             data = await websocket.receive()
             if "bytes" in data and data["bytes"] is not None:
-                # 面談モードでは双方向、通常モードでは先生のみ送信可
-                if not is_interview and role != "teacher":
+                # 面談: 双方向 / 自習室(音声有効): 全員 / 通常: 教師のみ
+                if is_interview:
+                    pass
+                elif is_study and study_voice:
+                    pass
+                elif role != "teacher":
                     continue
                 payload = data["bytes"]
                 for ws in list(audio_rooms.get(class_id, [])):

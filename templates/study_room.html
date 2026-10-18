@@ -50,6 +50,7 @@
   <button id="btn-focus" class="btn-focus">Focus (25m)</button>
   <button id="btn-break" class="btn-break">Break (5m)</button>
   <button id="btn-stop" class="btn-stop">Stop</button>
+<button id="btn-voice" style="display:none; background:#8b5cf6;">🎤 {{ T.start_voice }}</button>
 </div>
 
 <div class="chat-panel">
@@ -70,6 +71,9 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 window.CLASS_ID = {{ cls.id }};
+window.ROLE = {{ role|tojson }};
+window.USER_NAME = {{ user.name|tojson }};
+window.STUDY_VOICE_ENABLED = {{ (1 if cls.get('study_voice_enabled') else 0)|tojson }};
 window.CLASS_JOIN_CODE = {{ cls.join_code|tojson }};
 window.USER_ID = {{ user.id }};
 window.MEMBERS = {{ members|tojson }};
@@ -584,6 +588,11 @@ async function poll() {
       }
     }
     
+    if (data.study_voice_enabled !== undefined) {
+      window.STUDY_VOICE_ENABLED = data.study_voice_enabled;
+      const vBtn = document.getElementById("btn-voice");
+      if (vBtn) vBtn.style.display = window.STUDY_VOICE_ENABLED ? "inline-block" : "none";
+    }
     if (data.messages) {
       const chatBox = document.getElementById('chat-messages');
       data.messages.forEach(m => {
@@ -632,6 +641,115 @@ document.getElementById("btn-invite-study").addEventListener("click", () => {
   }).catch(() => {
     prompt("Invite link:", url);
   });
+});
+
+
+// ===== Voice chat =====
+let audioWs = null;
+let audioCtx = null;
+let micStream = null;
+let scriptProcessor = null;
+let audioSending = false;
+let reconnectTimer = null;
+
+function buildWsUrl() {
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  return proto + "//" + location.host + "/ws/audio/" + window.CLASS_ID;
+}
+
+function connectAudioWs() {
+  if (audioWs && (audioWs.readyState === WebSocket.OPEN || audioWs.readyState === WebSocket.CONNECTING)) return;
+  audioWs = new WebSocket(buildWsUrl());
+  audioWs.binaryType = "arraybuffer";
+  audioWs.onmessage = (e) => {
+    if (typeof e.data === "string") return;
+    playPCM(e.data);
+  };
+  audioWs.onclose = () => {
+    audioWs = null;
+    if (audioSending) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(connectAudioWs, 1500);
+    }
+  };
+}
+
+function playPCM(arrayBuffer) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    const pcm = new Int16Array(arrayBuffer);
+    const buffer = audioCtx.createBuffer(1, pcm.length, 16000);
+    const ch = buffer.getChannelData(0);
+    for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32767;
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(audioCtx.destination);
+    src.start();
+  } catch (e) {}
+}
+
+async function startAudioSending() {
+  if (!(location.protocol === "https:" || location.hostname === "localhost")) {
+    alert("HTTPS required for microphone");
+    return;
+  }
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+    });
+  } catch (err) {
+    alert(I18N.voice_permission_denied || "Microphone permission denied");
+    return;
+  }
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  if (audioCtx.state === "suspended") await audioCtx.resume();
+  const source = audioCtx.createMediaStreamSource(micStream);
+  scriptProcessor = audioCtx.createScriptProcessor(2048, 1, 1);
+  scriptProcessor.onaudioprocess = (e) => {
+    if (!audioWs || audioWs.readyState !== WebSocket.OPEN) return;
+    const input = e.inputBuffer.getChannelData(0);
+    const pcm = new Int16Array(input.length);
+    for (let i = 0; i < input.length; i++) {
+      const s = Math.max(-1, Math.min(1, input[i]));
+      pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+    try { audioWs.send(pcm.buffer); } catch (err) {}
+  };
+  source.connect(scriptProcessor);
+  scriptProcessor.connect(audioCtx.destination);
+  audioSending = true;
+}
+
+function stopAudioSending() {
+  audioSending = false;
+  if (scriptProcessor) { try { scriptProcessor.disconnect(); } catch (e) {} scriptProcessor = null; }
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+}
+
+async function handleAudioToggle(btn) {
+  if (audioSending) {
+    stopAudioSending();
+    btn.textContent = (I18N && I18N.start_voice) || "🎤 Mic On";
+    statusEl.textContent = "";
+  } else {
+    connectAudioWs();
+    setTimeout(async () => {
+      await startAudioSending();
+      if (audioSending) {
+        btn.textContent = (I18N && I18N.stop_voice) || "🎤 Mic Off";
+      }
+    }, 300);
+  }
+}
+
+document.getElementById("btn-voice")?.addEventListener("click", (e) => handleAudioToggle(e.currentTarget));
+
+// 受信専用で接続しておく
+connectAudioWs();
+
+window.addEventListener("beforeunload", () => {
+  stopAudioSending();
+  if (audioWs) try { audioWs.close(); } catch (e) {}
 });
 
 window.addEventListener('resize', () => {
