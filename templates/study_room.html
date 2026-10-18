@@ -35,6 +35,10 @@
 
 
 
+<button id="btn-invite-study" style="position: fixed; top: 20px; left: 240px; z-index: 9999; padding: 10px 16px; background: #3b82f6; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 12px rgba(59,130,246,0.4);">
+  🔗 {{ T.invite_link }}
+</button>
+
 <div class="timer-overlay state-idle" id="timer-container">
   <div id="timer-label">READY</div>
   <div id="timer-digits">25:00</div>
@@ -66,6 +70,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 window.CLASS_ID = {{ cls.id }};
+window.CLASS_JOIN_CODE = {{ cls.join_code|tojson }};
 window.USER_ID = {{ user.id }};
 window.MEMBERS = {{ members|tojson }};
 
@@ -616,6 +621,18 @@ document.getElementById('chat-form').onsubmit = async (e) => {
   });
   poll();
 };
+
+document.getElementById("btn-invite-study").addEventListener("click", () => {
+  const url = location.origin + "/invite/" + window.CLASS_JOIN_CODE;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById("btn-invite-study");
+    const orig = btn.textContent;
+    btn.textContent = "✓ コピーしました";
+    setTimeout(() => { btn.textContent = orig; }, 2000);
+  }).catch(() => {
+    prompt("Invite link:", url);
+  });
+});
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
