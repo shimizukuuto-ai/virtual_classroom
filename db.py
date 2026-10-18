@@ -1575,7 +1575,7 @@ def list_popular_teachers(limit=5):
                 JOIN classes c ON c.teacher_id = u.id
                 LEFT JOIN enrollments e ON e.class_id = c.id AND e.role = 'student'
                 WHERE c.is_public IN (1, 2)
-                GROUP BY u.id, u.name
+                GROUP BY u.id, u.name, u.display_name
                 ORDER BY student_count DESC, class_count DESC
                 LIMIT %s""", (limit,))
             return c.fetchall()
@@ -1589,7 +1589,7 @@ def list_popular_classes(limit=5):
                 JOIN users u ON u.id = c.teacher_id
                 LEFT JOIN enrollments e ON e.class_id = c.id AND e.role = 'student'
                 WHERE c.is_public IN (1, 2)
-                GROUP BY c.id, u.name
+                GROUP BY c.id, u.name, u.display_name
                 ORDER BY student_count DESC, c.created_at DESC
                 LIMIT %s""", (limit,))
             return c.fetchall()
