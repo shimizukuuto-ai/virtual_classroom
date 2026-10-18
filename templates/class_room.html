@@ -8,19 +8,58 @@
 {% block main_class %}wide{% endblock %}
 {% block title %}{{ cls.title }} - {{ T.app_title }}{% endblock %}
 
-<!-- Quill.js リッチテキストエディタ -->
 
 
-<script>
-  
-  
-  
-  
-  window.MEMBERS = {{ members|tojson }};
-  
-</script>
+
 
 {% block content %}
+<script>
+  window.CLASS_ID = Number("{{ cls.id }}");
+  window.ROLE = "{{ role }}";
+  window.USER_NAME = "{{ user.name }}";
+  window.INITIAL_BB = {{ (cls.blackboard or '')|tojson }};
+  window.MEMBERS = {{ members|tojson }};
+  window.I18N = {{ T | tojson }};
+  window.TEACHER_DISPLAY_NAME = {{ (cls.taught_by or T.teacher)|tojson }};
+  window.TEACHER_ID = {{ (members|selectattr('role','equalto','teacher')|map(attribute='user_id')|list|first) if members else 0 }};
+  window.IS_INTERVIEW = {{ (1 if cls.is_interview else 0)|tojson }};
+  window.RECORD_T = {{ (1 if cls.record_shared_teacher else 0)|tojson }};
+  window.RECORD_S = {{ (1 if cls.record_shared_student else 0)|tojson }};
+  window.CLASS_JOIN_CODE = {{ cls.join_code|tojson }};
+  window.CLASS_TITLE = {{ cls.title|tojson }};
+  window.CLASS_SUBJECT = {{ cls.subject|tojson }};
+  window.ALLOW_ANONYMOUS = {{ (1 if allow_anonymous else 0)|tojson }};
+  window.STEPS = [
+    {% for s in steps %}{id: {{ s.id }}, title: {{ s.title|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}
+  ];
+  window.INITIAL_QUESTIONS = [
+    {% for q in questions %}{
+      id: {{ q.id }}, content: {{ q.content|tojson }},
+      answer: {{ (q.answer or '')|tojson }},
+      is_anonymous: {{ q.is_anonymous }},
+      asker: {{ (q.asker_name or '')|tojson }},
+      answerer: {{ (q.answerer_name or '')|tojson }},
+      created_at: {{ q.created_at|tojson }},
+      answered_at: {{ (q.answered_at or '')|tojson }}
+    }{% if not loop.last %},{% endif %}{% endfor %}
+  ];
+  window.INITIAL_FILES = [
+    {% for f in files %}{id: {{ f.id }}, filename: {{ f.filename|tojson }}, url: {{ f.url|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}
+  ];
+  window.INITIAL_POSTS = [
+    {% for p in posts %}{
+      id: {{ p.id }}, title: {{ p.title|tojson }},
+      author: {{ p.author_name|tojson }},
+      content: {{ p.content|tojson }},
+      is_pinned: {{ p.is_pinned }},
+      comment_count: {{ p.comment_count }},
+      created_at: {{ p.created_at|tojson }}
+    }{% if not loop.last %},{% endif %}{% endfor %}
+  ];
+  window.INITIAL_GROUPS = {{ groups|tojson }};
+  window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
+</script>
+
 <script>
   window.CLASS_ID = Number("{{ cls.id }}");
   window.ROLE = "{{ role }}";
