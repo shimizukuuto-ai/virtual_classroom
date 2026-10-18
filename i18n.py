@@ -1,6 +1,8 @@
 STRINGS = {
     "ja": {
         "app_title": "仮想教室",
+        "streak_badge_hint": "7日連続で参加するとバッジ獲得",
+        "aura_unlock_hint": "5000 XP または 記事10本で解放",
         "voice_permission_denied": "マイクの使用が許可されていません",
         "stop_voice": "🎤 マイクOFF",
         "start_voice": "🎤 マイクON",

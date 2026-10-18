@@ -334,10 +334,17 @@ def set_user_skin(uid, skin_key):
     info = SKINS[skin_key]
     xp = calc_xp(uid)
     s = user_stats(uid) or {}
-    if xp < info[2]:
-        return False
-    if info[4] > 0 and s.get("taught", 0) < info[4]:
-        return False
+
+    # Aura は XP 5000 または 記事10本 で解放
+    if skin_key == "aura":
+        posts_count = count_user_posts(uid)
+        if xp < info[2] and posts_count < 10:
+            return False
+    else:
+        if xp < info[2]:
+            return False
+        if info[4] > 0 and s.get("taught", 0) < info[4]:
+            return False
     with get_conn() as conn:
         with conn.cursor() as c:
             c.execute("UPDATE users SET skin = %s WHERE id = %s", (skin_key, uid))
@@ -442,6 +449,7 @@ def record_attendance(uid, class_id):
             try:
                 c.execute("INSERT INTO attendance (user_id, class_id, date) VALUES (%s, %s, %s)", (uid, class_id, today()))
                 conn.commit()
+                check_badges(uid)
                 return True
             except psycopg.errors.UniqueViolation:
                 conn.rollback()
@@ -1635,3 +1643,11 @@ def set_study_voice_enabled(class_id, enabled):
         with conn.cursor() as c:
             c.execute("UPDATE classes SET study_voice_enabled = %s WHERE id = %s", (1 if enabled else 0, class_id))
         conn.commit()
+
+
+def count_user_posts(uid):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("SELECT COUNT(*) AS n FROM posts WHERE author_id = %s", (uid,))
+            row = c.fetchone()
+    return row["n"] if row else 0
