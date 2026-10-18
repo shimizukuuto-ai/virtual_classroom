@@ -1,5 +1,21 @@
 {% extends "base.html" %}
-{% block title %}{{ T.badges }} - {{ T.app_title }}{% endblock %}
+{% block title %}{{ T.badges }} - {{ T.app_title }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var currentCount = {{ earned_badges_count|default(0) }};
+  var lastSeen = parseInt(sessionStorage.getItem('last_badge_count') || '0', 10);
+  if (currentCount > lastSeen && lastSeen > 0) {
+    window.showSharePrompt({
+      icon: '🏆',
+      text: window.SHARE_I18N.share_prompt_badge,
+      url: location.origin + '/u/{{ user.id }}'
+    });
+  }
+  sessionStorage.setItem('last_badge_count', String(currentCount));
+});
+</script>
+
+{% endblock %}
 {% block content %}
 <style>
 .rank-hero {
@@ -87,4 +103,20 @@
   </div>
   <a class="btn lg" href="/customize">{{ T.customize }} →</a>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var currentCount = {{ earned_badges_count|default(0) }};
+  var lastSeen = parseInt(sessionStorage.getItem('last_badge_count') || '0', 10);
+  if (currentCount > lastSeen && lastSeen > 0) {
+    window.showSharePrompt({
+      icon: '🏆',
+      text: window.SHARE_I18N.share_prompt_badge,
+      url: location.origin + '/u/{{ user.id }}'
+    });
+  }
+  sessionStorage.setItem('last_badge_count', String(currentCount));
+});
+</script>
+
 {% endblock %}

@@ -551,6 +551,7 @@ def class_room(request: Request, class_id: int):
             duration=cls.get("duration") or 30,
             ends_at=cls.get("ends_at") or "",
             posts=list_class_posts(class_id),
+            streak=calc_streak(user["id"]),
             
         ),
     )

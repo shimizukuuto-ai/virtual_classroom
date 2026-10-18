@@ -1,5 +1,19 @@
 {% extends "base.html" %}
-{% block title %}{{ post.title }} - {{ T.app_title }}{% endblock %}
+{% block title %}{{ post.title }} - {{ T.app_title }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (sessionStorage.getItem('just_posted_article') === '1') {
+    sessionStorage.removeItem('just_posted_article');
+    window.showSharePrompt({
+      icon: '📝',
+      text: window.SHARE_I18N.share_prompt_post,
+      url: location.href
+    });
+  }
+});
+</script>
+
+{% endblock %}
 
 <script>
   MathJax = {
@@ -59,4 +73,18 @@ document.getElementById('btn-helpful').addEventListener('click', async () => {
   }
 });
 </script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (sessionStorage.getItem('just_posted_article') === '1') {
+    sessionStorage.removeItem('just_posted_article');
+    window.showSharePrompt({
+      icon: '📝',
+      text: window.SHARE_I18N.share_prompt_post,
+      url: location.href
+    });
+  }
+});
+</script>
+
 {% endblock %}

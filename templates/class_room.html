@@ -10,6 +10,33 @@
 <meta property="og:title" content="{{ cls.title }} - Virtual Classroom">
 <meta property="og:description" content="{{ cls.subject }} · {{ cls.description or '' }}">
 <meta name="twitter:card" content="summary_large_image">
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (sessionStorage.getItem('just_created_class') === '1') {
+    sessionStorage.removeItem('just_created_class');
+    window.showSharePrompt({
+      icon: '🎓',
+      text: window.SHARE_I18N.share_prompt_class,
+      url: location.origin + '/invite/{{ cls.join_code }}'
+    });
+    return;
+  }
+  var streak = {{ streak|default(0) }};
+  if (streak > 0 && streak % 7 === 0) {
+    var key = 'streak_prompt_' + streak;
+    if (!sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, '1');
+      window.showSharePrompt({
+        icon: '🔥',
+        text: window.SHARE_I18N.share_prompt_streak,
+        url: location.origin + '/u/{{ user.id }}'
+      });
+    }
+  }
+});
+</script>
+
 {% endblock %}
 {% block main_class %}wide{% endblock %}
 {% block title %}{{ cls.title }} - {{ T.app_title }}{% endblock %}

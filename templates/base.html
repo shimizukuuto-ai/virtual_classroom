@@ -221,5 +221,45 @@ textarea { resize: vertical; min-height: 80px; }
 <main class="{% block main_class %}{% endblock %}">
 {% block content %}{% endblock %}
 </main>
+
+<!-- Share Prompt Modal -->
+<div id="share-prompt-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center;">
+  <div style="background:#fff; border-radius:16px; padding:28px; max-width:420px; width:90%; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div id="share-prompt-icon" style="font-size:56px; margin-bottom:12px;">🎉</div>
+    <div id="share-prompt-text" style="font-size:16px; font-weight:600; margin-bottom:24px; color:#1e293b; line-height:1.6;"></div>
+    <div style="display:flex; gap:12px; justify-content:center;">
+      <button id="share-prompt-yes" style="background:#1d9bf0; color:#fff; border:none; padding:12px 28px; border-radius:10px; font-weight:700; cursor:pointer; font-size:14px;"></button>
+      <button id="share-prompt-no" style="background:#e2e8f0; color:#334155; border:none; padding:12px 28px; border-radius:10px; font-weight:700; cursor:pointer; font-size:14px;"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+window.SHARE_I18N = {
+  share: {{ T.share|tojson }},
+  later: {{ T.later|tojson }},
+  share_prompt_badge: {{ T.share_prompt_badge|tojson }},
+  share_prompt_post: {{ T.share_prompt_post|tojson }},
+  share_prompt_class: {{ T.share_prompt_class|tojson }},
+  share_prompt_streak: {{ T.share_prompt_streak|tojson }},
+};
+window.showSharePrompt = function(options) {
+  var modal = document.getElementById('share-prompt-modal');
+  document.getElementById('share-prompt-icon').textContent = options.icon || '🎉';
+  document.getElementById('share-prompt-text').textContent = options.text;
+  document.getElementById('share-prompt-yes').textContent = window.SHARE_I18N.share;
+  document.getElementById('share-prompt-no').textContent = window.SHARE_I18N.later;
+  modal.style.display = 'flex';
+  document.getElementById('share-prompt-yes').onclick = function() {
+    var url = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(options.text) + '&url=' + encodeURIComponent(options.url || location.href);
+    window.open(url, '_blank');
+    modal.style.display = 'none';
+  };
+  document.getElementById('share-prompt-no').onclick = function() {
+    modal.style.display = 'none';
+  };
+};
+</script>
+
 </body>
 </html>

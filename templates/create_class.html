@@ -1,5 +1,12 @@
 {% extends "base.html" %}
-{% block title %}{{ T.create_class }} - {{ T.app_title }}{% endblock %}
+{% block title %}{{ T.create_class }} - {{ T.app_title }}
+<script>
+document.querySelector('form').addEventListener('submit', function() {
+  sessionStorage.setItem('just_created_class', '1');
+});
+</script>
+
+{% endblock %}
 {% block content %}
 <style>
 .form-wrap { max-width: 640px; margin: 0 auto; }
@@ -97,4 +104,11 @@
 
 </form>
 </div>
+
+<script>
+document.querySelector('form').addEventListener('submit', function() {
+  sessionStorage.setItem('just_created_class', '1');
+});
+</script>
+
 {% endblock %}
