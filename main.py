@@ -22,7 +22,7 @@ from db import (
     create_user, get_user_by_name, get_user_by_id, set_user_lang, get_user_by_email, get_user_by_google_id, link_google_id, set_display_name, create_user_with_google,
     update_user_profile, set_user_skin, user_stats, calc_streak,
     list_classes_taught_by, list_weekly_classes,
-    create_class, get_class_by_code, get_class_by_id, join_class,
+    create_class, get_class_by_code, get_class_by_id, join_class, delete_class_and_related,
     list_classes_for_user, list_public_classes, list_subjects,
     list_members, get_role,
     add_message, get_messages, get_message, mark_helpful, mark_like,
@@ -296,6 +296,18 @@ def setup_name_submit(request: Request, display_name: str = Form(...)):
 # ============================================================
 # dashboard
 # ============================================================
+
+@app.post("/class/{class_id}/delete")
+def delete_class(request: Request, class_id: int):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    cls = get_class_by_id(class_id)
+    if not cls or int(cls["teacher_id"]) != int(user["id"]):
+        return RedirectResponse("/dashboard", status_code=303)
+    delete_class_and_related(class_id)
+    return RedirectResponse("/dashboard", status_code=303)
+
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
     user = current_user(request)

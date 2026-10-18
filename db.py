@@ -559,7 +559,7 @@ def get_class_by_id(cid):
             return c.fetchone()
 
 
-def list_public_classes(query="", subject=""):
+def list_public_classes(query="", subject="", teacher=""):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
             where = ["c.is_public IN (1, 2)"]
@@ -571,13 +571,15 @@ def list_public_classes(query="", subject=""):
             if subject:
                 where.append("c.subject = %s")
                 params.append(subject)
+            if teacher:
+                where.append("u.name ILIKE %s")
+                params.append(f"%{teacher}%")
             sql = f"""SELECT c.*, u.name AS teacher_name FROM classes c
                 JOIN users u ON u.id=c.teacher_id
                 WHERE {' AND '.join(where)}
-                ORDER BY c.is_weekly DESC, c.created_at DESC LIMIT 50"""
+                ORDER BY c.is_weekly DESC, c.created_at DESC LIMIT 20"""
             c.execute(sql, params)
             return c.fetchall()
-
 
 def list_subjects(limit=30):
     with get_conn() as conn:
@@ -1596,3 +1598,18 @@ def list_popular_classes(limit=5):
 def leave_study_room(class_id, user_id):
     with _cursor() as c:
         c.execute("DELETE FROM study_positions WHERE class_id = %s AND user_id = %s", (class_id, user_id))
+
+
+def delete_class_and_related(class_id):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            for table in ["enrollments", "messages", "class_steps", "join_requests",
+                          "blackboard_history", "class_bans", "questions", "attendance",
+                          "learning_cards", "class_files", "class_groups", "student_notes",
+                          "teacher_ratings", "posts", "study_positions", "room_state"]:
+                try:
+                    c.execute(f"DELETE FROM {table} WHERE class_id = %s", (class_id,))
+                except Exception:
+                    pass
+            c.execute("DELETE FROM classes WHERE id = %s", (class_id,))
+        conn.commit()

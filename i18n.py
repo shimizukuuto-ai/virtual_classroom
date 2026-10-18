@@ -1,6 +1,9 @@
 STRINGS = {
     "ja": {
         "app_title": "仮想教室",
+        "confirm_delete_class": "この教室を削除しますか？",
+        "interview_desc": "個人面談モードでは、先生と生徒が1対1で話せます。音声は双方向、記録は双方の許可で共有されます。",
+        "room_interview": "個人面談",
         "or": "または",
         "setup_name_submit": "決定して始める",
         "setup_name_desc": "アプリ内で表示される名前を決めてください。",

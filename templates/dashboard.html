@@ -265,7 +265,8 @@ function dismissOnboard() {
 <div class="section-h">{{ T.my_classes }}</div>
 {% if classes %}
   {% for c in classes %}
-  <a class="class-item" href="/class/{{ c.id }}">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+  <a class="class-item" style="flex:1; margin-bottom:0;" href="/class/{{ c.id }}">
     <div class="title">
       {% if c.is_weekly %}<span class="weekly-pill">{{ T.weekly_badge }}</span>{% endif %}
       {{ c.title }}
@@ -274,6 +275,12 @@ function dismissOnboard() {
     <div class="meta">{{ c.subject }}{% if c.description %} · {{ c.description }}{% endif %}</div>
     {% if c.next_session %}<div class="meta" style="color:#4338ca;font-weight:600;">{{ T.next_session }}: {{ c.next_session }}</div>{% endif %}
   </a>
+  {% if c.role == 'teacher' %}
+  <form method="post" action="/class/{{ c.id }}/delete" onsubmit="return confirm('{{ T.confirm_delete_class }}');" style="margin-left:10px;">
+    <button type="submit" class="btn red" style="font-size:11px; padding:2px 8px;">{{ T.delete }}</button>
+  </form>
+  {% endif %}
+</div>
   {% endfor %}
 {% else %}
   <div class="empty-card">
