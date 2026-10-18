@@ -1711,9 +1711,20 @@ def set_display_name(uid, name):
 def create_user_with_google(name, email, google_id):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
+            # 名前が重複する場合はサフィックスを付けて一意にする
+            base_name = name.strip() or email.split('@')[0]
+            unique_name = base_name
+            counter = 1
+            while True:
+                c.execute("SELECT 1 FROM users WHERE name = %s", (unique_name,))
+                if not c.fetchone():
+                    break
+                unique_name = f"{base_name}_{counter}"
+                counter += 1
+
             c.execute(
                 "INSERT INTO users (name, email, google_id, display_name, created_at) VALUES (%s, %s, %s, %s, %s) RETURNING id",
-                (name, email, google_id, name, now()),
+                (unique_name, email, google_id, name, now()),
             )
             uid = c.fetchone()["id"]
             conn.commit()
