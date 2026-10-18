@@ -250,6 +250,8 @@ def init_db():
                 "ALTER TABLE messages ADD COLUMN helpful_count INTEGER DEFAULT 0",
                 "ALTER TABLE messages ADD COLUMN like_count INTEGER DEFAULT 0",
                                 "ALTER TABLE users ADD COLUMN custom_hair INTEGER DEFAULT -1",
+                "ALTER TABLE users ADD COLUMN google_id TEXT UNIQUE",
+                "ALTER TABLE users ADD COLUMN display_name TEXT",
                 "ALTER TABLE users ADD COLUMN custom_skin INTEGER DEFAULT -1",
                 "ALTER TABLE users ADD COLUMN custom_shirt INTEGER DEFAULT -1",
                 "ALTER TABLE users ADD COLUMN custom_style TEXT DEFAULT ''",
@@ -1680,3 +1682,33 @@ def increment_post_helpful(post_id):
         with conn.cursor() as c:
             c.execute("UPDATE posts SET helpful_count = helpful_count + 1 WHERE id = %s", (post_id,))
         conn.commit()
+
+
+def get_user_by_google_id(google_id):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("SELECT * FROM users WHERE google_id = %s", (google_id,))
+            return c.fetchone()
+
+def link_google_id(uid, google_id):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("UPDATE users SET google_id = %s WHERE id = %s", (google_id, uid))
+        conn.commit()
+
+def set_display_name(uid, name):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("UPDATE users SET display_name = %s WHERE id = %s", (name, uid))
+        conn.commit()
+
+def create_user_with_google(name, email, google_id):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute(
+                "INSERT INTO users (name, email, google_id, display_name, created_at) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+                (name, email, google_id, name, now()),
+            )
+            uid = c.fetchone()["id"]
+            conn.commit()
+            return uid

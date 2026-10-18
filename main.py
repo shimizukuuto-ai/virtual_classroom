@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Resp
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from authlib.integrations.starlette_client import OAuth
 from fastapi.responses import Response, StreamingResponse
 from ogp import class_card, profile_card
 from datetime import datetime, timedelta, timezone
@@ -18,7 +19,7 @@ from db import get_room_state, set_pomodoro, init_room_state
 
 from db import (
     init_pool, close_pool, init_posts,
-    create_user, get_user_by_name, get_user_by_id, set_user_lang,
+    create_user, get_user_by_name, get_user_by_id, set_user_lang, get_user_by_email, get_user_by_google_id, link_google_id, set_display_name, create_user_with_google,
     update_user_profile, set_user_skin, user_stats, calc_streak,
     list_classes_taught_by, list_weekly_classes,
     create_class, get_class_by_code, get_class_by_id, join_class,
@@ -55,6 +56,15 @@ from i18n import all_t, default_steps
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SECRET_KEY", "dev-only-key"))
+
+oauth = OAuth()
+oauth.register(
+    name='google',
+    client_id=os.environ.get('GOOGLE_CLIENT_ID'),
+    client_secret=os.environ.get('GOOGLE_CLIENT_SECRET'),
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_kwargs={'scope': 'openid email profile'},
+)
 templates = Jinja2Templates(directory="templates")
 
 os.makedirs("static/uploads", exist_ok=True)
@@ -130,6 +140,11 @@ def ctx(request, user, **extra):
         "allow_anonymous": False,
         "notes": [],
     }
+    # 表示名の適用
+    if user and user.get("display_name"):
+        user_dict = dict(user)
+        user_dict["name"] = user["display_name"]
+        base["user"] = user_dict
     base.update(extra)
     return base
 
@@ -222,6 +237,65 @@ def profile_edit(request: Request, uid: int, title: str = Form(""), bio: str = F
     update_user_profile(uid, title.strip(), bio.strip())
     return RedirectResponse(f"/u/{uid}", status_code=303)
 
+
+
+# ============================================================
+# Google OAuth
+# ============================================================
+@app.get("/login/google")
+async def login_google(request: Request):
+    redirect_uri = request.url_for('auth_google_callback')
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+@app.get("/auth/google/callback")
+async def auth_google_callback(request: Request):
+    try:
+        token = await oauth.google.authorize_access_token(request)
+    except Exception as e:
+        return RedirectResponse(url='/login?error=google_auth_failed')
+    
+    user_info = token.get('userinfo')
+    if not user_info:
+        return RedirectResponse(url='/login?error=no_userinfo')
+        
+    google_id = user_info.get('sub')
+    email = user_info.get('email')
+    google_name = user_info.get('name') or email.split('@')[0]
+
+    user = get_user_by_google_id(google_id)
+    if user:
+        request.session['user_id'] = int(user['id'])
+        return RedirectResponse(url='/dashboard', status_code=303)
+
+    user = get_user_by_email(email)
+    if user:
+        link_google_id(user['id'], google_id)
+        if not user.get('display_name'):
+            set_display_name(user['id'], google_name)
+        request.session['user_id'] = int(user['id'])
+        return RedirectResponse(url='/dashboard', status_code=303)
+
+    new_user_id = create_user_with_google(google_name, email, google_id)
+    request.session['user_id'] = new_user_id
+    return RedirectResponse(url='/setup-name', status_code=303)
+
+@app.get("/setup-name", response_class=HTMLResponse)
+def setup_name_page(request: Request):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse(request, "setup_name.html", ctx(request, user))
+
+@app.post("/setup-name")
+def setup_name_submit(request: Request, display_name: str = Form(...)):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    name = display_name.strip()
+    if not name:
+        return RedirectResponse("/setup-name", status_code=303)
+    set_display_name(user['id'], name)
+    return RedirectResponse("/dashboard", status_code=303)
 
 # ============================================================
 # dashboard

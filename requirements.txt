@@ -6,3 +6,5 @@ itsdangerous
 python-multipart
 psycopg[binary,pool]
 Pillow
+authlib
+httpx
