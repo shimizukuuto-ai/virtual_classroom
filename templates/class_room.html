@@ -493,7 +493,8 @@ main { padding: 16px 20px; }
           <code>{{ cls.join_code }}</code>
         </div>
       </div>
-      <a href="/dashboard" class="reset-view-btn" style="right: 200px; text-decoration: none; display: flex; align-items: center; justify-content: center; background: #ef4444;">{{ T.leave_room }}</a>
+      
+      <a href="/dashboard" class="reset-view-btn" style="right: 130px; text-decoration: none; display: inline-flex; align-items: center; background: #ef4444; border-color: #ef4444; color: #fff;">{{ T.leave_room }}</a>
       <button id="btn-view-toggle" class="view-toggle-btn" type="button">👁 {{ T.view_overview }}</button>
       
       <button id="btn-reset-view" class="reset-view-btn" type="button">{{ T.reset_view }}</button>
@@ -845,11 +846,9 @@ window.addEventListener("error", (e) => {
   console.error("Global error:", e.message, e.filename, e.lineno);
 });
 
-window.I18N = Object.assign({{ T | tojson }}, {
+window.I18N = Object.assign({}, {{ T | tojson }}, {
+  // テンプレート側で確実に上書きしたい項目があればここに書く
   ai_teacher_mode: {{ (1 if cls.ai_teacher_mode else 0) }},
-  posts: {{ T.posts|tojson }},
-  no_posts: {{ T.no_posts|tojson }},
-  open_post: {{ T.open_post|tojson }}
 });
 window.CLASS_ID = {{ cls.id }};
 window.CLASS_JOIN_CODE = {{ cls.join_code|tojson }};
