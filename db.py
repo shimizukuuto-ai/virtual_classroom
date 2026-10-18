@@ -1081,7 +1081,6 @@ def save_upload(data_b64, mime, size=0, kind="image"):
         conn.commit()
     return uid
 
-
 def get_upload(upload_id):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
@@ -1201,7 +1200,6 @@ def create_post(class_id, author_id, author_name, title, content, is_pinned=0, i
                 (class_id, author_id, author_name, title, content, is_pinned, is_public, now(), now())
             )
             return c.fetchone()["id"]
-
 
 def list_posts(class_id=None):
     with get_conn() as conn:
