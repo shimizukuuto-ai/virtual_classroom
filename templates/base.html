@@ -236,12 +236,12 @@ textarea { resize: vertical; min-height: 80px; }
 
 <script>
 window.SHARE_I18N = {
-  share: {{ T.share|tojson }},
-  later: {{ T.later|tojson }},
-  share_prompt_badge: {{ T.share_prompt_badge|tojson }},
-  share_prompt_post: {{ T.share_prompt_post|tojson }},
-  share_prompt_class: {{ T.share_prompt_class|tojson }},
-  share_prompt_streak: {{ T.share_prompt_streak|tojson }},
+  share: {{ T.get('share', '')|tojson }},
+  later: {{ T.get('later', '')|tojson }},
+  share_prompt_badge: {{ T.get('share_prompt_badge', '')|tojson }},
+  share_prompt_post: {{ T.get('share_prompt_post', '')|tojson }},
+  share_prompt_class: {{ T.get('share_prompt_class', '')|tojson }},
+  share_prompt_streak: {{ T.get('share_prompt_streak', '')|tojson }},
 };
 window.showSharePrompt = function(options) {
   var modal = document.getElementById('share-prompt-modal');
