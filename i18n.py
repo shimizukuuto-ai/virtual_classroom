@@ -1,6 +1,7 @@
 STRINGS = {
     "ja": {
         "app_title": "仮想教室",
+        "editor_hint": "テキストを選択して装飾したり、画像をドラッグ＆ドロップできます",
         "math_hint": "LaTeX記法（$...$ や $$...$$）が使えます",
         "rich_editor": "リッチエディタ（数式・HTML対応）",
         "class_schedule": "授業スケジュール",
@@ -385,6 +386,7 @@ STRINGS = {
         "threed_fallback": "Couldn't load 3D view",
 
         "app_title": "Virtual Classroom",
+        "editor_hint": "Select text to format or drag & drop images",
         "articles": "Articles",
         "find_article": "Find an Article",
         "read_article": "Read Article",
