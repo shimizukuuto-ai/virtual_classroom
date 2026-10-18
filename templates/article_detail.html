@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ post.title }} - {{ T.app_title }}{% endblock %}
+{% block content %}
+<div class="card">
+  <div style="font-size: 12px; color: #64748b; margin-bottom: 12px;">
+    {{ post.author_name }} · {{ post.created_at[:16] }}
+  </div>
+  <h1 style="margin-top: 0;">{{ post.title }}</h1>
+  <div style="font-size: 15px; line-height: 1.8; color: #334155; margin-bottom: 24px;">
+    {{ post.content|safe }}
+  </div>
+  <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+    <button id="btn-helpful" class="btn" style="background: #f59e0b;">👍 {{ T.helpful_count }} (<span id="helpful-count">{{ post.helpful_count }}</span>)</button>
+    <a href="/articles" class="btn gray">{{ T.back_to_articles }}</a>
+  </div>
+</div>
+
+<div class="card">
+  <h3>{{ T.comments }}</h3>
+  <div id="comment-list">
+    {% for c in comments %}
+    <div style="padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
+      <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">{{ c.author_name }} · {{ c.created_at[:16] }}</div>
+      <div style="font-size: 14px; color: #1e293b;">{{ c.body|safe }}</div>
+    </div>
+    {% else %}
+    <p class="muted">{{ T.no_comments }}</p>
+    {% endfor %}
+  </div>
+
+  {% if user %}
+  <form method="post" action="/articles/{{ post.id }}/comment" style="margin-top: 16px;">
+    <textarea name="body" rows="3" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 8px; font-family: inherit;" placeholder="HTMLや画像タグも使えます"></textarea>
+    <button type="submit" class="btn">{{ T.send }}</button>
+  </form>
+  {% endif %}
+</div>
+
+<script>
+document.getElementById('btn-helpful').addEventListener('click', async () => {
+  const res = await fetch('/api/articles/{{ post.id }}/helpful', { method: 'POST' });
+  if (res.ok) {
+    const d = await res.json();
+    document.getElementById('helpful-count').textContent = d.count;
+  }
+});
+</script>
+{% endblock %}

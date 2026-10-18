@@ -27,12 +27,13 @@
   .chat-input-area button { padding: 8px 12px; border-radius: 6px; border: none; background: #3b82f6; color: #fff; cursor: pointer; }
 </style>
 
+<button id="btn-leave" class="leave-btn" style="position: fixed; top: 70px; right: 20px; z-index: 9999;">{{ T.leave_room }}</button>
 <div class="room-info">
   <h2 style="margin: 0; font-size: 20px; color: #e2e8f0;">{{ cls.title }}</h2>
   <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">{{ T.room_study }} · {{ cls.subject }} ({{ members|length }}/12)</div>
 </div>
 
-<button id="btn-leave" class="leave-btn">{{ T.leave_study_room }}</button>
+
 
 <div class="timer-overlay state-idle" id="timer-container">
   <div id="timer-label">READY</div>

@@ -1,6 +1,14 @@
 STRINGS = {
     "ja": {
         "app_title": "仮想教室",
+        "back_to_articles": "記事一覧に戻る",
+        "article_detail": "記事の詳細",
+        "write_article": "記事を書く",
+        "helpful_count": "役に立った",
+        "search_by_teacher": "講師名で探す",
+        "popular_classes": "人気の授業",
+        "popular_teachers": "人気の講師",
+        "leave_room": "退出する",
         "articles": "記事・ノート",
         "find_article": "記事を探す",
         "read_article": "記事を読む",

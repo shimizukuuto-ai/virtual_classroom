@@ -40,7 +40,8 @@ from db import (
     remove_member_from_group, get_user_group, set_group_board,
     add_student_note, list_student_notes, delete_student_note,
     save_upload, get_upload,    set_user_customization, get_unlock_tier, UNLOCK_TIERS,
-    rate_teacher, get_teacher_rating, get_my_rating,    create_post, list_posts, get_post, delete_post, create_comment, list_comments, list_public_posts, migrate_posts,
+    rate_teacher, get_teacher_rating, get_my_rating,    create_post, list_posts, get_post, delete_post, create_comment, list_comments, list_public_posts,
+    list_popular_teachers, list_popular_classes, increment_post_helpful, migrate_posts,
     create_class_post, list_class_posts,
     create_post, list_posts, get_post, update_post, delete_post,
     add_comment, list_comments,
@@ -252,23 +253,27 @@ def dashboard(request: Request):
 # browse
 # ============================================================
 @app.get("/classes", response_class=HTMLResponse)
-def browse_classes(request: Request, q: str = "", subject: str = ""):
+def browse_classes(request: Request, q: str = "", subject: str = "", teacher: str = ""):
     user = current_user(request)
     if not user:
         return RedirectResponse("/login")
-    raw = list_public_classes(q, subject)
+    raw = list_public_classes(q, subject, teacher)
     results = []
     for c in raw:
         d = dict(c)
         d["student_count"] = count_students(c["id"])
         results.append(d)
     my_classes = {c["id"] for c in list_classes_for_user(user["id"])}
+    
+    popular_teachers = list_popular_teachers()
+    popular_classes = list_popular_classes()
+    
     return templates.TemplateResponse(
         request, "browse.html",
-        ctx(request, user, results=results, q=q, subject=subject,
-            my_classes=my_classes, subjects=list_subjects()),
+        ctx(request, user, results=results, q=q, subject=subject, teacher=teacher,
+            my_classes=my_classes, subjects=list_subjects(),
+            popular_teachers=popular_teachers, popular_classes=popular_classes),
     )
-
 
 @app.post("/classes/{class_id}/request")
 def request_join(request: Request, class_id: int):
@@ -1440,6 +1445,34 @@ async def pomodoro_stop(request: Request, class_id: int):
 # dev
 # ============================================================
 
+@app.get("/api/articles")
+def api_articles(q: str = "", limit: int = 50):
+    posts = list_public_posts(query=q, limit=limit)
+    return {"items": [dict(p) for p in posts]}
+
+@app.post("/api/study/{class_id}/leave")
+async def api_study_leave(request: Request, class_id: int):
+    user = current_user(request)
+    if user:
+        from db import leave_study_room
+        leave_study_room(class_id, user["id"])
+    return JSONResponse({"ok": True})
+
+
+@app.post("/articles/{pid}/comment")
+def article_comment(request: Request, pid: int, body: str = Form(...)):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    if body.strip():
+        add_comment(pid, user["id"], user["name"], body.strip())
+    return RedirectResponse(f"/articles/{pid}", status_code=303)
+
+# ============================================================
+# dev
+# ============================================================
+
+
 # ============================================================
 # articles
 # ============================================================
@@ -1455,22 +1488,27 @@ def articles_page(request: Request, q: str = ""):
         ctx(request, user, posts=posts, q=q, my_class_ids=my_class_ids)
     )
 
-@app.get("/api/articles")
-def api_articles(q: str = "", limit: int = 50):
-    posts = list_public_posts(query=q, limit=limit)
-    return {"items": [dict(p) for p in posts]}
-
-@app.post("/api/study/{class_id}/leave")
-async def api_study_leave(request: Request, class_id: int):
+@app.get("/articles/{pid}", response_class=HTMLResponse)
+def article_detail(request: Request, pid: int):
     user = current_user(request)
-    if user:
-        from db import leave_study_room
-        leave_study_room(class_id, user["id"])
-    return JSONResponse({"ok": True})
+    post = get_post(pid)
+    if not post:
+        return RedirectResponse("/articles")
+    comments = list_comments(pid)
+    return templates.TemplateResponse(
+        request, "article_detail.html",
+        ctx(request, user, post=post, comments=comments)
+    )
 
-# ============================================================
-# dev
-# ============================================================
+@app.post("/api/articles/{pid}/helpful")
+async def api_article_helpful(request: Request, pid: int):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    increment_post_helpful(pid)
+    p = get_post(pid)
+    return JSONResponse({"ok": True, "count": p["helpful_count"]})
+
 
 if os.environ.get("ENABLE_DEV") == "1":
     @app.get("/dev/users", response_class=HTMLResponse)
