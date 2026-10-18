@@ -2340,41 +2340,39 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
     const title = titleEl.value.trim();
     
     let content = "";
-    if (postQuill) {
-      content = postQuill.root.innerHTML;
-      if (postQuill.getText().trim().length === 0) return;
+    if (window.postQuill) {
+      content = window.postQuill.root.innerHTML;
+      if (window.postQuill.getText().trim().length === 0) return;
     } else {
       const contentEl = document.getElementById("new-post-content");
-      if (!contentEl) return;
-      content = contentEl.value.trim();
-      if (!content) return;
+      if (contentEl) {
+        content = contentEl.value.trim();
+        if (!content) return;
+      } else {
+        return;
+      }
     }
-    
+
     const btn = document.getElementById("btn-post-submit");
-    btn.disabled = true;
-    btn.textContent = "...";
-    
+    btn.disabled = true; btn.textContent = "...";
+
     try {
       const res = await fetch('/api/posts/' + window.CLASS_ID, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, content })
       });
       if (res.ok) {
         document.getElementById("post-drawer").classList.remove("open");
-        if (postQuill) postQuill.root.innerHTML = "";
+        if (window.postQuill) window.postQuill.root.innerHTML = "";
         titleEl.value = "";
         await loadPosts();
       } else {
         const d = await res.json().catch(() => ({}));
         alert("Error: " + (d.error || res.status));
       }
-    } catch (e) {
-      alert("Error: " + e);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = I18N.submit || "投稿する";
-    }
+    } catch (e) { alert("Error: " + e); }
+    
+    btn.disabled = false; btn.textContent = I18N.submit || "投稿する";
   });
 
 
