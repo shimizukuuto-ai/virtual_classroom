@@ -503,6 +503,7 @@ main { padding: 16px 20px; }
       
 
       
+
 <a href="/dashboard" id="btn-leave" class="btn">{{ T.leave_room }}</a>
 <button id="btn-view-toggle" class="view-toggle-btn" type="button">👁 {{ T.view_overview }}</button>
       
@@ -856,10 +857,10 @@ main { padding: 16px 20px; }
 
 <script>
   // ===== グローバル変数の確実な初期化 =====
-  window.I18N = {{ I18N_JSON|safe }};
-  window.CLASS_ID = {{ cls.id }};
-  window.ROLE = "{{ role }}";
-  window.USER_NAME = "{{ user.name }}";
+  
+  
+  
+  
   window.INITIAL_BB = {{ (cls.blackboard or '')|tojson }};
   window.MEMBERS = {{ members|tojson }};
 
