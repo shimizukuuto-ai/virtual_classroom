@@ -1,6 +1,11 @@
 STRINGS = {
     "ja": {
         "app_title": "仮想教室",
+        "setup_name_submit": "決定して始める",
+        "setup_name_desc": "アプリ内で表示される名前を決めてください。",
+        "setup_name_welcome": "ようこそ！",
+        "setup_name_title": "名前の設定",
+        "google_login": "Googleでログイン",
         "editor_hint": "テキストを選択して装飾したり、画像をドラッグ＆ドロップできます",
         "math_hint": "LaTeX記法（$...$ や $$...$$）が使えます",
         "rich_editor": "リッチエディタ（数式・HTML対応）",
