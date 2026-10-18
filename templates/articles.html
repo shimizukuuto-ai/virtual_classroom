@@ -11,6 +11,10 @@
   .article-content img { max-width: 100%; border-radius: 6px; margin-top: 8px; }
   .article-footer { border-top: 1px solid #f1f5f9; padding-top: 12px; display: flex; justify-content: space-between; align-items: center; }
   .class-tag { font-size: 11px; background: #eff6ff; color: #2563eb; padding: 4px 10px; border-radius: 12px; }
+  .btn-join { font-size: 12px; padding: 6px 12px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; color: #fff; }
+  .btn-join.open { background: #10b981; }
+  .btn-join.request { background: #6366f1; }
+  .btn-join.private { background: #64748b; }
 </style>
 
 <div class="card" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
@@ -37,7 +41,20 @@
     </div>
     <div class="article-footer">
       <span class="class-tag">{{ p.class_title }}</span>
-      <div style="font-size: 12px; color: #f59e0b;">👍 {{ p.helpful_count or 0 }}</div>
+      
+      {% if user and p.class_id in my_class_ids %}
+        <span style="font-size: 12px; color: #10b981; font-weight: bold;">✓ {{ T.already_member }}</span>
+      {% elif not user %}
+        <a href="/login" class="btn-join request" onclick="event.stopPropagation();">ログインして参加</a>
+      {% else %}
+        {% if p.class_is_public == 2 %}
+          <a href="/classes/{{ p.class_id }}/open" class="btn-join open" onclick="event.stopPropagation();">{{ T.join }}</a>
+        {% elif p.class_is_public == 1 %}
+          <button class="btn-join request" onclick="event.stopPropagation(); requestJoin({{ p.class_id }})">{{ T.request_join }}</button>
+        {% else %}
+          <a href="/join_class" class="btn-join private" onclick="event.stopPropagation();">コードで参加</a>
+        {% endif %}
+      {% endif %}
     </div>
   </div>
   {% endfor %}
@@ -47,4 +64,20 @@
   <p>{{ T.no_posts }}</p>
 </div>
 {% endif %}
+
+<script>
+async function requestJoin(classId) {
+  try {
+    const res = await fetch(`/classes/${classId}/request`, { method: 'POST' });
+    if (res.ok) {
+      alert('{{ T.request_sent }}');
+      window.location.reload();
+    } else {
+      alert('Failed to send request');
+    }
+  } catch (e) {
+    alert('Error: ' + e);
+  }
+}
+</script>
 {% endblock %}
