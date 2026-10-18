@@ -1,3 +1,13 @@
+
+<script>
+  // グローバル変数の確実な定義（ここで失敗したら全てが終わるため、最も安全な形で記述）
+  window.CLASS_ID = Number("{{ cls.id }}");
+  window.ROLE = "{{ role }}";
+  window.USER_NAME = "{{ user.name }}";
+  window.INITIAL_BB = {{ (cls.blackboard or '')|tojson }};
+  window.MEMBERS = {{ members|tojson }};
+  window.I18N = {{ T | tojson }};
+</script>
 {% extends "base.html" %}
 {% block extra_head %}
 <meta property="og:image" content="https://virtual-classroom-sg.onrender.com/class/{{ cls.id }}/card.png">
@@ -2858,7 +2868,7 @@ function drawBlackboardText(text) {
       attCtx.textAlign = "center";
       attCtx.fillText("ATTENDANCE", W/2, 30);
       attCtx.fillStyle = "#fff"; attCtx.font = "bold 48px sans-serif";
-      attCtx.fillText(String(MEMBERS.length), W/2, 85);
+      attCtx.fillText(String(window.MEMBERS ? window.MEMBERS.length : 0), W/2, 85);
       attCtx.fillStyle = "#93c5fd"; attCtx.font = "12px sans-serif";
       attCtx.fillText("members", W/2, 108);
       attTex.needsUpdate = true;
@@ -2874,6 +2884,7 @@ function drawBlackboardText(text) {
        AVATARS (improved)
     ========================================================= */
     function hashName(name) {
+      if (!name) return 0;
       let h = 0;
       for (let i = 0; i < name.length; i++) h = ((h<<5)-h + name.charCodeAt(i)) | 0;
       return Math.abs(h);

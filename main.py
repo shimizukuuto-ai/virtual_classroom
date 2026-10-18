@@ -451,11 +451,6 @@ def class_room(request: Request, class_id: int):
     groups = list_groups(class_id)
     my_group = get_user_group(class_id, user["id"]) if role == "student" else None
     
-    # 翻訳データをJSON文字列に変換して渡す
-    lang = user["lang"] or "ja"
-    i18n_dict = all_t(lang).copy()
-    i18n_dict["ai_teacher_mode"] = 1 if cls.get("ai_teacher_mode") else 0
-    i18n_json = json.dumps(i18n_dict, ensure_ascii=False)
 
     template_name = "study_room.html" if (cls.get("room_type") or "class") == "study" else "class_room.html"
     return templates.TemplateResponse(
@@ -469,7 +464,7 @@ def class_room(request: Request, class_id: int):
             duration=cls.get("duration") or 30,
             ends_at=cls.get("ends_at") or "",
             posts=list_posts(class_id=class_id),
-            I18N_JSON=i18n_json
+            
         ),
     )
 
