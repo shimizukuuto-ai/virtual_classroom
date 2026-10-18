@@ -242,11 +242,13 @@ async def auth_google_callback(request: Request):
     email = user_info.get('email')
     google_name = user_info.get('name') or email.split('@')[0]
 
+    # 1. google_id で検索
     user = get_user_by_google_id(google_id)
     if user:
         request.session['user_id'] = int(user['id'])
         return RedirectResponse(url='/dashboard', status_code=303)
 
+    # 2. email で検索
     user = get_user_by_email(email)
     if user:
         link_google_id(user['id'], google_id)
@@ -255,10 +257,24 @@ async def auth_google_callback(request: Request):
         request.session['user_id'] = int(user['id'])
         return RedirectResponse(url='/dashboard', status_code=303)
 
-    new_user_id = create_user_with_google(google_name, email, google_id)
+    # 3. 新規作成（万が一の重複エラーをキャッチ）
+    try:
+        new_user_id = create_user_with_google(google_name, email, google_id)
+    except Exception as e:
+        # 重複エラー等が起きた場合は、もう一度emailで探して紐付ける
+        user = get_user_by_email(email)
+        if user:
+            link_google_id(user['id'], google_id)
+            if not user.get('display_name'):
+                set_display_name(user['id'], google_name)
+            request.session['user_id'] = int(user['id'])
+            return RedirectResponse(url='/dashboard', status_code=303)
+        # それでもダメならエラー画面へ
+        traceback.print_exc()
+        return RedirectResponse(url='/login?error=creation_failed', status_code=303)
+        
     request.session['user_id'] = new_user_id
     return RedirectResponse(url='/setup-name', status_code=303)
-
 @app.get("/setup-name", response_class=HTMLResponse)
 def setup_name_page(request: Request):
     user = current_user(request)
