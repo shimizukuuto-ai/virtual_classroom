@@ -1,12 +1,22 @@
 
 <script>
-  // グローバル変数の確実な定義（ここで失敗したら全てが終わるため、最も安全な形で記述）
+  // グローバル変数の確実な定義
   window.CLASS_ID = Number("{{ cls.id }}");
   window.ROLE = "{{ role }}";
   window.USER_NAME = "{{ user.name }}";
   window.INITIAL_BB = {{ (cls.blackboard or '')|tojson }};
   window.MEMBERS = {{ members|tojson }};
   window.I18N = {{ T | tojson }};
+</script>
+
+<script>
+  // グローバル変数の確実な定義（ここで失敗したら全てが終わるため、最も安全な形で記述）
+  
+  
+  
+  
+  window.MEMBERS = {{ members|tojson }};
+  
 </script>
 {% extends "base.html" %}
 {% block extra_head %}
@@ -844,7 +854,7 @@ main { padding: 16px 20px; }
   </div>
   
     <div style="margin-bottom: 8px; font-size: 12px; color: #9ca3af;">{{ T.editor_hint }}</div>
-    <div id="post-editor-container" style="height: 250px; background: #fff; color: #000; border-radius: 8px;"></div>
+    <textarea id="new-post-content" placeholder="本文を入力..." style="width:100%;min-height:160px;background:#0f1117;color:#e5e7eb;border:1px solid #2a2e3a;border-radius:8px;padding:14px;box-sizing:border-box;line-height:1.6;resize:vertical;"></textarea>
     
   <div style="margin-top:10px;display:flex;gap:8px;">
     <button id="btn-post-submit" class="btn green">{{ T.submit }}</button>
