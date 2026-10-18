@@ -2334,6 +2334,7 @@ window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
   }
 
   // 投稿ボタンのイベント
+  window.postQuill = postQuill;
   document.getElementById("btn-post-submit").addEventListener("click", async () => {
     const titleEl = document.getElementById("new-post-title");
     if (!titleEl) return;
