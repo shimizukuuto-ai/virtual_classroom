@@ -1192,17 +1192,15 @@ def set_share_record(class_id, role, share):
 
 
 # ===== bulletin board (posts / comments) =====
-def create_post(class_id, author_id, author_name, title, content, is_pinned=0):
+def create_post(class_id, author_id, author_name, title, content, is_pinned=0, is_public=1):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
             c.execute(
-                """INSERT INTO posts (class_id, author_id, author_name, title, content, is_pinned, created_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-                (class_id, author_id, author_name, title, content, is_pinned, now()),
+                """INSERT INTO posts (class_id, author_id, author_name, title, content, is_pinned, is_public, created_at, updated_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (class_id, author_id, author_name, title, content, is_pinned, is_public, now(), now())
             )
-            pid = c.fetchone()["id"]
-        conn.commit()
-    return pid
+            return c.fetchone()["id"]
 
 
 def list_posts(class_id=None):
@@ -1305,14 +1303,16 @@ def init_posts():
                 )
             """)
 
-def create_post(author_id, author_name, title, body, tags="", class_id=None, is_public=1):
-    now = datetime.datetime.utcnow().isoformat()
-    with _cursor() as c:
-        row = c.execute("""
-            INSERT INTO posts (author_id, author_name, title, body, tags, class_id, is_public, created_at, updated_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
-        """, (author_id, author_name, title, body, tags, class_id, is_public, now, now)).fetchone()
-        return row["id"]
+def create_post(class_id, author_id, author_name, title, content, is_pinned=0, is_public=1):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute(
+                """INSERT INTO posts (class_id, author_id, author_name, title, content, is_pinned, is_public, created_at, updated_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (class_id, author_id, author_name, title, content, is_pinned, is_public, now(), now())
+            )
+            return c.fetchone()["id"]
+
 
 def list_posts(q="", class_id=None, limit=50):
     sql = "SELECT * FROM posts WHERE is_public = 1"
@@ -1510,6 +1510,7 @@ def create_post(class_id, author_id, author_name, title, content, is_pinned=0, i
             )
             return c.fetchone()["id"]
 
+
 def list_public_posts(query="", limit=50):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
@@ -1603,13 +1604,14 @@ def migrate_posts():
 
 def create_post(class_id, author_id, author_name, title, content, is_pinned=0, is_public=1):
     with get_conn() as conn:
-        with conn.cursor() as c:
+        with conn.cursor(row_factory=dict_row) as c:
             c.execute(
                 """INSERT INTO posts (class_id, author_id, author_name, title, content, is_pinned, is_public, created_at, updated_at)
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
                 (class_id, author_id, author_name, title, content, is_pinned, is_public, now(), now())
             )
             return c.fetchone()["id"]
+
 
 def list_public_posts(query="", limit=20):
     with get_conn() as conn:
