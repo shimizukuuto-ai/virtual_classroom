@@ -285,25 +285,31 @@ def create_user(name, email=None, lang="en"):
                 return None
 
 
+def _apply_display_name(user):
+    if user and user.get("display_name"):
+        user = dict(user)
+        user["name"] = user["display_name"]
+    return user
+
 def get_user_by_name(name):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
             c.execute("SELECT * FROM users WHERE name = %s", (name,))
-            return c.fetchone()
+            return _apply_display_name(c.fetchone()) and _apply_display_name(c.fetchone())
 
 
 def get_user_by_email(email):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
             c.execute("SELECT * FROM users WHERE email = %s", (email,))
-            return c.fetchone()
+            return _apply_display_name(c.fetchone()) and _apply_display_name(c.fetchone())
 
 
 def get_user_by_id(uid):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
             c.execute("SELECT * FROM users WHERE id = %s", (uid,))
-            return c.fetchone()
+            return _apply_display_name(c.fetchone()) and _apply_display_name(c.fetchone())
 
 
 def set_user_lang(uid, lang):
@@ -630,7 +636,7 @@ def list_members(class_id):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
             c.execute(
-                """SELECT u.id AS user_id, u.name, u.skin,
+                """SELECT u.id AS user_id, COALESCE(u.display_name, u.name) AS name, u.skin,
                    u.custom_hair, u.custom_skin, u.custom_shirt, u.custom_style,
                    e.role FROM enrollments e
                    JOIN users u ON u.id = e.user_id
@@ -1688,7 +1694,7 @@ def get_user_by_google_id(google_id):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
             c.execute("SELECT * FROM users WHERE google_id = %s", (google_id,))
-            return c.fetchone()
+            return _apply_display_name(c.fetchone()) and _apply_display_name(c.fetchone())
 
 def link_google_id(uid, google_id):
     with get_conn() as conn:

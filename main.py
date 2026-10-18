@@ -141,10 +141,6 @@ def ctx(request, user, **extra):
         "notes": [],
     }
     # 表示名の適用
-    if user and user.get("display_name"):
-        user_dict = dict(user)
-        user_dict["name"] = user["display_name"]
-        base["user"] = user_dict
     base.update(extra)
     return base
 
