@@ -291,13 +291,6 @@ def _apply_display_name(user):
         user["name"] = user["display_name"]
     return user
 
-def get_user_by_name(name):
-    with get_conn() as conn:
-        with conn.cursor(row_factory=dict_row) as c:
-            c.execute("SELECT * FROM users WHERE name = %s", (name,))
-            return _apply_display_name(c.fetchone())
-
-
 def get_class_by_id(cid):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
@@ -1438,29 +1431,60 @@ def increment_post_helpful(post_id):
         conn.commit()
 
 
+
+
+def get_user_by_name(name):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("SELECT * FROM users WHERE name = %s", (name,))
+            row = c.fetchone()
+    if row and row.get("display_name"):
+        row = dict(row)
+        row["name"] = row["display_name"]
+    return row
+
+
+def get_user_by_id(uid):
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("SELECT * FROM users WHERE id = %s", (uid,))
+            row = c.fetchone()
+    if row and row.get("display_name"):
+        row = dict(row)
+        row["name"] = row["display_name"]
+    return row
+
+
+def get_user_by_email(email):
+    if not email:
+        return None
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as c:
+            c.execute("SELECT * FROM users WHERE email = %s", (email,))
+            row = c.fetchone()
+    if row and row.get("display_name"):
+        row = dict(row)
+        row["name"] = row["display_name"]
+    return row
+
+
 def get_user_by_google_id(google_id):
+    if not google_id:
+        return None
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
             c.execute("SELECT * FROM users WHERE google_id = %s", (google_id,))
-            return _apply_display_name(c.fetchone()) and _apply_display_name(c.fetchone())
+            row = c.fetchone()
+    if row and row.get("display_name"):
+        row = dict(row)
+        row["name"] = row["display_name"]
+    return row
 
-def link_google_id(uid, google_id):
-    with get_conn() as conn:
-        with conn.cursor() as c:
-            c.execute("UPDATE users SET google_id = %s WHERE id = %s", (google_id, uid))
-        conn.commit()
-
-def set_display_name(uid, name):
-    with get_conn() as conn:
-        with conn.cursor() as c:
-            c.execute("UPDATE users SET display_name = %s WHERE id = %s", (name, uid))
-        conn.commit()
 
 def create_user_with_google(name, email, google_id):
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
-            # 名前が重複する場合はサフィックスを付けて一意にする
-            base_name = name.strip() or email.split('@')[0]
+            base_name = (name or "").strip() or (email.split('@')[0] if email else 'user')
             unique_name = base_name
             counter = 1
             while True:
@@ -1469,11 +1493,24 @@ def create_user_with_google(name, email, google_id):
                     break
                 unique_name = f"{base_name}_{counter}"
                 counter += 1
-
             c.execute(
                 "INSERT INTO users (name, email, google_id, display_name, created_at) VALUES (%s, %s, %s, %s, %s) RETURNING id",
-                (unique_name, email, google_id, name, now()),
+                (unique_name, email, google_id, base_name, now()),
             )
             uid = c.fetchone()["id"]
             conn.commit()
             return uid
+
+
+def link_google_id(uid, google_id):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("UPDATE users SET google_id = %s WHERE id = %s", (google_id, uid))
+        conn.commit()
+
+
+def set_display_name(uid, name):
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("UPDATE users SET display_name = %s WHERE id = %s", (name, uid))
+        conn.commit()
