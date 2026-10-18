@@ -1763,3 +1763,38 @@ def invite(request: Request, code: str):
     return templates.TemplateResponse(
         request, "invite.html", ctx(request, user, cls=cls, code=code)
     )
+
+# ============================================================
+# Legal Pages
+# ============================================================
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy_policy():
+    return """
+    <html>
+    <head><title>プライバシーポリシー</title></head>
+    <body style="font-family: sans-serif; padding: 40px; max-width: 800px; margin: auto;">
+        <h1>プライバシーポリシー</h1>
+        <p>本アプリ（Virtual Classroom）は、Googleアカウントによるログイン機能を提供するため、ユーザーのメールアドレスおよびプロフィール情報（名前、プロフィール画像）を取得します。</p>
+        <p>取得した情報は、本アプリ内でのユーザー識別およびログイン機能の提供にのみ使用し、第三者に提供することはありません。</p>
+        <p>お問い合わせ: lhugyftyrtud@gmail.com</p>
+        <p><a href="/login">ログイン画面に戻る</a></p>
+    </body>
+    </html>
+    """
+
+@app.get("/terms", response_class=HTMLResponse)
+def terms_of_service():
+    return """
+    <html>
+    <head><title>利用規約</title></head>
+    <body style="font-family: sans-serif; padding: 40px; max-width: 800px; margin: auto;">
+        <h1>利用規約</h1>
+        <p>本アプリ（Virtual Classroom）をご利用いただくにあたり、以下の規約に同意していただく必要があります。</p>
+        <p>1. 本アプリは教育目的で提供されています。<br>
+           2. 他のユーザーへの迷惑行為、誹謗中傷、不正アクセスを禁止します。<br>
+           3. 本アプリの利用によって生じた損害について、開発者は一切の責任を負いません。</p>
+        <p>お問い合わせ: lhugyftyrtud@gmail.com</p>
+        <p><a href="/login">ログイン画面に戻る</a></p>
+    </body>
+    </html>
+    """
