@@ -1208,9 +1208,9 @@ def create_post(class_id, author_id, author_name, title, content, is_pinned=0, i
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
             c.execute(
-                """INSERT INTO posts (class_id, author_id, author_name, title, content, is_pinned, is_public, created_at, updated_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-                (class_id, author_id, author_name, title, content, is_pinned, is_public, now(), now()),
+                """INSERT INTO posts (class_id, author_id, author_name, title, content, body, is_pinned, is_public, created_at, updated_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (class_id, author_id, author_name, title, content, content, is_pinned, is_public, now(), now()),
             )
             pid = c.fetchone()["id"]
         conn.commit()
@@ -1319,9 +1319,9 @@ def create_post(class_id, author_id, author_name, title, content, is_pinned=0, i
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as c:
             c.execute(
-                """INSERT INTO posts (class_id, author_id, author_name, title, content, is_pinned, is_public, created_at, updated_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-                (class_id, author_id, author_name, title, content, is_pinned, is_public, now(), now()),
+                """INSERT INTO posts (class_id, author_id, author_name, title, content, body, is_pinned, is_public, created_at, updated_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (class_id, author_id, author_name, title, content, content, is_pinned, is_public, now(), now()),
             )
             pid = c.fetchone()["id"]
         conn.commit()
