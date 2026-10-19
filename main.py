@@ -59,6 +59,8 @@ app = FastAPI()
 # VC_SESSIONS_V1
 from vc_sessions import router as vc_sessions_router, initialize as init_vc_sessions
 app.include_router(vc_sessions_router)
+from vc_social_features import router as vc_social_router, initialize as init_vc_social
+app.include_router(vc_social_router)
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SECRET_KEY", "dev-only-key"))
 
 oauth = OAuth()
@@ -153,6 +155,7 @@ def ctx(request, user, **extra):
 def startup():
     init_pool()
     init_vc_sessions()
+    init_vc_social()
     init_posts()
     migrate_posts()
     init_room_state()
@@ -1283,6 +1286,7 @@ async def audio_ws(websocket: WebSocket, class_id: int):
         return
 
     is_interview = bool(cls.get("is_interview"))
+    is_social = (cls.get("room_type") or "class") == "social"
     is_study = (cls.get("room_type") or "class") == "study"
     study_voice = bool(cls.get("study_voice_enabled"))
 
@@ -1295,7 +1299,7 @@ async def audio_ws(websocket: WebSocket, class_id: int):
             data = await websocket.receive()
             if "bytes" in data and data["bytes"] is not None:
                 # 面談: 双方向 / 自習室(音声有効): 全員 / 通常: 教師のみ
-                if is_interview:
+                if is_interview or is_social:
                     pass
                 elif is_study and study_voice:
                     pass
