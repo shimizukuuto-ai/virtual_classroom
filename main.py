@@ -56,6 +56,9 @@ from i18n import all_t, default_steps
 
 
 app = FastAPI()
+# VC_SESSIONS_V1
+from vc_sessions import router as vc_sessions_router, initialize as init_vc_sessions
+app.include_router(vc_sessions_router)
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SECRET_KEY", "dev-only-key"))
 
 oauth = OAuth()
@@ -149,6 +152,7 @@ def ctx(request, user, **extra):
 @app.on_event("startup")
 def startup():
     init_pool()
+    init_vc_sessions()
     init_posts()
     migrate_posts()
     init_room_state()
