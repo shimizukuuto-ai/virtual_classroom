@@ -82,6 +82,42 @@
 }
 </style>
 
+
+<!-- VC_UX_DESIGN_V2 -->
+<style>
+.vc2-avatar-guide {
+  padding:18px 22px;
+  margin-bottom:22px;
+  border:1px solid #c7d2fe;
+  border-radius:18px;
+  background:#eef2ff;
+  color:#312e81;
+}
+.vc2-avatar-guide p {
+  margin:8px 0 0;
+  line-height:1.8;
+  font-size:14px;
+}
+@media(max-width:900px) {
+  .cust-preview-card {
+    position:relative !important;
+    top:auto !important;
+  }
+  .cust-swatch, .cust-style {
+    min-height:44px;
+  }
+}
+</style>
+<div class="vc2-avatar-guide">
+  <strong>🎨 {{ 'Customize Your Avatar' if lang == 'en' else 'アバターをカスタマイズ' }}</strong>
+  <p>
+    ① {{ 'Choose your style and colors' if lang == 'en' else '好きなスタイルと色を選ぶ' }}<br>
+    ② {{ 'Drag the 3D preview to explore' if lang == 'en' else '3Dプレビューをドラッグして確認' }}<br>
+    ③ {{ 'Save your changes when ready' if lang == 'en' else '変更を保存して完成' }}
+  </p>
+</div>
+<!-- /VC_UX_DESIGN_V2 -->
+
 <div class="cust-head">
   <h1>{{ T.customize }}</h1>
   <p>{{ T.customize_desc }}</p>
