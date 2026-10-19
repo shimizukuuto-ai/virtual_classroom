@@ -1,0 +1,3982 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+<style>
+  .ql-container { font-family: inherit; font-size: 14px; background: #fff; color: #000; min-height: 200px; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
+  .ql-toolbar { background: #f8fafc; border-top-left-radius: 8px; border-top-right-radius: 8px; }
+</style>
+<meta property="og:image" content="https://virtual-classroom-sg.onrender.com/class/{{ cls.id }}/card.png">
+<meta property="og:title" content="{{ cls.title }} - Virtual Classroom">
+<meta property="og:description" content="{{ cls.subject }} · {{ cls.description or '' }}">
+<meta name="twitter:card" content="summary_large_image">
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (sessionStorage.getItem('just_created_class') === '1') {
+    sessionStorage.removeItem('just_created_class');
+    window.showSharePrompt({
+      icon: '🎓',
+      text: window.SHARE_I18N.share_prompt_class,
+      url: location.origin + '/invite/{{ cls.join_code }}'
+    });
+    return;
+  }
+  var streak = {{ streak|default(0) }};
+  if (streak > 0 && streak % 7 === 0) {
+    var key = 'streak_prompt_' + streak;
+    if (!sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, '1');
+      window.showSharePrompt({
+        icon: '🔥',
+        text: window.SHARE_I18N.share_prompt_streak,
+        url: location.origin + '/u/{{ user.id }}'
+      });
+    }
+  }
+});
+</script>
+
+{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block title %}{{ cls.title }} - {{ T.app_title }}{% endblock %}
+
+
+
+
+
+{% block content %}
+
+<!-- VC_SOCIAL_ROOM_I18N -->
+<style>
+.vc-social-banner {
+  background:linear-gradient(120deg,#182942,#185c55);
+  border:1px solid #428d81;
+  border-radius:18px;
+  padding:20px;
+  color:white;
+  margin-bottom:16px;
+}
+.vc-social-banner h2 {
+  color:white;
+  font-size:24px;
+  margin:0 0 8px;
+}
+.vc-social-banner p {
+  color:#d5e8e4;
+  margin:0 0 12px;
+}
+.vc-social-features {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.vc-social-features span {
+  background:rgba(255,255,255,.12);
+  padding:7px 12px;
+  border-radius:20px;
+  font-size:12px;
+}
+</style>
+
+{% set social_ja = (lang|default("ja")) == "ja" %}
+
+<div class="vc-social-banner">
+
+  <h2>
+    💬 {{ cls.title }}
+  </h2>
+
+  <p>
+    {% if social_ja %}
+      気軽に話そう。学ぼう。つながろう。
+    {% else %}
+      Talk, learn, and connect.
+    {% endif %}
+  </p>
+
+  <div class="vc-social-features">
+
+    <span>
+      🎤 {{ "音声交流" if social_ja else "Voice Chat" }}
+    </span>
+
+    <span>
+      💬 {{ "チャット" if social_ja else "Text Chat" }}
+    </span>
+
+    <span>
+      🌍 {{ "3Dルーム" if social_ja else "3D Room" }}
+    </span>
+
+    <span>
+      🤝 {{ "コミュニティ" if social_ja else "Community" }}
+    </span>
+
+  </div>
+
+</div>
+
+<script>window.CLASS_ID = {{ cls.id }};</script>
+<script>window.ROLE = {{ role|tojson }};</script>
+<script>window.USER_NAME = {{ user.name|tojson }};</script>
+<script>window.INITIAL_BB = {{ (cls.blackboard or '')|tojson }};</script>
+<script>window.MEMBERS = {{ members|tojson }};</script>
+<script>window.I18N = {{ T|tojson }};</script>
+<script>window.TEACHER_DISPLAY_NAME = {{ (cls.taught_by or T.teacher)|tojson }};</script>
+<script>window.IS_INTERVIEW = {{ (1 if (cls.get("is_interview") or cls.get("room_type") == "social") else 0)|tojson }};</script>
+<script>window.RECORD_T = {{ (1 if cls.get("record_shared_teacher") else 0)|tojson }};</script>
+<script>window.RECORD_S = {{ (1 if cls.get("record_shared_student") else 0)|tojson }};</script>
+<script>window.CLASS_JOIN_CODE = {{ cls.join_code|tojson }};</script>
+<script>window.CLASS_TITLE = {{ cls.title|tojson }};</script>
+<script>window.CLASS_SUBJECT = {{ cls.subject|tojson }};</script>
+<script>window.ALLOW_ANONYMOUS = {{ (1 if allow_anonymous else 0)|tojson }};</script>
+<script>window.STEPS = [{% for s in steps %}{id: {{ s.id }}, title: {{ s.title|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];</script>
+<script>window.INITIAL_QUESTIONS = [{% for q in questions %}{id: {{ q.id }}, content: {{ q.content|tojson }}, answer: {{ (q.answer or '')|tojson }}, is_anonymous: {{ q.is_anonymous }}, asker: {{ (q.asker_name or '')|tojson }}, answerer: {{ (q.answerer_name or '')|tojson }}, created_at: {{ q.created_at|tojson }}, answered_at: {{ (q.answered_at or '')|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];</script>
+<script>window.INITIAL_FILES = [{% for f in files %}{id: {{ f.id }}, filename: {{ f.filename|tojson }}, url: {{ f.url|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];</script>
+<script>window.INITIAL_POSTS = [{% for p in posts %}{id: {{ p.id }}, title: {{ p.title|tojson }}, author: {{ p.author_name|tojson }}, content: {{ p.content|tojson }}, is_pinned: {{ p.is_pinned }}, comment_count: {{ p.comment_count or 0 }}, created_at: {{ p.created_at|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];</script>
+<script>window.INITIAL_GROUPS = {{ groups|tojson }};</script>
+<script>window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};</script>
+<script>
+  if (window.IS_INTERVIEW === undefined) window.IS_INTERVIEW = 0;
+  console.log("[3D DEBUG] CLASS_ID=" + window.CLASS_ID + " IS_INTERVIEW=" + window.IS_INTERVIEW + " TEACHER=" + window.TEACHER_DISPLAY_NAME);
+</script>
+
+
+<script>
+  window.CLASS_ID = Number("{{ cls.id }}");
+  window.ROLE = "{{ role }}";
+  window.USER_NAME = "{{ user.name }}";
+  window.INITIAL_BB = {{ (cls.blackboard or '')|tojson }};
+  window.MEMBERS = {{ members|tojson }};
+  window.I18N = {{ T | tojson }};
+</script>
+<style>
+body { background: #0f1117 !important; }
+main { padding: 16px 20px; }
+
+.room-grid {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 1000px) { .room-grid { grid-template-columns: 1fr; } }
+
+#canvas-container {
+  width: 100%; height: 56vh; min-height: 380px;
+  position: relative; border-radius: 18px; overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0,0,0,.5);
+  cursor: grab;
+  background: linear-gradient(180deg, #7fb5e6 0%, #a8cfee 45%, #cfc3f4 80%, #e8f1f8 100%);
+  touch-action: none;
+}
+#canvas-container:active { cursor: grabbing; }
+.hud {
+  position: absolute; top: 14px; left: 14px;
+  background: rgba(15,17,23,.85); backdrop-filter: blur(12px);
+  color: #fff; padding: 12px 16px; border-radius: 12px;
+  font-size: 12px; pointer-events: none;
+  border: 1px solid rgba(255,255,255,.08);
+  max-width: 320px;
+}
+.hud h2 { margin: 0 0 4px 0; font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+.hud .meta { color: #b8c4d8; font-size: 11px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.hud code { background: rgba(255,255,255,.1); padding: 2px 7px; border-radius: 5px; color: #fbbf24; font-weight: 600; font-family: ui-monospace, monospace; }
+.hud .role-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; letter-spacing: .05em; }
+.hud .role-badge.teacher { background: #fef3c7; color: #92400e; }
+.hud .role-badge.student { background: #d1fae5; color: #047857; }
+.hint { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); background: rgba(15,17,23,.75); backdrop-filter: blur(8px); color: #cbd5e1; padding: 6px 14px; border-radius: 20px; font-size: 11px; pointer-events: none; }
+.threed-fallback { height: 100%; display: flex; align-items: center; justify-content: center; color: #334155; font-size: 13px; text-align: center; padding: 20px; }
+.reset-view-btn { position: absolute; top: 14px; right: 130px; z-index: 5; background: rgba(15,17,23,.75); backdrop-filter: blur(8px); color: #fff; border: 1px solid rgba(255,255,255,.1); padding: 8px 12px; border-radius: 10px; font-size: 12px; cursor: pointer; font-weight: 600; }
+.reset-view-btn:hover { background: rgba(15,17,23,1); }
+.view-toggle-btn { position: absolute; top: 14px; right: 210px; z-index: 5; background: rgba(15,17,23,.75); backdrop-filter: blur(8px); color: #fff; border: 1px solid rgba(255,255,255,.1); padding: 8px 12px; border-radius: 10px; font-size: 12px; cursor: pointer; font-weight: 600; }
+.view-toggle-btn.active { background: #6366f1; border-color: #6366f1; }
+
+.stage-bar-dark { background: #1a1d26; border: 1px solid #2a2e3a; border-radius: 16px; padding: 14px 18px; margin-top: 16px; }
+.stage-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.stage-title { font-size: 12px; font-weight: 700; color: #b8c4d8; text-transform: uppercase; letter-spacing: .08em; }
+.stage-controls { display: flex; gap: 6px; }
+.stage-controls button { padding: 6px 12px; font-size: 12px; border-radius: 8px; border: 1px solid #2a2e3a; background: #232733; color: #cbd5e1; cursor: pointer; font-weight: 600; transition: all .15s; }
+.stage-controls button:hover { background: #2a2e3a; color: #fff; }
+.stage-controls button.add { background: #6366f1; border-color: #6366f1; color: #fff; }
+.stage-steps { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.stage-step { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 80px; opacity: .35; flex-shrink: 0; padding: 8px 6px; border-radius: 10px; position: relative; transition: all .2s; }
+.stage-step .dot { width: 10px; height: 10px; border-radius: 50%; background: #4b5563; }
+.stage-step .label { font-size: 10px; color: #9ca3af; white-space: nowrap; font-weight: 600; letter-spacing: .02em; }
+.stage-step.done { opacity: .7; }
+.stage-step.done .dot { background: #10b981; }
+.stage-step.current { opacity: 1; background: rgba(99,102,241,.15); }
+.stage-step.current .dot { background: #6366f1; box-shadow: 0 0 0 5px rgba(99,102,241,.2); }
+.stage-step.current .label { color: #fff; font-weight: 700; }
+.stage-step .step-del { position: absolute; top: 0; right: 4px; background: transparent; color: #6b7280; border: none; font-size: 14px; cursor: pointer; line-height: 1; padding: 0; display: none; }
+.stage-step:hover .step-del { display: block; }
+.stage-step .step-del:hover { color: #ef4444; }
+
+.side { background: #1a1d26; border: 1px solid #2a2e3a; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; height: calc(56vh + 90px); min-height: 520px; }
+.side-info { padding: 16px 20px; border-bottom: 1px solid #2a2e3a; }
+.side-info h2 { margin: 0 0 8px; font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -.01em; }
+.side-info .rowline { display: flex; justify-content: space-between; font-size: 12px; color: #9ca3af; padding: 3px 0; }
+.side-info .rowline .v { color: #e5e7eb; font-weight: 600; }
+
+.side-tabs { display: flex; border-bottom: 1px solid #2a2e3a; background: #15171f; overflow-x: auto; }
+.side-tab { flex: 1; padding: 12px 8px; border: none; background: transparent; color: #6b7280; font-size: 12px; font-weight: 700; cursor: pointer; position: relative; white-space: nowrap; letter-spacing: .02em; transition: color .15s; }
+.side-tab:hover { color: #cbd5e1; }
+.side-tab.active { color: #6366f1; }
+.side-tab.active::after { content: ""; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #6366f1; }
+
+.side-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.pane { display: none; padding: 16px 18px; }
+.pane.active { display: flex; flex-direction: column; flex: 1; }
+
+.bb-wrap { background: linear-gradient(180deg, #1f3a2a 0%, #14281c 100%); border: 6px solid #8b4513; border-radius: 12px; padding: 16px 18px; color: #f5f5e8; font-family: "Hiragino Mincho ProN", "Yu Mincho", serif; box-shadow: inset 0 0 30px rgba(0,0,0,.5); overflow-y: auto; white-space: pre-wrap; font-size: 14px; line-height: 1.8; aspect-ratio: 16 / 9; }
+.bb-wrap.empty { color: #6b8a75; font-style: italic; }
+.bb-wrap img { display: block; max-width: 100%; border-radius: 8px; margin: 10px 0; }
+.bb-wrap a { color: #60a5fa; text-decoration: none; font-weight: 600; }
+.bb-wrap a:hover { text-decoration: underline; }
+.bb-content { padding: 4px 0; }
+
+#messages { display: flex; flex-direction: column; gap: 8px; flex: 1; overflow-y: auto; padding: 4px 0; }
+.msg { padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.55; position: relative; word-break: break-word; }
+.msg.user { background: #232733; color: #e5e7eb; border: 1px solid #2a2e3a; }
+.msg.system { background: transparent; color: #6b7280; font-size: 11px; text-align: center; padding: 4px 10px; }
+.msg .who { font-size: 11px; color: #9ca3af; margin-bottom: 4px; font-weight: 700; letter-spacing: .01em; }
+.msg .body { padding-right: 130px; }
+.msg .helpful-btn, .msg .like-btn { position: absolute; right: 10px; bottom: 8px; background: #15171f; border: 1px solid #2a2e3a; border-radius: 14px; padding: 3px 10px; font-size: 11px; cursor: pointer; color: #9ca3af; font-weight: 600; transition: all .15s; }
+.msg .helpful-btn { right: 10px; }
+.msg .like-btn { right: 78px; }
+.msg .helpful-btn:hover { background: rgba(16,185,129,.15); border-color: #10b981; color: #10b981; }
+.msg .like-btn:hover { background: rgba(239,68,68,.15); border-color: #ef4444; color: #ef4444; }
+.msg .helpful-btn.done { background: rgba(16,185,129,.15); border-color: #10b981; color: #10b981; cursor: default; }
+.msg .like-btn.done { background: rgba(239,68,68,.15); border-color: #ef4444; color: #ef4444; cursor: default; }
+.jump-latest-btn { display: none; margin: 6px auto 0; padding: 5px 14px; font-size: 11px; border-radius: 14px; border: none; background: #6366f1; color: #fff; cursor: pointer; font-weight: 600; }
+.jump-latest-btn.show { display: block; }
+
+.chat-form { display: flex; gap: 6px; margin-top: 12px; }
+.chat-form input { margin: 0; background: #232733; border-color: #2a2e3a; color: #e5e7eb; font-size: 13px; }
+.chat-form input::placeholder { color: #6b7280; }
+.chat-form button { flex-shrink: 0; }
+
+.q-form { margin-bottom: 16px; }
+.q-form textarea { background: #232733; border-color: #2a2e3a; color: #e5e7eb; min-height: 70px; font-size: 13px; }
+.q-form textarea::placeholder { color: #6b7280; }
+.q-form .anon-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #9ca3af; margin: 8px 0; }
+.q-item { background: #232733; border: 1px solid #2a2e3a; border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+.q-head { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #6b7280; margin-bottom: 8px; }
+.q-body { font-size: 13px; line-height: 1.6; color: #e5e7eb; white-space: pre-wrap; }
+.q-a { background: rgba(16,185,129,.08); border-left: 3px solid #10b981; padding: 10px 12px; border-radius: 8px; margin-top: 10px; font-size: 12px; color: #d1fae5; white-space: pre-wrap; }
+.q-a .q-a-meta { font-size: 10px; color: #10b981; margin-bottom: 4px; font-weight: 700; letter-spacing: .03em; }
+.q-answer-input { width: 100%; min-height: 60px; margin-top: 10px; padding: 10px; border: 1px solid #2a2e3a; background: #15171f; color: #e5e7eb; border-radius: 8px; font-family: inherit; font-size: 13px; box-sizing: border-box; }
+.q-delete { background: transparent; color: #6b7280; border: none; cursor: pointer; font-size: 11px; padding: 2px 6px; }
+.q-delete:hover { color: #ef4444; }
+
+.member-grid { display: flex; flex-direction: column; gap: 8px; }
+.member-card { background: #232733; border: 1px solid #2a2e3a; border-radius: 10px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; }
+.member-card-teacher { border-left: 3px solid #f59e0b; }
+.member-card_name { font-size: 13px; font-weight: 700; color: #e5e7eb; }
+.member-card_role { font-size: 11px; color: #6b7280; margin-top: 2px; }
+.member-card .actions { display: flex; gap: 4px; }
+.member-card .actions button { padding: 4px 10px; font-size: 11px; border-radius: 6px; border: 1px solid #2a2e3a; background: #15171f; color: #9ca3af; cursor: pointer; font-weight: 600; }
+.member-card .actions button.kick:hover { color: #f59e0b; border-color: #f59e0b; }
+.member-card .actions button.ban:hover { color: #ef4444; border-color: #ef4444; }
+.member-card .actions button.unban:hover { color: #10b981; border-color: #10b981; }
+
+.t-ctrl { padding: 14px 20px; border-bottom: 1px solid #2a2e3a; display: flex; gap: 6px; flex-wrap: wrap; }
+.t-ctrl button { flex: 1; min-width: 90px; padding: 9px 10px; border-radius: 9px; border: 1px solid #2a2e3a; background: #232733; color: #e5e7eb; cursor: pointer; font-size: 12px; font-weight: 600; transition: all .15s; }
+.t-ctrl button:hover { background: #2a2e3a; }
+.t-ctrl button.primary { background: #6366f1; border-color: #6366f1; color: #fff; }
+.t-ctrl button.danger:hover { color: #ef4444; border-color: #ef4444; }
+.t-ctrl button.green { background: #10b981; border-color: #10b981; color: #fff; }
+.t-ctrl button.red { background: #ef4444; border-color: #ef4444; color: #fff; }
+
+.drawer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 100; background: #1a1d26; border-top: 3px solid #6366f1; padding: 20px; transform: translateY(110%); transition: transform .25s; max-height: 80vh; overflow-y: auto; box-shadow: 0 -12px 40px rgba(0,0,0,.6); }
+.drawer.open { transform: translateY(0); }
+.drawer h3 { margin: 0 0 12px; font-size: 15px; color: #fff; }
+.drawer textarea { width: 100%; font-family: ui-monospace, "SF Mono", monospace; font-size: 14px; padding: 14px; background: #0f1117; color: #e5e7eb; border: 1px solid #2a2e3a; border-radius: 10px; box-sizing: border-box; line-height: 1.6; resize: vertical; }
+.drawer textarea.bb-editor { aspect-ratio: 16 / 9; min-height: auto; }
+.status { font-size: 12px; color: #6b7280; margin-top: 8px; min-height: 16px; word-break: break-all; }
+
+.side-tab.has-unread::before { content: ""; position: absolute; top: 8px; right: 8px; width: 6px; height: 6px; border-radius: 50%; background: #ef4444; }
+
+/* color palette */
+.color-palette { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
+.color-swatch { width: 28px; height: 28px; border-radius: 6px; border: 2px solid #2a2e3a; cursor: pointer; transition: all .15s; }
+.color-swatch:hover, .color-swatch.active { border-color: #fff; transform: scale(1.1); }
+.color-swatch[data-color="white"]  { background: #f5f5e8; }
+.color-swatch[data-color="yellow"] { background: #fbbf24; }
+.color-swatch[data-color="red"]    { background: #ef4444; }
+.color-swatch[data-color="blue"]   { background: #60a5fa; }
+.color-hint { font-size: 11px; color: #9ca3af; margin-left: 8px; }
+
+/* fullscreen board */
+.board-fullscreen { position: fixed; inset: 0; z-index: 200; background: #0a0d12; display: none; flex-direction: column; }
+.board-fullscreen.open { display: flex; }
+.board-fullscreen-head { padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; background: #1a1d26; border-bottom: 1px solid #2a2e3a; }
+.board-fullscreen-head h2 { margin: 0; font-size: 16px; color: #fff; }
+.board-fullscreen-body { flex: 1; padding: 24px; display: flex; align-items: center; justify-content: center; }
+.board-fullscreen .bb-wrap { width: 100%; max-width: calc((100vh - 140px) * 16 / 9); max-height: calc(100vh - 140px); font-size: 20px; padding: 28px 34px; aspect-ratio: 16 / 9; }
+
+/* history */
+.history-item { background: #232733; border: 1px solid #2a2e3a; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+.history-item .meta { font-size: 11px; color: #6b7280; margin-bottom: 6px; }
+.history-item .body { font-size: 12px; color: #9ca3af; white-space: pre-wrap; max-height: 80px; overflow: hidden; }
+.history-item .actions { margin-top: 8px; text-align: right; }
+.history-item .actions button { padding: 4px 10px; font-size: 11px; border-radius: 5px; background: #6366f1; color: #fff; border: none; cursor: pointer; }
+
+/* files */
+.file-item { background: #232733; border: 1px solid #2a2e3a; border-radius: 8px; padding: 10px 14px; margin: 6px 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.file-item a { color: #60a5fa; text-decoration: none; font-weight: 600; font-size: 13px; word-break: break-all; }
+.file-item a:hover { text-decoration: underline; }
+.file-item .fname { font-size: 11px; color: #6b7280; }
+
+/* groups */
+.group-card { background: #232733; border: 1px solid #2a2e3a; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+.group-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.group-name { font-size: 13px; font-weight: 700; color: #e5e7eb; }
+.group-del { background: transparent; color: #6b7280; border: none; cursor: pointer; font-size: 11px; }
+.group-del:hover { color: #ef4444; }
+.group-members { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.group-member-chip { background: #15171f; border: 1px solid #2a2e3a; border-radius: 10px; padding: 3px 10px; font-size: 11px; color: #cbd5e1; cursor: pointer; }
+.group-member-chip.mine { border-color: #f59e0b; color: #fbbf24; }
+.group-board-preview { background: #15171f; border-radius: 6px; padding: 8px 10px; font-size: 11px; color: #9ca3af; white-space: pre-wrap; max-height: 80px; overflow: hidden; margin-top: 6px; }
+.group-board-edit { width: 100%; min-height: 100px; background: #0f1117; color: #e5e7eb; border: 1px solid #2a2e3a; border-radius: 8px; padding: 10px; font-family: inherit; font-size: 13px; box-sizing: border-box; }
+
+@media (max-width: 900px) {
+  body { background: #0f1117 !important; }
+  main { padding: 0 !important; max-width: 100% !important; }
+  .room-grid { display: flex; flex-direction: column; gap: 0; }
+  
+  #canvas-container {
+    height: 30vh; min-height: 180px;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .hud {
+    top: 8px; left: 8px; padding: 6px 10px; border-radius: 8px;
+    max-width: 150px;
+  }
+  .hud h2 { font-size: 12px; }
+  .hud .meta { font-size: 9px; gap: 4px; }
+  .hud code { padding: 1px 4px; font-size: 9px; }
+  .hud .role-badge { padding: 1px 5px; font-size: 8px; }
+  .reset-view-btn, .view-toggle-btn {
+    top: 8px; padding: 5px 8px; font-size: 10px; border-radius: 8px;
+  }
+  .reset-view-btn { right: 8px; }
+  .view-toggle-btn { right: 82px; }
+  .hint { display: none; }
+  
+  .stage-bar-dark {
+    margin: 8px 8px 0; padding: 10px 12px; border-radius: 12px;
+  }
+  .stage-title { font-size: 10px; letter-spacing: .05em; }
+  .stage-head { margin-bottom: 6px; }
+  .stage-controls button { padding: 4px 8px; font-size: 10px; }
+  .stage-steps { gap: 4px; }
+  .stage-step { min-width: 50px; padding: 6px 4px; }
+  .stage-step .dot { width: 8px; height: 8px; }
+  .stage-step .label { font-size: 9px; }
+  .stage-step.current { background: rgba(99,102,241,.2); }
+  
+  .side {
+    margin: 8px; border-radius: 12px;
+    height: auto; min-height: 0; max-height: none;
+  }
+  .side-info { padding: 10px 14px; }
+  .side-info h2 { font-size: 13px; margin-bottom: 6px; }
+  .side-info .rowline { font-size: 11px; padding: 2px 0; }
+  
+  .t-ctrl { padding: 8px 10px; gap: 5px; }
+  .t-ctrl button {
+    padding: 9px 8px; font-size: 11px; min-width: 60px;
+    border-radius: 8px;
+  }
+  .t-ctrl button[style*="width:100%"] { min-width: 100%; }
+  
+  .side-tabs { overflow-x: auto; }
+  .side-tab {
+    flex: 0 0 auto; padding: 10px 12px; font-size: 11px;
+    min-width: 70px;
+  }
+  
+  .side-body { min-height: 300px; }
+  .pane { padding: 12px; }
+  
+  .bb-wrap {
+    aspect-ratio: auto;
+    min-height: 160px; max-height: 300px;
+    font-size: 12px; padding: 10px 12px; line-height: 1.6;
+    border-width: 4px;
+  }
+  
+  #messages { max-height: 300px; }
+  .msg { font-size: 12px; padding: 8px 10px; border-radius: 10px; }
+  .msg .body { padding-right: 0; }
+  .msg .helpful-btn, .msg .like-btn {
+    position: static;
+    display: inline-block;
+    margin-top: 6px;
+    margin-right: 4px;
+    padding: 3px 8px;
+    font-size: 10px;
+  }
+  .msg .helpful-btn { margin-left: 0; }
+  
+  .chat-form input { font-size: 13px; padding: 10px; }
+  .chat-form button { padding: 10px 14px; font-size: 12px; }
+  
+  .q-form textarea { min-height: 60px; }
+  .q-item { padding: 10px 12px; }
+  .member-card { padding: 8px 10px; }
+  
+  .drawer {
+    padding: 14px; max-height: 85vh;
+  }
+  .drawer h3 { font-size: 14px; margin-bottom: 10px; }
+  .drawer textarea.bb-editor {
+    aspect-ratio: auto;
+    min-height: 200px;
+    font-size: 13px;
+  }
+  .drawer textarea { min-height: 140px; font-size: 13px; }
+  
+  .board-fullscreen-head { padding: 10px 14px; }
+  .board-fullscreen-head h2 { font-size: 14px; }
+  .board-fullscreen-body { padding: 10px; }
+  .board-fullscreen .bb-wrap { font-size: 13px; padding: 14px; }
+  
+  .color-palette { gap: 5px; margin-bottom: 6px; }
+  .color-swatch { width: 24px; height: 24px; }
+  .color-hint { display: none; }
+  
+  .history-item { padding: 10px; }
+  .file-item { padding: 8px 10px; font-size: 12px; }
+  .group-card { padding: 10px; }
+}
+
+@media (max-width: 400px) {
+  #canvas-container { height: 26vh; min-height: 150px; }
+  .hud { max-width: 120px; padding: 5px 8px; }
+  .hud h2 { font-size: 11px; }
+  .hud .meta { font-size: 8px; }
+  .t-ctrl button { min-width: 50px; font-size: 10px; padding: 8px 6px; }
+  .side-tab { padding: 8px 10px; font-size: 10px; min-width: 60px; }
+}
+
+@media (max-width: 900px) {
+  main.wide, main {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .room-grid { 
+    display: block !important;
+    grid-template-columns: 1fr !important;
+  }
+  .room-grid > div:first-child { width: 100%; }
+  
+  #canvas-container {
+    height: 28vh; min-height: 160px;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .hud {
+    top: 8px; left: 8px; padding: 6px 10px; border-radius: 8px;
+    max-width: 130px;
+  }
+  .hud h2 { font-size: 11px; }
+  .hud .meta { font-size: 9px; gap: 3px; }
+  .hud code { padding: 1px 4px; font-size: 9px; }
+  .hud .role-badge { padding: 1px 5px; font-size: 8px; }
+  .reset-view-btn, .view-toggle-btn {
+    top: 8px; padding: 5px 8px; font-size: 10px; border-radius: 8px;
+  }
+  .reset-view-btn { right: 8px; }
+  .view-toggle-btn { right: 82px; }
+  .hint { display: none; }
+  
+  .stage-bar-dark {
+    margin: 6px 0 0; border-radius: 0;
+    padding: 8px 10px;
+  }
+  .stage-title { font-size: 10px; letter-spacing: .05em; }
+  .stage-head { margin-bottom: 6px; }
+  .stage-controls button { padding: 4px 8px; font-size: 10px; }
+  .stage-steps { gap: 4px; }
+  .stage-step { min-width: 50px; padding: 6px 4px; }
+  .stage-step .dot { width: 8px; height: 8px; }
+  .stage-step .label { font-size: 9px; }
+  .stage-step.current { background: rgba(99,102,241,.2); }
+  
+  .side {
+    margin: 0 !important;
+    width: 100% !important;
+    border-radius: 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+  .side-info { padding: 12px 14px; }
+  .side-info h2 { font-size: 14px; margin-bottom: 6px; }
+  .side-info .rowline { font-size: 11px; padding: 3px 0; }
+  
+  .t-ctrl { padding: 8px 12px; gap: 6px; }
+  .t-ctrl button {
+    padding: 10px 8px; font-size: 11px; min-width: 60px;
+    border-radius: 8px;
+  }
+  
+  .side-tabs { 
+    display: flex; overflow-x: auto;
+    scrollbar-width: none;
+    padding: 0 4px;
+  }
+  .side-tabs::-webkit-scrollbar { display: none; }
+  .side-tab {
+    flex: 0 0 auto; padding: 12px 14px; font-size: 11px;
+    min-width: 72px;
+  }
+  
+  .side-body { min-height: 300px; }
+  .pane { padding: 12px 14px; }
+  
+  .bb-wrap {
+    aspect-ratio: auto;
+    min-height: 180px; max-height: 320px;
+    font-size: 13px; padding: 12px 14px; line-height: 1.7;
+    border-width: 4px;
+  }
+  
+  #messages { max-height: 340px; }
+  .msg { font-size: 13px; padding: 8px 12px; border-radius: 10px; }
+  .msg .body { padding-right: 0; }
+  .msg .helpful-btn, .msg .like-btn {
+    position: static;
+    display: inline-block;
+    margin-top: 6px;
+    margin-right: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+  
+  .chat-form input { font-size: 14px; padding: 10px; }
+  .chat-form button { padding: 10px 16px; font-size: 13px; }
+  
+  .drawer {
+    padding: 14px; max-height: 85vh;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+  }
+  .drawer h3 { font-size: 15px; margin-bottom: 12px; }
+  .drawer textarea.bb-editor {
+    aspect-ratio: auto;
+    min-height: 220px;
+    font-size: 14px;
+  }
+  
+  .board-fullscreen-head { padding: 12px 14px; }
+  .board-fullscreen-head h2 { font-size: 14px; }
+  .board-fullscreen-body { padding: 8px; }
+  .board-fullscreen .bb-wrap { font-size: 13px; padding: 12px; border-width: 4px; }
+  
+  .color-palette { gap: 6px; margin-bottom: 8px; }
+  .color-swatch { width: 26px; height: 26px; }
+  .color-hint { display: none; }
+  
+  .member-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .member-card { padding: 8px 10px; font-size: 12px; }
+  
+  .history-item { padding: 10px 12px; }
+  .file-item { padding: 10px 12px; font-size: 12px; flex-wrap: wrap; }
+  .group-card { padding: 10px 12px; }
+}
+
+@media (max-width: 400px) {
+  #canvas-container { height: 24vh; min-height: 140px; }
+  .hud { max-width: 110px; padding: 5px 8px; }
+  .hud h2 { font-size: 10px; }
+  .hud .meta { font-size: 8px; }
+  .t-ctrl button { min-width: 50px; font-size: 10px; padding: 8px 6px; }
+  .side-tab { padding: 10px 12px; font-size: 10px; min-width: 60px; }
+}
+
+#bulletin-modal {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.7); z-index: 200;
+  align-items: center; justify-content: center;
+}
+#bulletin-modal .panel {
+  background: #fff; width: min(900px, 92vw); height: min(600px, 85vh);
+  border-radius: 12px; padding: 20px; display: flex; flex-direction: column;
+}
+#bulletin-modal .body-grid {
+  display: grid; grid-template-columns: 220px 1fr; gap: 14px;
+  flex: 1; min-height: 0;
+}
+#bulletin-list, #bulletin-reader { overflow: auto; }
+.bb-item {
+  display: block; width: 100%; text-align: left;
+  padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px;
+  margin-bottom: 6px; background: #fff; cursor: pointer;
+}
+.bb-item:hover { background: #eff6ff; border-color: #93c5fd; }
+
+</style>
+
+
+<!-- VC_UX_DESIGN_V2 -->
+<style>
+.vc2-toolbar {
+  display:flex; align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap; gap:12px;
+  padding:14px 18px;
+  margin-bottom:16px;
+  background:#1e293b;
+  color:#f8fafc;
+  border-radius:16px;
+}
+.vc2-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.vc2-btn {
+  min-height:44px; padding:10px 16px;
+  background:#6366f1; color:#fff;
+  border:0; border-radius:12px;
+  font-weight:700; cursor:pointer;
+}
+.vc2-btn.alt { background:#475569; }
+.vc2-overlay {
+  position:fixed; inset:0;
+  z-index:99999; padding:16px;
+  background:rgba(15,23,42,.8);
+  display:grid; place-items:center;
+}
+.vc2-overlay[hidden] { display:none; }
+.vc2-panel {
+  background:#fff; color:#111827;
+  border-radius:22px;
+  padding:28px;
+  width:min(100%,480px);
+  max-height:90vh;
+  overflow:auto;
+}
+.vc2-panel p { line-height:1.8; }
+.vc2-panel h2 { margin-top:0; }
+.vc2-panel .vc2-btn { width:100%; }
+@media(max-width:700px) {
+  .vc2-actions { width:100%; }
+  .vc2-actions .vc2-btn { flex:1; }
+}
+</style>
+<div class="vc2-toolbar">
+  <div>
+    <strong>🎓 {{ '3D Classroom' if lang == 'en' else '3D教室' }}</strong>
+    <div style="font-size:12px;opacity:.8">
+      {{ 'New here? Open the quick guide.' if lang == 'en' else '初めての方は操作ガイドをご覧ください。' }}
+    </div>
+  </div>
+  <div class="vc2-actions">
+    <button type="button" id="vc2-help"
+      class="vc2-btn alt">❔ {{ 'Help' if lang == 'en' else '使い方' }}</button>
+    <button type="button" id="vc2-expand"
+      class="vc2-btn">⛶ {{ 'Expand View' if lang == 'en' else '画面を広げる' }}</button>
+  </div>
+</div>
+<div id="vc2-overlay" class="vc2-overlay"
+     role="dialog" aria-modal="true"
+     aria-labelledby="vc2-heading" hidden>
+  <div class="vc2-panel">
+    <h2 id="vc2-heading">👋 {{ 'Welcome to the 3D Classroom' if lang == 'en' else '3D教室へようこそ' }}</h2>
+    <p>① {{ 'Explore the classroom in the 3D view.' if lang == 'en' else '3D画面で教室を確認しましょう。' }}</p>
+    <p>② {{ 'Use the board, chat, and lesson tools.' if lang == 'en' else '黒板・チャット・授業機能を使って参加しましょう。' }}</p>
+    <p>③ {{ 'Use Expand View for a larger 3D display.' if lang == 'en' else '画面を広げるボタンで3D表示を大きくできます。' }}</p>
+    <button type="button" class="vc2-btn"
+      id="vc2-close">{{ 'Get Started' if lang == 'en' else '始める' }}</button>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('vc2-overlay');
+  const help = document.getElementById('vc2-help');
+  const close = document.getElementById('vc2-close');
+  const expand = document.getElementById('vc2-expand');
+  const canvas = document.getElementById('canvas-container');
+  let lastFocus = null;
+
+  function openGuide() {
+    lastFocus = document.activeElement;
+    overlay.hidden = false;
+    close.focus();
+  }
+  function closeGuide() {
+    overlay.hidden = true;
+    try { localStorage.setItem('vc2_guide_seen','1'); } catch(e) {}
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+
+  help.addEventListener('click', openGuide);
+  close.addEventListener('click', closeGuide);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !overlay.hidden) closeGuide();
+  });
+
+  expand.addEventListener('click', () => {
+    if (!canvas) return;
+    if (document.fullscreenElement) {
+      if (document.exitFullscreen) document.exitFullscreen();
+    } else if (canvas.requestFullscreen) {
+      canvas.requestFullscreen().catch(() => {});
+    }
+  });
+
+  try {
+    if (!localStorage.getItem('vc2_guide_seen')) openGuide();
+  } catch(e) {}
+});
+</script>
+<!-- /VC_UX_DESIGN_V2 -->
+
+<div class="room-grid">
+  <div>
+    <div id="canvas-container">
+      <div class="hud">
+        <h2>{{ cls.title }}</h2>
+        <div class="meta">
+          <span class="role-badge {{ 'teacher' if role == 'teacher' else 'student' }}">{{ T[role] if role in ['teacher','student'] else role }}</span>
+          <span>{{ cls.subject }}</span>
+          <code>{{ cls.join_code }}</code>
+        </div>
+      </div>
+      
+      
+      
+
+      
+
+
+<a href="/dashboard" id="btn-leave" class="btn">{{ T.leave_room }}</a>
+<button id="btn-view-toggle" class="view-toggle-btn" type="button">👁 {{ T.view_overview }}</button>
+      
+      <button id="btn-reset-view" class="reset-view-btn" type="button">{{ T.reset_view }}</button>
+      <div class="hint">{{ T.drag_hint }}</div>
+    </div>
+
+    <div class="stage-bar-dark">
+      <div class="stage-head">
+        <span class="stage-title">{{ T.stage }}</span>
+        {% if role == 'teacher' %}
+        <div class="stage-controls">
+          <button id="btn-step-add" class="add" type="button">+ {{ T.add_step }}</button>
+          <button id="btn-stage-prev" type="button">{{ T.prev_stage }}</button>
+          <button id="btn-stage-next" type="button">{{ T.next_stage }}</button>
+        </div>
+        {% endif %}
+      </div>
+      <div class="stage-steps" id="stage-steps">
+        {% if steps %}
+          {% for s in steps %}
+          <div class="stage-step{% if loop.index0 == cls.stage %} current{% elif loop.index0 < cls.stage %} done{% endif %}"
+               data-idx="{{ loop.index0 }}" data-step-id="{{ s.id }}">
+            <span class="dot"></span><span class="label">{{ s.title }}</span>
+            {% if role == 'teacher' %}<button class="step-del" data-step-id="{{ s.id }}">x</button>{% endif %}
+          </div>
+          {% endfor %}
+        {% else %}
+          <div style="padding:8px 0;color:#6b7280;font-size:12px;">{{ T.no_steps }}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="side-info">
+      <h2>{{ cls.title }}</h2>
+      <div class="rowline"><span>{{ T.subject }}</span><span class="v">{{ cls.subject }}</span></div>
+      <div class="rowline">
+        <span>{{ T.stage }}</span>
+        <span class="v" id="info-stage-name">
+          {% if steps %}
+            {% if cls.stage is not none and cls.stage < steps|length %}{{ steps[cls.stage].title }}{% else %}{{ steps[0].title }}{% endif %}
+          {% else %}{{ T.no_steps }}{% endif %}
+        </span>
+      </div>
+      <div class="rowline"><span>{{ T.members_label }}</span><span class="v">{{ members|length }}</span></div>
+      <div class="rowline"><span>{{ T.you_label }}</span><span class="v">{{ user.name }}</span></div>
+                  <div class="rowline" id="remaining-row" style="display:none;">
+        <span class="label">{{ T.remaining_time }}</span>
+        <span class="value" id="remaining-time">--:--</span>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+
+    {% if role == 'teacher' %}
+    <div class="t-ctrl">
+      <button id="btn-bb-open" class="primary">{{ T.write_blackboard }}</button>
+      <button id="btn-img-upload">{{ T.upload_image }}</button>
+      <button id="btn-audio" class="green">{{ T.audio_start }}</button>
+      <button id="btn-pdf-upload">📄 {{ T.pdf_share }}</button>
+      <button id="btn-bb-clear" class="danger">{{ T.clear_blackboard }}</button>
+      <button id="btn-invite">{{ T.invite_link }}</button>
+                  <button id="btn-share-class">🔗 {{ T.share_on_x }}</button>
+      <button id="btn-groups-open">👥 {{ T.group_manage }}</button>
+      <input type="file" id="img-file" accept="image/*" style="display:none;">
+      <input type="file" id="pdf-file" accept="application/pdf" style="display:none;">
+    </div>
+    {% endif %}
+
+    {% if role == 'student' %}
+    <div class="t-ctrl">
+      <button id="btn-hand" class="primary" style="flex:2;">✋ {{ T.raise_hand }}</button>
+      <button id="btn-like" class="red" style="flex:1;">👍 {{ T.like }}</button>
+    </div>
+        <div class="t-ctrl" id="rate-teacher-row">
+      <button id="btn-rate-good" class="green" style="flex:1;">👍 {{ T.rate_good }}</button>
+      <button id="btn-rate-bad" class="red" style="flex:1;">👎 {{ T.rate_bad }}</button>
+    </div>
+        <div class="t-ctrl" id="audio-listen-row" style="display:none;">
+      <button id="btn-audio-listen" class="green" style="width:100%;">
+        🔊 {{ T.audio_listening }}
+      </button>
+    </div>
+    {% if cls.is_interview %}
+    <div class="t-ctrl" id="student-audio-row" style="display:none;">
+      <button id="btn-audio-student" class="green" style="width:100%;">{{ T.audio_start }}</button>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <div class="t-ctrl">
+                        <button id="btn-share-record" style="display:none;background:#f59e0b;border-color:#f59e0b;color:#fff;">📋 {{ T.share_record }}</button>
+      <button id="btn-card-open">{{ T.create_card }}</button>
+      <button id="btn-board-fullscreen2">⛶ {{ T.board_fullscreen }}</button>
+    </div>
+
+    <div class="side-tabs">
+      <button class="side-tab active" data-tab="board">{{ T.blackboard }}</button>
+      <button class="side-tab" data-tab="chat">{{ T.log }}</button>
+      <button class="side-tab" data-tab="qa">{{ T.qa_tab }}</button>
+            <button class="side-tab" data-tab="bulletin">📋 {{ T.bulletin }}</button>
+                 {% if role == 'student' %}
+      <button class="side-tab" data-tab="notebook">📓 {{ T.notebook }}</button>
+      {% endif %}
+      <button class="side-tab" data-tab="files">{{ T.pdf_files }}</button>
+      {% if role == 'student' and my_group %}
+      <button class="side-tab" data-tab="group">👥 {{ T.group_my }}</button>
+      {% elif role == 'teacher' %}
+      <button class="side-tab" data-tab="history">{{ T.history_tab }}</button>
+      {% endif %}
+      <button class="side-tab" data-tab="members">{{ T.members_label }}</button>
+    </div>
+
+    <div class="side-body">
+      <div class="pane active" data-pane="board">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <span style="font-size:12px;color:#9ca3af;">{{ T.blackboard }}</span>
+          <button id="btn-board-fullscreen" style="background:#232733;border:1px solid #2a2e3a;color:#e5e7eb;padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;">⛶ {{ T.board_fullscreen }}</button>
+        </div>
+        <div class="bb-wrap empty" id="bb-wrap">
+          <div id="bb-content" class="bb-content"></div>
+        </div>
+      </div>
+
+      <div class="pane" data-pane="chat">
+        <div id="messages"></div>
+        <button id="jump-latest" class="jump-latest-btn" type="button">{{ T.jump_to_latest }}</button>
+        <form id="announce-form" class="chat-form" onsubmit="return false;">
+          <input type="text" id="announce-input" placeholder="{{ T.send }}" autocomplete="off">
+          <button class="btn sm" type="button" id="announce-submit">{{ T.send }}</button>
+        </form>
+      </div>
+
+      <div class="pane" data-pane="qa">
+        <div class="q-form">
+          <textarea id="qa-input" placeholder="{{ T.qa_placeholder }}"></textarea>
+          {% if allow_anonymous %}
+          <label class="anon-row">
+            <input type="checkbox" id="qa-anon" style="width:auto;margin:0;">{{ T.qa_anonymous }}
+          </label>
+          {% else %}
+          <div style="font-size:11px;color:#6b7280;margin:8px 0;">{{ T.qa_realname_notice }}</div>
+          <input type="hidden" id="qa-anon" value="0">
+          {% endif %}
+          <button id="qa-submit" class="btn sm" type="button" style="width:100%;">{{ T.qa_ask }}</button>
+        </div>
+        <div id="qa-list"></div>
+      </div>
+
+            <div class="pane" data-pane="bulletin">
+        <div id="post-list-view">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <span style="font-size:13px;font-weight:700;color:#fff;">{{ T.bulletin }}</span>
+            <button id="btn-new-post" class="btn sm" style="background:#6366f1;">{{ T.new_post }}</button>
+          </div>
+          <div id="posts-container"></div>
+        </div>
+        <div id="post-detail-view" style="display:none;">
+          <button id="btn-back-to-list" class="btn sm ghost" style="margin-bottom:12px;background:#232733;color:#e5e7eb;border-color:#2a2e3a;">{{ T.back_to_list }}</button>
+          <div id="post-content-container" style="background:#232733;border:1px solid #2a2e3a;border-radius:10px;padding:14px;margin-bottom:16px;"></div>
+          <h4 style="margin:0 0 10px;color:#fff;font-size:13px;">レス</h4>
+          <div id="comments-container"></div>
+          <div style="margin-top:12px;">
+            <textarea id="comment-input" placeholder="{{ T.reply_placeholder }}" style="width:100%;min-height:60px;background:#232733;border:1px solid #2a2e3a;color:#e5e7eb;border-radius:8px;padding:10px;font-size:13px;box-sizing:border-box;font-family:inherit;"></textarea>
+            <button id="btn-submit-comment" class="btn sm" style="margin-top:6px;width:100%;">{{ T.reply }}</button>
+          </div>
+        </div>
+      </div>
+
+                 {% if role == 'student' %}
+      <div class="pane" data-pane="notebook">
+        <div style="margin-bottom:12px;">
+          <button id="note-save-bb" style="width:100%;background:#6366f1;border:none;color:#fff;padding:10px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">
+            📓 {{ T.note_save_bb }}
+          </button>
+        </div>
+        <div style="margin-bottom:12px;">
+          <textarea id="note-input" placeholder="{{ T.note_input_ph }}" style="width:100%;min-height:80px;background:#232733;border:1px solid #2a2e3a;color:#e5e7eb;border-radius:8px;padding:10px;font-size:13px;box-sizing:border-box;font-family:inherit;"></textarea>
+          <button id="note-save-custom" style="width:100%;margin-top:6px;background:#10b981;border:none;color:#fff;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">
+            {{ T.note_save_custom }}
+          </button>
+        </div>
+        <div id="notes-list"></div>
+      </div>
+      {% endif %}
+
+      <div class="pane" data-pane="files">
+        <div id="files-list"></div>
+      </div>
+
+      {% if role == 'teacher' %}
+      <div class="pane" data-pane="history">
+        <div id="history-list"></div>
+      </div>
+      {% endif %}
+
+      {% if role == 'student' %}
+      <div class="pane" data-pane="group">
+        <div id="my-group-content"></div>
+      </div>
+      {% endif %}
+
+      <div class="pane" data-pane="members">
+        <div class="member-grid" id="member-grid">
+          {% for m in members %}
+          <div class="member-card {% if m.role == 'teacher' %}member-card-teacher{% endif %}" data-uid="{{ m.user_id }}">
+            <div>
+              <div class="member-card_name">{{ m.name }}</div>
+              <div class="member-card_role">{{ T[m.role] if m.role in ['teacher','student'] else m.role }}</div>
+            </div>
+            {% if role == 'teacher' and m.user_id != user.id %}
+            <div class="actions">
+              <button class="kick" data-uid="{{ m.user_id }}">{{ T.member_kick }}</button>
+              <button class="ban" data-uid="{{ m.user_id }}">{{ T.member_ban }}</button>
+            </div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+
+        {% if role == 'teacher' %}
+        <h3 style="margin-top:20px;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;">{{ T.banned_list }}</h3>
+        <div id="banned-list" style="margin-top:8px;">
+          {% if bans %}
+            {% for b in bans %}
+            <div class="member-card" data-uid="{{ b.user_id }}">
+              <div>
+                <div class="member-card_name">{{ b.user_name }}</div>
+                <div class="member-card_role">{{ b.reason or "" }}</div>
+              </div>
+              <div class="actions">
+                <button class="unban" data-uid="{{ b.user_id }}">{{ T.member_unban }}</button>
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div style="color:#6b7280;font-size:12px;">{{ T.no_bans }}</div>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- blackboard edit drawer -->
+<div class="drawer" id="bb-drawer">
+  <h3>{{ T.write_blackboard }}</h3>
+  <div class="color-palette">
+    <div class="color-swatch active" data-color="white" title="White"></div>
+    <div class="color-swatch" data-color="yellow" title="Yellow"></div>
+    <div class="color-swatch" data-color="red" title="Red"></div>
+    <div class="color-swatch" data-color="blue" title="Blue"></div>
+    <span class="color-hint">{{ T.board_color }} → 選択範囲に適用</span>
+  </div>
+  <textarea id="bb-textarea" class="bb-editor"></textarea>
+  <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+    <button id="bb-save" class="btn green">{{ T.save }}</button>
+    <button id="bb-cancel" class="btn ghost" style="background:#232733;color:#e5e7eb;border-color:#2a2e3a;">{{ T.cancel }}</button>
+    <button id="bb-draw-open" class="btn" style="background:#7c3aed;">✎ {{ T.draw_pen }}</button>
+  </div>
+</div>
+
+<!-- drawing canvas drawer -->
+<div class="drawer" id="draw-drawer">
+  <h3>{{ T.draw_mode }}</h3>
+  <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+    <button id="draw-pen" class="btn sm" style="background:#f5f5e8;color:#111;">{{ T.draw_pen }}</button>
+    <button id="draw-eraser" class="btn sm" style="background:#64748b;">{{ T.draw_eraser }}</button>
+    <button id="draw-clear" class="btn sm" style="background:#ef4444;">{{ T.draw_clear }}</button>
+    <div class="color-palette" style="margin:0;margin-left:8px;">
+      <div class="color-swatch draw-color active" data-color="#f5f5e8"></div>
+      <div class="color-swatch draw-color" data-color="#fbbf24"></div>
+      <div class="color-swatch draw-color" data-color="#ef4444"></div>
+      <div class="color-swatch draw-color" data-color="#60a5fa"></div>
+    </div>
+  </div>
+  <canvas id="draw-canvas" style="width:100%;aspect-ratio:16/9;background:#14281c;border-radius:10px;touch-action:none;cursor:crosshair;"></canvas>
+  <div style="display:flex;gap:8px;margin-top:12px;">
+    <button id="draw-save" class="btn green">{{ T.draw_save }}</button>
+    <button id="draw-cancel" class="btn ghost" style="background:#232733;color:#e5e7eb;border-color:#2a2e3a;">{{ T.cancel }}</button>
+  </div>
+</div>
+
+<!-- image scale drawer -->
+<div class="drawer" id="img-adjust-drawer">
+  <h3>{{ T.image_edit }}</h3>
+  <img id="img-adjust-preview" style="max-width:100%;max-height:40vh;display:block;margin:0 auto;border-radius:8px;">
+  <label style="color:#e5e7eb;font-size:13px;margin-top:12px;display:block;">{{ T.image_scale }}: <span id="img-scale-val">100</span>%</label>
+  <input type="range" id="img-scale-range" min="20" max="100" value="100" style="width:100%;margin-top:6px;">
+  <div style="display:flex;gap:8px;margin-top:14px;">
+    <button id="img-adjust-apply" class="btn green">{{ T.image_apply }}</button>
+    <button id="img-adjust-cancel" class="btn ghost" style="background:#232733;color:#e5e7eb;border-color:#2a2e3a;">{{ T.image_cancel }}</button>
+  </div>
+</div>
+
+<!-- group manage drawer (teacher) -->
+<div class="drawer" id="groups-drawer">
+  <h3>{{ T.group_manage }}</h3>
+  <div style="display:flex;gap:6px;margin-bottom:12px;">
+    <input type="text" id="group-name-input" placeholder="{{ T.group_placeholder }}" style="flex:1;background:#232733;border:1px solid #2a2e3a;color:#e5e7eb;padding:8px 12px;border-radius:8px;font-size:13px;">
+    <button id="group-create-btn" class="btn" style="background:#6366f1;">{{ T.group_create }}</button>
+  </div>
+  <div id="groups-list"></div>
+  <div style="margin-top:12px;">
+    <button id="groups-close" class="btn ghost" style="background:#232733;color:#e5e7eb;border-color:#2a2e3a;width:100%;">{{ T.cancel }}</button>
+  </div>
+</div>
+
+<!-- learning card drawer -->
+<div class="drawer" id="card-drawer">
+  <h3>{{ T.learning_card }}</h3>
+  <textarea id="card-textarea" placeholder="{{ T.card_placeholder }}" style="min-height:180px;"></textarea>
+  <div style="display:flex;gap:8px;margin-top:12px;">
+    <button id="card-save" class="btn green">{{ T.save }}</button>
+    <button id="card-cancel" class="btn ghost" style="background:#232733;color:#e5e7eb;border-color:#2a2e3a;">{{ T.cancel }}</button>
+  </div>
+</div>
+
+<div class="drawer" id="post-drawer">
+  <h3>{{ T.new_post }}</h3>
+  <input type="text" id="new-post-title" placeholder="{{ T.post_title }}" style="width:100%;margin-bottom:10px;background:#232733;border:1px solid #2a2e3a;color:#e5e7eb;border-radius:8px;padding:10px;box-sizing:border-box;">
+  <div style="display:flex; gap:8px; margin-bottom:8px;">
+    <button type="button" id="btn-post-img-upload" class="btn sm gray">📷 {{ T.upload_image }}</button>
+    <input type="file" id="post-img-file" accept="image/*" style="display:none;">
+  </div>
+  
+        <div id="post-editor-container" style="margin-bottom: 10px;"></div>
+    <input type="hidden" id="new-post-content" name="content">
+    
+  <div style="margin-top:10px;display:flex;gap:8px;">
+    <button id="btn-post-submit" class="btn green">{{ T.submit }}</button>
+    <button id="btn-post-cancel" class="btn ghost" style="background:#232733;color:#e5e7eb;border-color:#2a2e3a;">{{ T.cancel }}</button>
+  </div>
+</div>
+
+<!-- fullscreen board -->
+<div class="board-fullscreen" id="board-fullscreen">
+  <div class="board-fullscreen-head">
+    <h2 id="fs-title">{{ cls.title }}</h2>
+    <button id="fs-close" class="btn red">{{ T.board_fullscreen_close }}</button>
+  </div>
+  <div class="board-fullscreen-body">
+    <div class="bb-wrap" id="fs-bb-wrap">
+      <div id="fs-bb-content" class="bb-content"></div>
+    </div>
+  </div>
+</div>
+
+
+
+<script>
+
+
+
+
+
+  // グローバル変数の確実な定義
+  
+  
+  
+  
+  window.MEMBERS = {{ members|tojson }};
+  
+
+window.addEventListener("error", (e) => {
+  console.error("Global error:", e.message, e.filename, e.lineno);
+});
+
+
+
+window.CLASS_JOIN_CODE = {{ cls.join_code|tojson }};
+
+
+window.CLASS_TITLE = {{ cls.title|tojson }};
+window.CLASS_SUBJECT = {{ cls.subject|tojson }};
+window.ALLOW_ANONYMOUS = {{ (1 if allow_anonymous else 0)|tojson }};
+
+window.TEACHER_DISPLAY_NAME = {{ (cls.taught_by or T.teacher)|tojson }};
+window.TEACHER_ID = {{ (members|selectattr('role','equalto','teacher')|map(attribute='user_id')|list|first) if members else 0 }};
+window.IS_INTERVIEW = {{ (1 if (cls.is_interview or cls.get("room_type") == "social") else 0)|tojson }};
+window.RECORD_T = {{ (1 if cls.record_shared_teacher else 0)|tojson }};
+window.RECORD_S = {{ (1 if cls.record_shared_student else 0)|tojson }};
+window.STEPS = [
+  {% for s in steps %}{id: {{ s.id }}, title: {{ s.title|tojson }}},{% endfor %}
+];
+
+window.INITIAL_QUESTIONS = [
+  {% for q in questions %}{
+    id: {{ q.id }}, content: {{ q.content|tojson }},
+    answer: {{ (q.answer or '')|tojson }},
+    is_anonymous: {{ q.is_anonymous }},
+    asker: {{ (q.asker_name or '')|tojson }},
+    answerer: {{ (q.answerer_name or '')|tojson }},
+    created_at: {{ q.created_at|tojson }},
+    answered_at: {{ (q.answered_at or '')|tojson }}
+  },{% endfor %}
+];
+window.INITIAL_FILES = [
+  {% for f in files %}{id: {{ f.id }}, filename: {{ f.filename|tojson }}, url: {{ f.url|tojson }}},{% endfor %}
+];
+
+window.INITIAL_POSTS = [
+  {% for p in posts %}{
+    id: {{ p.id }}, title: {{ p.title|tojson }},
+    author: {{ p.author_name|tojson }},
+    content: {{ p.content|tojson }},
+    is_pinned: {{ p.is_pinned }},
+    comment_count: {{ p.comment_count or 0 }},
+    created_at: {{ p.created_at|tojson }}
+  },{% endfor %}
+];
+window.INITIAL_GROUPS = {{ groups|tojson }};
+window.MY_GROUP = {{ (dict(my_group) if my_group else None)|tojson }};
+</script>
+
+<script>
+(function () {
+  const I18N = window.I18N;
+  const CLASS_ID = window.CLASS_ID;
+  const ROLE = window.ROLE;
+  const USER_NAME = window.USER_NAME;
+  const HAND_RAISE_SENTINEL = "_HANDRAISE_";
+  const LIKE_SENTINEL = "_LIKE_";
+  const statusEl = document.getElementById("status");
+
+  // ===== TABS =====
+  document.querySelectorAll(".side-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      const name = tab.dataset.tab;
+      document.querySelectorAll(".side-tab").forEach(t => t.classList.toggle("active", t === tab));
+      document.querySelectorAll(".pane").forEach(p => p.classList.toggle("active", p.dataset.pane === name));
+      if (name === "history") loadHistory();
+      if (name === "chat") tab.classList.remove("has-unread");
+      if (name === "bulletin") loadPosts();
+    });
+  });
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (ch) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[ch]);
+  }
+
+  const COLOR_MAP = { white: "#f5f5e8", yellow: "#fbbf24", red: "#ef4444", blue: "#60a5fa" };
+
+  function renderBlackboardHTML(text) {
+    if (!text || !text.trim()) {
+      return '<span style="color:#6b8a75;font-style:italic;">(empty)</span>';
+    }
+    let escaped = escapeHtml(text);
+    escaped = escaped.replace(/\[c=(white|yellow|red|blue)\]([\s\S]*?)\[\/c\]/g, (m, color, inner) => {
+      const c = COLOR_MAP[color] || COLOR_MAP.white;
+      return '<span style="color:' + c + ';">' + inner + '</span>';
+    });
+    escaped = escaped.replace(/\[img\]([\s\S]*?)\[\/img\]/g, (m, url) => {
+      const cleanUrl = url.trim();
+      if (!/\.(png|jpg|jpeg|gif|webp)$/i.test(cleanUrl)) {
+        return '<span style="color:#94a3b8;font-size:12px;">[image missing]</span>';
+      }
+      return '<img src="' + cleanUrl + '" alt="attachment" onerror="this.style.display=\'none\'"/>';
+    });
+    escaped = escaped.replace(/\[pdf\]([\s\S]*?)\|([\s\S]*?)\[\/pdf\]/g, (m, url, name) => {
+      return '<div style="margin-top:6px;"><a href="' + url.trim() + '" target="_blank">📄 ' + name.trim() + '</a></div>';
+    });
+    escaped = escaped.replace(/\[draw\]([\s\S]*?)\[\/draw\]/g, (m, url) => {
+      return '<img src="' + url.trim() + '" style="display:block;max-width:100%;border-radius:8px;margin-top:8px;" alt="drawing"/>';
+    });
+    return escaped;
+  }
+  function renderMessageBody(text) {
+    let escaped = escapeHtml(text);
+    escaped = escaped.replace(/\[img\]([\s\S]*?)\[\/img\]/g,
+      (m, url) => '<img src="' + url.trim() + '" style="display:block;max-width:100%;border-radius:8px;margin-top:6px;" alt="attachment"/>');
+    return escaped;
+  }
+  function setDirectBB(text) {
+    const el = document.getElementById("bb-wrap");
+    const c = document.getElementById("bb-content");
+    if (!el || !c) return;
+    c.innerHTML = renderBlackboardHTML(text);
+    if (text && text.trim()) el.classList.remove("empty");
+    else el.classList.add("empty");
+  }
+  setDirectBB(window.INITIAL_BB);
+
+  function applyStage(idx) {
+    document.querySelectorAll(".stage-step").forEach(el => {
+      const i = parseInt(el.dataset.idx, 10);
+      el.classList.toggle("current", i === idx);
+      el.classList.toggle("done", i < idx);
+    });
+    const infoEl = document.getElementById("info-stage-name");
+    if (infoEl && window.STEPS && window.STEPS.length) {
+      if (idx >= 0 && idx < window.STEPS.length) infoEl.textContent = window.STEPS[idx].title;
+    }
+  }
+
+  // ===== MESSAGES =====
+  const messagesEl = document.getElementById("messages");
+  const jumpBtn = document.getElementById("jump-latest");
+  let lastMsgId = 0;
+  let lastBlackboardSeen = window.INITIAL_BB;
+  const seenMsgIds = new Set();
+
+  function makeMsgEl(m) {
+    const div = document.createElement("div");
+    if (m.content === HAND_RAISE_SENTINEL) {
+      div.className = "msg system";
+      div.innerHTML = escapeHtml(m.name) + I18N.hand_raise_suffix;
+      return div;
+    }
+    if (m.content === LIKE_SENTINEL) {
+      div.className = "msg system";
+      div.innerHTML = "👍 " + escapeHtml(m.name) + I18N.like_suffix;
+      return div;
+    }
+    div.className = "msg " + m.type;
+    div.dataset.mid = m.id;
+    const who = m.type === "system" ? I18N.system : m.name;
+    const showReactions = (m.type === "user" && m.name !== USER_NAME);
+    let html = '<div class="who">' + escapeHtml(who) + '</div><div class="body">' + renderMessageBody(m.content) + '</div>';
+    if (showReactions) {
+      html += '<button class="helpful-btn" data-mid="' + m.id + '">' + I18N.helpful + ' <span class="hc">' + (m.helpful || 0) + '</span></button>';
+      html += '<button class="like-btn" data-mid="' + m.id + '">👍 <span class="lc">' + (m.like || 0) + '</span></button>';
+    }
+    div.innerHTML = html;
+    return div;
+  }
+
+  function appendMessage(m) {
+    if (seenMsgIds.has(m.id)) return false;
+    seenMsgIds.add(m.id);
+    messagesEl.appendChild(makeMsgEl(m));
+    if (m.id > lastMsgId) lastMsgId = m.id;
+    return true;
+  }
+
+  messagesEl.addEventListener("click", async (e) => {
+    const hBtn = e.target.closest(".helpful-btn");
+    const lBtn = e.target.closest(".like-btn");
+    if (hBtn && !hBtn.classList.contains("done")) {
+      const mid = hBtn.dataset.mid;
+      try {
+        const res = await fetch('/api/helpful/' + CLASS_ID + '/' + mid, { method: "POST" });
+        if (!res.ok) return;
+        const d = await res.json();
+        hBtn.querySelector(".hc").textContent = d.count;
+        hBtn.classList.add("done");
+      } catch (err) {}
+    } else if (lBtn && !lBtn.classList.contains("done")) {
+      const mid = lBtn.dataset.mid;
+      try {
+        const res = await fetch('/api/like/' + CLASS_ID + '/' + mid, { method: "POST" });
+        if (!res.ok) return;
+        const d = await res.json();
+        lBtn.querySelector(".lc").textContent = d.count;
+        lBtn.classList.add("done");
+      } catch (err) {}
+    }
+  });
+
+  function notifyChatBadge() {
+    const chatTab = document.querySelector('.side-tab[data-tab="chat"]');
+    if (chatTab && !chatTab.classList.contains("active")) chatTab.classList.add("has-unread");
+  }
+
+  if (jumpBtn) jumpBtn.addEventListener("click", () => {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    jumpBtn.classList.remove("show");
+  });
+
+  // ===== Q&A =====
+  const qaList = document.getElementById("qa-list");
+  function renderQuestions(items) {
+    if (!qaList) return;
+    if (!items.length) {
+      qaList.innerHTML = '<div style="color:#6b7280;font-size:12px;padding:12px 0;">' + I18N.qa_no_questions + '</div>';
+      return;
+    }
+    let html = "";
+    for (const q of items) {
+      const asker = q.is_anonymous ? I18N.qa_anonymous : (q.asker || "?");
+      const ans = q.answer
+        ? '<div class="q-a"><div class="q-a-meta">' + I18N.qa_answered_by + ': ' + escapeHtml(q.answerer || '') + '</div>' + escapeHtml(q.answer) + '</div>'
+        : '';
+      let answerForm = '';
+      if (ROLE === "teacher" && !q.answer) {
+        answerForm = '<textarea data-qid="' + q.id + '" class="qa-answer-input" placeholder="' + I18N.qa_answer_placeholder + '"></textarea><button class="qa-answer-btn btn sm green" data-qid="' + q.id + '" style="margin-top:8px;width:100%;">' + I18N.qa_answer + '</button>';
+      }
+      const delBtn = ROLE === "teacher" ? '<button class="q-delete" data-qid="' + q.id + '">' + I18N.qa_delete + '</button>' : '';
+      html += '<div class="q-item" data-qid="' + q.id + '">'
+        + '<div class="q-head"><span>' + escapeHtml(asker) + '</span><span>' + delBtn + '</span></div>'
+        + '<div class="q-body">' + escapeHtml(q.content) + '</div>'
+        + ans + answerForm
+        + '</div>';
+    }
+    qaList.innerHTML = html;
+  }
+  renderQuestions(window.INITIAL_QUESTIONS || []);
+
+  const qaSubmit = document.getElementById("qa-submit");
+  if (qaSubmit) qaSubmit.addEventListener("click", async () => {
+    const input = document.getElementById("qa-input");
+    const anonEl = document.getElementById("qa-anon");
+    const anon = anonEl && anonEl.checked === true;
+    const content = input.value.trim();
+    if (!content) return;
+    try {
+      const res = await fetch('/api/questions/' + CLASS_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, anonymous: anon })
+      });
+      if (res.ok) { input.value = ""; await pollNow(); }
+      else {
+        const d = await res.json().catch(() => ({}));
+        statusEl.textContent = I18N.error + ": " + (d.error || res.status);
+      }
+    } catch (err) {}
+  });
+
+  if (qaList) qaList.addEventListener("click", async (e) => {
+    if (e.target.classList.contains("qa-answer-btn")) {
+      const qid = e.target.dataset.qid;
+      const ta = qaList.querySelector('.qa-answer-input[data-qid="' + qid + '"]');
+      const ans = ta.value.trim();
+      if (!ans) return;
+      try {
+        const res = await fetch('/api/questions/' + CLASS_ID + '/' + qid + '/answer', {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ answer: ans })
+        });
+        if (res.ok) await pollNow();
+      } catch (err) {}
+    } else if (e.target.classList.contains("q-delete")) {
+      if (!confirm(I18N.qa_confirm_delete)) return;
+      const qid = e.target.dataset.qid;
+      try {
+        const res = await fetch('/api/questions/' + CLASS_ID + '/' + qid + '/delete', { method: "POST" });
+        if (res.ok) await pollNow();
+      } catch (err) {}
+    }
+  });
+
+  // ===== FILES =====
+  function renderFiles(items) {
+    const el = document.getElementById("files-list");
+    if (!el) return;
+    if (!items.length) {
+      el.innerHTML = '<div style="color:#6b7280;font-size:12px;padding:12px 0;">PDFはまだありません</div>';
+      return;
+    }
+    el.innerHTML = items.map(f => (
+      '<div class="file-item">' +
+      '<a href="' + f.url + '" target="_blank">📄 ' + escapeHtml(f.filename) + '</a>' +
+      '</div>'
+    )).join("");
+  }
+  renderFiles(window.INITIAL_FILES || []);
+
+  // ===== MEMBERS kick/ban/unban =====
+  document.addEventListener("click", async (e) => {
+    const kick = e.target.closest("button.kick");
+    const ban = e.target.closest("button.ban");
+    const unban = e.target.closest("button.unban");
+    if (kick) {
+      if (!confirm(I18N.confirm_kick)) return;
+      const uid = kick.dataset.uid;
+      try {
+        const res = await fetch('/api/kick/' + CLASS_ID + '/' + uid, { method: "POST" });
+        if (res.ok) location.reload();
+      } catch (err) {}
+    } else if (ban) {
+      if (!confirm(I18N.confirm_ban)) return;
+      const uid = ban.dataset.uid;
+      const reason = prompt(I18N.reason_label) || "";
+      try {
+        const res = await fetch('/api/ban/' + CLASS_ID + '/' + uid, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason })
+        });
+        if (res.ok) location.reload();
+      } catch (err) {}
+    } else if (unban) {
+      const uid = unban.dataset.uid;
+      try {
+        const res = await fetch('/api/unban/' + CLASS_ID + '/' + uid, { method: "POST" });
+        if (res.ok) location.reload();
+      } catch (err) {}
+    }
+  });
+
+  // ===== POLLING =====
+  let pollTimer = null;
+  let pollInFlight = false;
+  let lastQuestionsKey = "";
+  let lastFilesKey = "";
+  let lastGroupsKey = "";
+  function questionsKey(items) { return items.map(q => q.id + ":" + (q.answer || "").length).join(","); }
+  function filesKey(items) { return items.map(f => f.id).join(","); }
+  function groupsKey(items) { return items.map(g => g.id + ":" + g.members.map(m => m.user_id).join("|") + ":" + (g.board || "").length).join(","); }
+  lastQuestionsKey = questionsKey(window.INITIAL_QUESTIONS || []);
+  lastFilesKey = filesKey(window.INITIAL_FILES || []);
+  lastGroupsKey = groupsKey(window.INITIAL_GROUPS || []);
+
+  async function pollNow() {
+    if (pollInFlight) return;
+    pollInFlight = true;
+    try {
+      const res = await fetch('/api/poll/' + CLASS_ID + '?since_id=' + lastMsgId, { method: "POST" });
+      if (!res.ok) return;
+      const d = await res.json();
+
+      if (d.blackboard !== lastBlackboardSeen) {
+        lastBlackboardSeen = d.blackboard;
+        setDirectBB(d.blackboard);
+        const fsContent = document.getElementById("fs-bb-content");
+        if (fsContent && document.getElementById("board-fullscreen").classList.contains("open")) {
+          fsContent.innerHTML = renderBlackboardHTML(d.blackboard);
+        }
+        if (window._3d && window._3d.drawBlackboardText) window._3d.drawBlackboardText(d.blackboard);
+      }
+      if (typeof d.stage === "number") applyStage(d.stage);
+
+                  if (typeof d.record_shared_teacher !== "undefined") {
+        const newT = d.record_shared_teacher ? 1 : 0;
+        const newS = d.record_shared_student ? 1 : 0;
+        if (newT !== window.RECORD_T || newS !== window.RECORD_S) {
+          window.RECORD_T = newT;
+          window.RECORD_S = newS;
+          if (shareBtn && shareBtn.style.display !== "none") {
+            if (newT && newS) {
+              shareBtn.textContent = "✓ " + I18N.share_record_both;
+            } else if (ROLE === "teacher" ? newT : newS) {
+              shareBtn.textContent = "✓ " + I18N.share_record_active;
+            } else {
+              shareBtn.textContent = "📋 " + I18N.share_record;
+            }
+          }
+        }
+      }
+
+      let appended = false;
+      for (const m of d.messages) {
+        if (seenMsgIds.has(m.id)) continue;
+        if (m.name !== USER_NAME) notifyChatBadge();
+        appendMessage(m);
+        if (window._onMessageFor3D) window._onMessageFor3D(m.name, m.content);
+        appended = true;
+      }
+      if (appended) {
+        const nearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 120;
+        if (nearBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
+        else if (jumpBtn) jumpBtn.classList.add("show");
+      }
+
+      if (Array.isArray(d.questions)) {
+        const k = questionsKey(d.questions);
+        if (k !== lastQuestionsKey) { lastQuestionsKey = k; renderQuestions(d.questions); }
+      }
+      if (Array.isArray(d.files)) {
+        const k = filesKey(d.files);
+        if (k !== lastFilesKey) { lastFilesKey = k; renderFiles(d.files); }
+      }
+      if (Array.isArray(d.groups)) {
+        const k = groupsKey(d.groups);
+        if (k !== lastGroupsKey) { lastGroupsKey = k; renderGroups(d.groups); }
+      }
+    } catch (e) {
+      console.error("poll error:", e);
+    } finally {
+      pollInFlight = false;
+    }
+  }
+
+  function scheduleNextPoll() {
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(async () => {
+      if (document.hidden) { scheduleNextPoll(); return; }
+      await pollNow();
+      scheduleNextPoll();
+    }, 4000);
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) pollNow();
+  });
+
+  // ===== CHAT FORM =====
+  async function sendMessage() {
+    const input = document.getElementById("announce-input");
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    try {
+      const res = await fetch('/api/announce/' + CLASS_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        statusEl.textContent = I18N.error + ": " + (data.error || res.status);
+        return;
+      }
+      await pollNow();
+    } catch (err) { statusEl.textContent = I18N.error + ": " + err; }
+  }
+  const announceBtn = document.getElementById("announce-submit");
+  const announceInput = document.getElementById("announce-input");
+  if (announceBtn) announceBtn.addEventListener("click", (e) => { e.preventDefault(); sendMessage(); });
+  if (announceInput) announceInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); sendMessage(); }
+  });
+
+  // ===== HAND RAISE =====
+  const handBtn = document.getElementById("btn-hand");
+  if (handBtn) handBtn.addEventListener("click", async () => {
+    try {
+      await fetch('/api/announce/' + CLASS_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: HAND_RAISE_SENTINEL })
+      });
+      const threeD = window._3d;
+      const me = threeD && threeD.characterMap[USER_NAME];
+      if (me) { me.userData.handRaised = true; setTimeout(() => { me.userData.handRaised = false; }, 4000); }
+      await pollNow();
+    } catch (err) {}
+  });
+
+  // ===== LIKE =====
+  const likeBtn = document.getElementById("btn-like");
+  if (likeBtn) likeBtn.addEventListener("click", async () => {
+    try {
+      await fetch('/api/announce/' + CLASS_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: LIKE_SENTINEL })
+      });
+      const threeD = window._3d;
+      const me = threeD && threeD.characterMap[USER_NAME];
+      if (me) {
+        me.userData.highlight = 1.2;
+        if (threeD.showLike) threeD.showLike(USER_NAME);
+      }
+      await pollNow();
+    } catch (err) {}
+  });
+
+  // ===== STAGE =====
+  const stepPrev = document.getElementById("btn-stage-prev");
+  const stepNext = document.getElementById("btn-stage-next");
+  async function changeStage(action) {
+    try {
+      await fetch('/api/step/' + CLASS_ID + '/' + action, { method: "POST" });
+      await pollNow();
+    } catch (err) {}
+  }
+  if (stepPrev) stepPrev.addEventListener("click", () => changeStage("prev"));
+  if (stepNext) stepNext.addEventListener("click", () => changeStage("next"));
+  const stepAdd = document.getElementById("btn-step-add");
+  if (stepAdd) stepAdd.addEventListener("click", async () => {
+    const title = prompt(I18N.step_name_prompt);
+    if (!title || !title.trim()) return;
+    try {
+      await fetch('/api/steps/' + CLASS_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: title.trim() })
+      });
+      location.reload();
+    } catch (err) {}
+  });
+  document.querySelectorAll(".step-del").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (!confirm(I18N.confirm_delete_step)) return;
+      const sid = btn.dataset.stepId;
+      try {
+        await fetch('/api/steps/' + CLASS_ID + '/' + sid + '/delete', { method: "POST" });
+        location.reload();
+      } catch (err) {}
+    });
+  });
+
+  // ===== BOARD FULLSCREEN =====
+  const fsOverlay = document.getElementById("board-fullscreen");
+  const fsContent = document.getElementById("fs-bb-content");
+  const fsBtn = document.getElementById("btn-board-fullscreen");
+  const fsBtn2 = document.getElementById("btn-board-fullscreen2");
+  const fsClose = document.getElementById("fs-close");
+  function openFullscreen() {
+    if (!fsOverlay || !fsContent) return;
+    fsContent.innerHTML = renderBlackboardHTML(lastBlackboardSeen);
+    fsOverlay.classList.add("open");
+  }
+  if (fsBtn) fsBtn.addEventListener("click", openFullscreen);
+  if (fsBtn2) fsBtn2.addEventListener("click", openFullscreen);
+  if (fsClose) fsClose.addEventListener("click", () => fsOverlay.classList.remove("open"));
+
+  // ===== BLACKBOARD EDIT =====
+  const drawer = document.getElementById("bb-drawer");
+  const bbTextarea = document.getElementById("bb-textarea");
+  const bbOpen = document.getElementById("btn-bb-open");
+  if (bbOpen) bbOpen.addEventListener("click", async () => {
+    try {
+      const res = await fetch('/api/poll/' + CLASS_ID, { method: "POST" });
+      const data = await res.json();
+      if (data.pomodoro) {
+  pomoState = data.pomodoro.state || "idle";
+  pomoEndsAt = data.pomodoro.ends_at ? new Date(data.pomodoro.ends_at).getTime() : 0;
+  renderPomo();
+}
+      bbTextarea.value = data.blackboard || "";
+      drawer.classList.add("open");
+    } catch (err) {}
+  });
+  const bbCancel = document.getElementById("bb-cancel");
+  if (bbCancel) bbCancel.addEventListener("click", () => drawer.classList.remove("open"));
+  const bbSave = document.getElementById("bb-save");
+  if (bbSave) bbSave.addEventListener("click", async () => {
+    statusEl.textContent = I18N.save + "...";
+    try {
+      const res = await fetch('/api/blackboard/' + CLASS_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: bbTextarea.value })
+      });
+      if (res.ok) {
+        lastBlackboardSeen = bbTextarea.value;
+        setDirectBB(bbTextarea.value);
+        if (window._3d && window._3d.drawBlackboardText) window._3d.drawBlackboardText(bbTextarea.value);
+        drawer.classList.remove("open");
+        statusEl.textContent = "";
+      } else statusEl.textContent = I18N.error;
+    } catch (err) { statusEl.textContent = I18N.error; }
+  });
+  const bbClear = document.getElementById("btn-bb-clear");
+  if (bbClear) bbClear.addEventListener("click", async () => {
+    if (!confirm(I18N.confirm_clear_blackboard)) return;
+    try {
+      await fetch('/api/blackboard/clear/' + CLASS_ID, { method: "POST" });
+      lastBlackboardSeen = "";
+      setDirectBB("");
+      if (window._3d && window._3d.drawBlackboardText) window._3d.drawBlackboardText("");
+    } catch (err) {}
+  });
+
+  // ===== COLOR PALETTE =====
+  let currentColor = "white";
+  document.querySelectorAll(".color-swatch:not(.draw-color)").forEach(sw => {
+    sw.addEventListener("click", () => {
+      document.querySelectorAll(".color-swatch:not(.draw-color)").forEach(s => s.classList.remove("active"));
+      sw.classList.add("active");
+      currentColor = sw.dataset.color;
+      const ta = document.getElementById("bb-textarea");
+      if (!ta) return;
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      const selected = ta.value.substring(start, end) || "text";
+      const wrapped = `[c=${currentColor}]${selected}[/c]`;
+      ta.value = ta.value.substring(0, start) + wrapped + ta.value.substring(end);
+      ta.focus();
+      ta.setSelectionRange(start + wrapped.length, start + wrapped.length);
+    });
+  });
+
+  // ===== IMAGE UPLOAD with scale =====
+  const imgFile = document.getElementById("img-file");
+  const imgBtn = document.getElementById("btn-img-upload");
+  const imgAdjustDrawer = document.getElementById("img-adjust-drawer");
+  const imgPreview = document.getElementById("img-adjust-preview");
+  const imgScaleRange = document.getElementById("img-scale-range");
+  const imgScaleVal = document.getElementById("img-scale-val");
+  let pendingImageUrl = null;
+  let pendingImageExt = null;
+
+  if (imgBtn && imgFile) {
+    imgBtn.addEventListener("click", () => imgFile.click());
+    imgFile.addEventListener("change", async () => {
+      const file = imgFile.files[0];
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) {
+        statusEl.textContent = I18N.image_too_large;
+        imgFile.value = "";
+        return;
+      }
+      statusEl.textContent = I18N.uploading;
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch('/api/upload/' + CLASS_ID, { method: "POST", body: fd });
+        const d = await res.json();
+        if (!res.ok) { statusEl.textContent = "Error: " + (d.error || res.status); return; }
+        pendingImageUrl = d.url;
+        pendingImageExt = d.ext;
+        imgPreview.src = d.url;
+        imgScaleRange.value = "100";
+        imgScaleVal.textContent = "100";
+        imgAdjustDrawer.classList.add("open");
+        statusEl.textContent = "";
+      } catch (err) { statusEl.textContent = I18N.error; }
+      imgFile.value = "";
+    });
+  }
+  if (imgScaleRange) imgScaleRange.addEventListener("input", () => {
+    imgScaleVal.textContent = imgScaleRange.value;
+    imgPreview.style.width = imgScaleRange.value + "%";
+  });
+  const imgApply = document.getElementById("img-adjust-apply");
+  if (imgApply) imgApply.addEventListener("click", async () => {
+    if (!pendingImageUrl) return;
+    const scale = parseInt(imgScaleRange.value, 10) || 100;
+    const tag = `\n[img]${pendingImageUrl}[/img]\n`;
+    try {
+      const pollRes = await fetch('/api/poll/' + CLASS_ID, { method: "POST" });
+      const pollData = await pollRes.json();
+      const newBB = (pollData.blackboard || "") + tag;
+      const saveRes = await fetch('/api/blackboard/' + CLASS_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: newBB })
+      });
+      if (saveRes.ok) {
+        lastBlackboardSeen = newBB;
+        setDirectBB(newBB);
+        if (window._3d && window._3d.drawBlackboardText) window._3d.drawBlackboardText(newBB);
+      }
+    } catch (err) {}
+    imgAdjustDrawer.classList.remove("open");
+    pendingImageUrl = null;
+  });
+  const imgCancel = document.getElementById("img-adjust-cancel");
+  if (imgCancel) imgCancel.addEventListener("click", () => {
+    imgAdjustDrawer.classList.remove("open");
+    pendingImageUrl = null;
+  });
+
+  // ===== PDF UPLOAD =====
+  const pdfFile = document.getElementById("pdf-file");
+  const pdfBtn = document.getElementById("btn-pdf-upload");
+  if (pdfBtn && pdfFile) {
+    pdfBtn.addEventListener("click", () => pdfFile.click());
+    pdfFile.addEventListener("change", async () => {
+      const file = pdfFile.files[0];
+      if (!file) return;
+      statusEl.textContent = I18N.pdf_uploading;
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch('/api/upload_pdf/' + CLASS_ID, { method: "POST", body: fd });
+        const d = await res.json();
+        if (!res.ok) { statusEl.textContent = "Error: " + (d.error || res.status); return; }
+        const pollRes = await fetch('/api/poll/' + CLASS_ID, { method: "POST" });
+        const pollData = await pollRes.json();
+        const newBB = (pollData.blackboard || "") + "\n[pdf]" + d.url + "|" + d.name + "[/pdf]\n";
+        const saveRes = await fetch('/api/blackboard/' + CLASS_ID, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: newBB })
+        });
+        if (saveRes.ok) {
+          lastBlackboardSeen = newBB;
+          setDirectBB(newBB);
+          if (window._3d && window._3d.drawBlackboardText) window._3d.drawBlackboardText(newBB);
+          statusEl.textContent = "";
+        }
+      } catch (err) { statusEl.textContent = "Error: " + err; }
+      pdfFile.value = "";
+    });
+  }
+
+  // ===== DRAWING CANVAS =====
+  const drawDrawer = document.getElementById("draw-drawer");
+  const drawCanvas = document.getElementById("draw-canvas");
+  let drawCtx = null;
+  let drawing = false;
+  let drawColor = "#f5f5e8";
+  let drawMode = "pen";
+
+  if (drawCanvas) {
+    const setupCanvas = () => {
+      const rect = drawCanvas.getBoundingClientRect();
+      drawCanvas.width = rect.width;
+      drawCanvas.height = rect.height;
+      drawCtx = drawCanvas.getContext("2d");
+      drawCtx.fillStyle = "#14281c";
+      drawCtx.fillRect(0, 0, drawCanvas.width, drawCanvas.height);
+      drawCtx.lineCap = "round";
+      drawCtx.lineJoin = "round";
+    };
+    const openDraw = document.getElementById("bb-draw-open");
+    if (openDraw) openDraw.addEventListener("click", () => {
+      drawer.classList.remove("open");
+      drawDrawer.classList.add("open");
+      setTimeout(setupCanvas, 100);
+    });
+    const drawCancel = document.getElementById("draw-cancel");
+    if (drawCancel) drawCancel.addEventListener("click", () => drawDrawer.classList.remove("open"));
+    const drawClear = document.getElementById("draw-clear");
+    if (drawClear) drawClear.addEventListener("click", () => {
+      drawCtx.fillStyle = "#14281c";
+      drawCtx.fillRect(0, 0, drawCanvas.width, drawCanvas.height);
+    });
+    const drawPen = document.getElementById("draw-pen");
+    const drawEraser = document.getElementById("draw-eraser");
+    if (drawPen) drawPen.addEventListener("click", () => { drawMode = "pen"; });
+    if (drawEraser) drawEraser.addEventListener("click", () => { drawMode = "eraser"; });
+    document.querySelectorAll(".color-swatch.draw-color").forEach(sw => {
+      sw.addEventListener("click", () => {
+        document.querySelectorAll(".color-swatch.draw-color").forEach(s => s.classList.remove("active"));
+        sw.classList.add("active");
+        drawColor = sw.dataset.color;
+      });
+    });
+    const drawSave = document.getElementById("draw-save");
+    if (drawSave) drawSave.addEventListener("click", async () => {
+      const dataUrl = drawCanvas.toDataURL("image/png");
+      const res = await fetch('/api/upload_draw/' + CLASS_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: dataUrl })
+      });
+      const d = await res.json();
+      if (!res.ok) { statusEl.textContent = "Error: " + (d.error || ""); return; }
+      const pollRes = await fetch('/api/poll/' + CLASS_ID, { method: "POST" });
+      const pollData = await pollRes.json();
+      const newBB = (pollData.blackboard || "") + "\n[draw]" + d.url + "[/draw]\n";
+      const saveRes = await fetch('/api/blackboard/' + CLASS_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: newBB })
+      });
+      if (saveRes.ok) {
+        lastBlackboardSeen = newBB;
+        setDirectBB(newBB);
+        if (window._3d && window._3d.drawBlackboardText) window._3d.drawBlackboardText(newBB);
+      }
+      drawDrawer.classList.remove("open");
+    });
+
+    const getPos = (e) => {
+      const rect = drawCanvas.getBoundingClientRect();
+      const p = e.touches ? e.touches[0] : e;
+      return { x: p.clientX - rect.left, y: p.clientY - rect.top };
+    };
+    const start = (e) => {
+      e.preventDefault();
+      drawing = true;
+      const { x, y } = getPos(e);
+      drawCtx.beginPath();
+      drawCtx.moveTo(x, y);
+      drawCtx.lineWidth = drawMode === "eraser" ? 30 : 4;
+      drawCtx.strokeStyle = drawMode === "eraser" ? "#14281c" : drawColor;
+    };
+    const move = (e) => {
+      if (!drawing) return;
+      e.preventDefault();
+      const { x, y } = getPos(e);
+      drawCtx.lineTo(x, y);
+      drawCtx.stroke();
+    };
+    const end = () => { drawing = false; };
+    drawCanvas.addEventListener("mousedown", start);
+    drawCanvas.addEventListener("mousemove", move);
+    drawCanvas.addEventListener("mouseup", end);
+    drawCanvas.addEventListener("mouseleave", end);
+    drawCanvas.addEventListener("touchstart", start, { passive: false });
+    drawCanvas.addEventListener("touchmove", move, { passive: false });
+    drawCanvas.addEventListener("touchend", end);
+  }
+
+  // ===== INVITE LINK =====
+  const inviteBtn = document.getElementById("btn-invite");
+  if (inviteBtn) inviteBtn.addEventListener("click", () => {
+    const url = location.origin + "/invite/" + window.CLASS_JOIN_CODE;
+    navigator.clipboard.writeText(url).then(() => {
+      statusEl.textContent = I18N.invite_link_copied + ": " + url;
+      setTimeout(() => { statusEl.textContent = ""; }, 5000);
+    }).catch(() => { prompt("Invite link:", url); });
+  });
+
+     // ===== SHARE CLASS =====
+  const shareClassBtn = document.getElementById("btn-share-class");
+  if (shareClassBtn) shareClassBtn.addEventListener("click", () => {
+    const tmpl = I18N.share_text_template;
+    const text = tmpl
+      .replace("{title}", window.CLASS_TITLE || "")
+      .replace("{subject}", window.CLASS_SUBJECT || "");
+    const encoded = encodeURIComponent(text);
+    const url = encodeURIComponent(location.origin + "/invite/" + window.CLASS_JOIN_CODE);
+    window.open("https://twitter.com/intent/tweet?text=" + encoded + "&url=" + url + "&hashtags=VirtualClassroom", "_blank");
+  });
+
+  // ===== HISTORY =====
+  let lastHistoryLoad = 0;
+  async function loadHistory() {
+    const list = document.getElementById("history-list");
+    if (!list) return;
+    const now = Date.now();
+    if (now - lastHistoryLoad < 3000) return;
+    lastHistoryLoad = now;
+    list.innerHTML = '<div style="color:#6b7280;font-size:12px;padding:8px;">' + I18N.loading + '</div>';
+    try {
+      const res = await fetch('/api/history/' + CLASS_ID);
+      const d = await res.json();
+      if (!res.ok) { list.innerHTML = '<div style="color:#ef4444;">' + I18N.load_failed + '</div>'; return; }
+      if (!d.items || !d.items.length) {
+        list.innerHTML = '<div style="color:#6b7280;font-size:12px;padding:8px;">' + I18N.no_history + '</div>';
+        return;
+      }
+      list.innerHTML = "";
+      for (const item of d.items) {
+        const div = document.createElement("div");
+        div.className = "history-item";
+        const preview = (item.content || "").slice(0, 200);
+        div.innerHTML =
+          '<div class="meta">' + escapeHtml(item.author || "unknown") + " · " + escapeHtml(item.created_at) + '</div>' +
+          '<div class="body">' + escapeHtml(preview) + '</div>' +
+          (ROLE === "teacher" ? '<div class="actions"><button data-hid="' + item.id + '">Restore</button></div>' : '');
+        list.appendChild(div);
+      }
+      list.querySelectorAll("button[data-hid]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const hid = btn.dataset.hid;
+          const r = await fetch('/api/history/restore/' + CLASS_ID + '/' + hid, { method: "POST" });
+          const dd = await r.json();
+          if (r.ok) {
+            lastBlackboardSeen = dd.content;
+            setDirectBB(dd.content);
+            if (window._3d && window._3d.drawBlackboardText) window._3d.drawBlackboardText(dd.content);
+          }
+        });
+      });
+    } catch (err) { list.innerHTML = '<div style="color:#ef4444;">' + I18N.error + '</div>'; }
+  }
+
+  // ===== GROUPS =====
+  const groupsDrawer = document.getElementById("groups-drawer");
+  const groupsOpen = document.getElementById("btn-groups-open");
+  if (groupsOpen) groupsOpen.addEventListener("click", () => {
+    renderGroupsDrawer(window.INITIAL_GROUPS || []);
+    groupsDrawer.classList.add("open");
+  });
+  const groupsClose = document.getElementById("groups-close");
+  if (groupsClose) groupsClose.addEventListener("click", () => groupsDrawer.classList.remove("open"));
+
+  const groupCreateBtn = document.getElementById("group-create-btn");
+  if (groupCreateBtn) groupCreateBtn.addEventListener("click", async () => {
+    const input = document.getElementById("group-name-input");
+    const name = input.value.trim();
+    if (!name) return;
+    try {
+      const res = await fetch('/api/groups/' + CLASS_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name })
+      });
+      if (res.ok) { input.value = ""; await pollNow(); renderGroupsDrawer(await fetchGroups()); }
+    } catch (err) {}
+  });
+
+  async function fetchGroups() {
+    try {
+      const res = await fetch('/api/poll/' + CLASS_ID, { method: "POST" });
+      const d = await res.json();
+      return d.groups || [];
+    } catch (err) { return []; }
+  }
+
+  function renderGroupsDrawer(groups) {
+    const el = document.getElementById("groups-list");
+    if (!el) return;
+    if (!groups.length) {
+      el.innerHTML = '<div style="color:#6b7280;font-size:12px;padding:8px;">' + I18N.group_no_groups + '</div>';
+      return;
+    }
+    const studentMembers = (window.MEMBERS || []).filter(m => m.role === "student");
+    el.innerHTML = groups.map(g => {
+      const chips = studentMembers.map(m => {
+        const inGroup = g.members.some(gm => gm.user_id === m.id);
+        return '<span class="group-member-chip ' + (inGroup ? 'mine' : '') + '" data-gid="' + g.id + '" data-uid="' + m.id + '" data-toggle="' + (inGroup ? '0' : '1') + '">' + escapeHtml(m.name) + '</span>';
+      }).join("");
+      return '<div class="group-card">' +
+        '<div class="group-head"><span class="group-name">' + escapeHtml(g.name) + '</span>' +
+        '<button class="group-del" data-gid="' + g.id + '">✕</button></div>' +
+        '<div class="group-members">' + chips + '</div>' +
+        '</div>';
+    }).join("");
+    el.querySelectorAll(".group-member-chip").forEach(chip => {
+      chip.addEventListener("click", async () => {
+        const gid = chip.dataset.gid;
+        const uid = chip.dataset.uid;
+        const toggle = chip.dataset.toggle === "1";
+        const url = toggle
+          ? '/api/groups/' + CLASS_ID + '/' + gid + '/members/' + uid
+          : '/api/groups/' + CLASS_ID + '/' + gid + '/members/' + uid + '/remove';
+        try {
+          await fetch(url, { method: "POST" });
+          renderGroupsDrawer(await fetchGroups());
+        } catch (err) {}
+      });
+    });
+    el.querySelectorAll(".group-del").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm(I18N.group_delete_confirm)) return;
+        const gid = btn.dataset.gid;
+        try {
+          await fetch('/api/groups/' + CLASS_ID + '/' + gid + '/delete', { method: "POST" });
+          renderGroupsDrawer(await fetchGroups());
+        } catch (err) {}
+      });
+    });
+  }
+
+  // Student group pane
+  function renderGroups(groups) {
+    const el = document.getElementById("my-group-content");
+    if (!el || ROLE !== "student") return;
+    const mine = groups.find(g => g.members.some(m => m.user_id === window.MEMBERS.find(x => x.name === USER_NAME)?.id));
+    if (!mine) {
+      el.innerHTML = '<div style="color:#6b7280;font-size:12px;padding:12px 0;">' + I18N.group_no_groups + '</div>';
+      return;
+    }
+    el.innerHTML =
+      '<div style="font-size:13px;font-weight:700;color:#fbbf24;margin-bottom:8px;">👥 ' + escapeHtml(mine.name) + '</div>' +
+      '<div style="font-size:11px;color:#9ca3af;margin-bottom:8px;">' + escapeHtml(mine.members.map(m => m.name).join(", ")) + '</div>' +
+      '<textarea class="group-board-edit" id="group-board-edit" placeholder="' + I18N.group_board + '">' + escapeHtml(mine.board || "") + '</textarea>' +
+      '<button id="group-board-save" class="btn sm green" style="margin-top:8px;width:100%;">' + I18N.save + '</button>';
+    const saveBtn = document.getElementById("group-board-save");
+    if (saveBtn) saveBtn.addEventListener("click", async () => {
+      const ta = document.getElementById("group-board-edit");
+      try {
+        const res = await fetch('/api/groups/' + CLASS_ID + '/' + mine.id + '/board', {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: ta.value })
+        });
+        if (res.ok) {
+          statusEl.textContent = "Saved";
+          setTimeout(() => { statusEl.textContent = ""; }, 1500);
+        }
+      } catch (err) {}
+    });
+  }
+  renderGroups(window.INITIAL_GROUPS || []);
+
+  // ===== LEARNING CARD =====
+  const cardDrawer = document.getElementById("card-drawer");
+  const cardTextarea = document.getElementById("card-textarea");
+  const cardOpen = document.getElementById("btn-card-open");
+  if (cardOpen) cardOpen.addEventListener("click", () => {
+    cardTextarea.value = "#VirtualClassroom\n" + (window.CLASS_TITLE || "") + " (" + (window.CLASS_SUBJECT || "") + ")\n\n";
+    cardDrawer.classList.add("open");
+  });
+  const cardCancel = document.getElementById("card-cancel");
+  if (cardCancel) cardCancel.addEventListener("click", () => cardDrawer.classList.remove("open"));
+  const cardSave = document.getElementById("card-save");
+  if (cardSave) cardSave.addEventListener("click", async () => {
+    const content = cardTextarea.value.trim();
+    if (!content) return;
+    try {
+      const res = await fetch('/card/' + CLASS_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content })
+      });
+      if (res.ok) {
+        cardDrawer.classList.remove("open");
+        statusEl.textContent = I18N.card_made;
+        setTimeout(() => { statusEl.textContent = ""; }, 2000);
+      }
+    } catch (err) {}
+  });
+
+  // ===== LIVE AUDIO =====
+  let audioWs = null;
+  let audioCtx = null;
+  let micStream = null;
+  let scriptProcessor = null;
+  let audioSending = false;
+  let reconnectTimer = null;
+  const audioBtn = document.getElementById("btn-audio");
+  const listenRow = document.getElementById("audio-listen-row");
+
+  function isSecureContext() {
+    return location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1";
+  }
+  function buildWsUrl() {
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    return proto + "//" + location.host + "/ws/audio/" + CLASS_ID;
+  }
+  function connectAudioWs() {
+    if (audioWs && (audioWs.readyState === WebSocket.OPEN || audioWs.readyState === WebSocket.CONNECTING)) return;
+    audioWs = new WebSocket(buildWsUrl());
+    audioWs.binaryType = "arraybuffer";
+        audioWs.onmessage = (e) => {
+      if (typeof e.data === "string") return;
+      // 面談モードでは先生も生徒も受信する
+      if (ROLE === "teacher" && !window.IS_INTERVIEW) return;
+      playPCM(e.data);
+    };
+    audioWs.onclose = () => {
+      audioWs = null;
+      if (audioSending) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(connectAudioWs, 1500);
+      }
+    };
+  }
+  function playPCM(arrayBuffer) {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      const pcm = new Int16Array(arrayBuffer);
+      const buffer = audioCtx.createBuffer(1, pcm.length, 16000);
+      const ch = buffer.getChannelData(0);
+      for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32767;
+      const src = audioCtx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(audioCtx.destination);
+      src.start();
+      if (listenRow) listenRow.style.display = "";
+    } catch (e) {}
+  }
+  async function startAudioSending() {
+    if (!isSecureContext()) { alert("HTTPS required for microphone"); return; }
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      });
+    } catch (err) { alert(I18N.audio_perm_denied); return; }
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    if (audioCtx.state === "suspended") await audioCtx.resume();
+    const source = audioCtx.createMediaStreamSource(micStream);
+    scriptProcessor = audioCtx.createScriptProcessor(2048, 1, 1);
+    scriptProcessor.onaudioprocess = (e) => {
+      if (!audioWs || audioWs.readyState !== WebSocket.OPEN) return;
+      const input = e.inputBuffer.getChannelData(0);
+      const pcm = new Int16Array(input.length);
+      for (let i = 0; i < input.length; i++) {
+        const s = Math.max(-1, Math.min(1, input[i]));
+        pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      }
+      try { audioWs.send(pcm.buffer); } catch (err) {}
+    };
+    source.connect(scriptProcessor);
+    scriptProcessor.connect(audioCtx.destination);
+    audioSending = true;
+  }
+  function stopAudioSending() {
+    audioSending = false;
+    if (scriptProcessor) { try { scriptProcessor.disconnect(); } catch (e) {} scriptProcessor = null; }
+    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  }
+    async function handleAudioToggle(btn) {
+    if (audioSending) {
+      stopAudioSending();
+      btn.textContent = I18N.audio_start;
+      btn.className = "green";
+      statusEl.textContent = I18N.audio_off;
+      setTimeout(() => { statusEl.textContent = ""; }, 1500);
+    } else {
+      connectAudioWs();
+      statusEl.textContent = I18N.audio_connecting;
+      setTimeout(async () => {
+        await startAudioSending();
+        if (audioSending) {
+          btn.textContent = "● " + I18N.audio_stop;
+          btn.className = "red";
+          statusEl.textContent = I18N.audio_live;
+        } else {
+          statusEl.textContent = I18N.audio_mic_error;
+        }
+      }, 300);
+    }
+  }
+
+  // 先生の音声ボタン
+  if (audioBtn && ROLE === "teacher") {
+    audioBtn.addEventListener("click", () => handleAudioToggle(audioBtn));
+  }
+
+  // 面談モード: 生徒も音声を使える
+  const studentAudioRow = document.getElementById("student-audio-row");
+  const studentAudioBtn = document.getElementById("btn-audio-student");
+  if (studentAudioBtn && window.IS_INTERVIEW && ROLE === "student") {
+    if (studentAudioRow) studentAudioRow.style.display = "";
+    studentAudioBtn.addEventListener("click", () => handleAudioToggle(studentAudioBtn));
+  }
+
+  // 生徒側はWS接続を維持（通常モードでは聴くだけ、面談モードでは送信も）
+  if (ROLE === "student") {
+    connectAudioWs();
+    setInterval(() => {
+      if (audioWs && audioWs.readyState === WebSocket.OPEN) {
+        try { audioWs.send("ping"); } catch (e) {}
+      } else if (!audioWs) connectAudioWs();
+    }, 25000);
+  }
+  window.addEventListener("beforeunload", () => {
+    stopAudioSending();
+    if (audioWs) try { audioWs.close(); } catch (e) {}
+  });
+
+    // ===== STUDENT NOTEBOOK =====
+  const notesList = document.getElementById("notes-list");
+  async function loadNotes() {
+    if (!notesList) return;
+    try {
+      const res = await fetch('/api/notes/' + CLASS_ID);
+      const d = await res.json();
+      if (!d.items || !d.items.length) {
+        notesList.innerHTML = '<div style="color:#6b7280;font-size:12px;padding:8px;">まだノートがありません</div>';
+        return;
+      }
+      notesList.innerHTML = "";
+      for (const n of d.items) {
+        const div = document.createElement("div");
+        div.className = "history-item";
+        div.innerHTML =
+          '<div class="meta">' + escapeHtml(n.created_at) + (n.title ? " · " + escapeHtml(n.title) : "") + '</div>' +
+          '<div class="body">' + escapeHtml(n.content.slice(0, 300)) + '</div>' +
+          '<div class="actions"><button data-nid="' + n.id + '" style="background:#ef4444;">削除</button></div>';
+        notesList.appendChild(div);
+      }
+      notesList.querySelectorAll("button[data-nid]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const nid = btn.dataset.nid;
+          await fetch('/api/notes/' + CLASS_ID + '/' + nid + '/delete', { method: "POST" });
+          loadNotes();
+        });
+      });
+    } catch (err) {}
+  }
+  const noteSaveBB = document.getElementById("note-save-bb");
+  if (noteSaveBB) noteSaveBB.addEventListener("click", async () => {
+    const content = lastBlackboardSeen || "";
+    if (!content.trim()) { alert("黒板が空です"); return; }
+    await fetch('/api/notes/' + CLASS_ID, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content, title: "黒板スナップショット" })
+    });
+    loadNotes();
+  });
+  const noteSaveCustom = document.getElementById("note-save-custom");
+  if (noteSaveCustom) noteSaveCustom.addEventListener("click", async () => {
+    const ta = document.getElementById("note-input");
+    const content = ta.value.trim();
+    if (!content) return;
+    await fetch('/api/notes/' + CLASS_ID, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content, title: "" })
+    });
+    ta.value = "";
+    loadNotes();
+  });
+  // タブクリック時にノート読み込み
+  document.querySelectorAll(".side-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      if (tab.dataset.tab === "notebook") loadNotes();
+    });
+  });
+
+    // ===== TEACHER RATING (student only) =====
+  const rateGood = document.getElementById("btn-rate-good");
+  const rateBad = document.getElementById("btn-rate-bad");
+  const rateRow = document.getElementById("rate-teacher-row");
+  if (rateRow && ROLE === "teacher") {
+    rateRow.style.display = "none";
+  }
+  async function sendRating(value) {
+    if (!window.TEACHER_ID) return;
+    try {
+      const res = await fetch('/api/rate/' + CLASS_ID + '/' + window.TEACHER_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value })
+      });
+      if (res.ok) {
+        statusEl.textContent = value > 0 ? I18N.rate_good_thanks : I18N.rate_bad_thanks;
+        setTimeout(() => { statusEl.textContent = ""; }, 2000);
+      }
+    } catch (err) {}
+  }
+  if (rateGood) rateGood.addEventListener("click", () => sendRating(1));
+  if (rateBad) rateBad.addEventListener("click", () => sendRating(-1));
+
+      // ===== INTERVIEW RECORD SHARING =====
+  const shareBtn = document.getElementById("btn-share-record");
+  if (shareBtn && window.IS_INTERVIEW) {
+    shareBtn.style.display = "";
+    function updateShareBtn() {
+      const mine = ROLE === "teacher" ? window.RECORD_T : window.RECORD_S;
+      if (window.RECORD_T && window.RECORD_S) {
+        shareBtn.textContent = "✓ " + I18N.share_record_both;
+        shareBtn.style.background = "#10b981";
+        shareBtn.style.borderColor = "#10b981";
+      } else if (mine) {
+        shareBtn.textContent = "✓ " + I18N.share_record_active;
+        shareBtn.style.background = "#10b981";
+        shareBtn.style.borderColor = "#10b981";
+      } else {
+        shareBtn.textContent = "📋 " + I18N.share_record;
+        shareBtn.style.background = "#f59e0b";
+        shareBtn.style.borderColor = "#f59e0b";
+      }
+    }
+    updateShareBtn();
+    shareBtn.addEventListener("click", async () => {
+      const mine = ROLE === "teacher" ? window.RECORD_T : window.RECORD_S;
+      const next = !mine;
+      try {
+        const res = await fetch('/api/class/' + CLASS_ID + '/share_record', {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ share: next })
+        });
+        if (res.ok) {
+          if (ROLE === "teacher") window.RECORD_T = next ? 1 : 0;
+          else window.RECORD_S = next ? 1 : 0;
+          updateShareBtn();
+          if (window.RECORD_T && window.RECORD_S) {
+            statusEl.textContent = I18N.share_record_agreed;
+            setTimeout(() => { statusEl.textContent = ""; }, 3000);
+          }
+        }
+      } catch (err) {}
+    });
+  }
+
+     // ===== REMAINING TIME =====
+  const endsAtStr = {{ (cls.ends_at or '')|tojson }};
+  const remainingRow = document.getElementById("remaining-row");
+  const remainingTime = document.getElementById("remaining-time");
+  let endsAt = null;
+  if (endsAtStr) {
+    try { endsAt = new Date(endsAtStr); } catch (e) {}
+  }
+  if (endsAt && remainingRow && remainingTime) {
+    remainingRow.style.display = "";
+    setInterval(() => {
+      const now = new Date();
+      const diff = Math.floor((endsAt - now) / 1000);
+      if (diff <= 0) {
+        remainingTime.textContent = I18N.remaining_ended;
+        remainingTime.style.color = "#ef4444";
+        return;
+      }
+      const m = Math.floor(diff / 60);
+      const s = diff % 60;
+      remainingTime.textContent = m + ":" + String(s).padStart(2, "0");
+      if (diff < 60) remainingTime.style.color = "#f59e0b";
+    }, 1000);
+  }
+
+    // ===== BULLETIN BOARD =====
+  
+  const postListView = document.getElementById("post-list-view");
+  const postDetailView = document.getElementById("post-detail-view");
+  const postContentContainer = document.getElementById("post-content-container");
+  const commentsContainer = document.getElementById("comments-container");
+  const postDrawer = document.getElementById("post-drawer");
+  const newPostTitle = document.getElementById("new-post-title");
+  const newPostContent = document.getElementById("new-post-content");
+
+  let currentPostId = null;
+
+  function renderPosts(posts) {
+    const postsContainer = document.getElementById("posts-container");
+    if (!postsContainer) return;
+    if (!posts.length) {
+      postsContainer.innerHTML = '<div style="color:#6b7280;font-size:12px;padding:8px;">' + I18N.no_posts + '</div>';
+      return;
+    }
+    postsContainer.innerHTML = posts.map(p => {
+      const pin = p.is_pinned ? '<span style="background:#f59e0b;color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;margin-right:6px;font-weight:700;">' + I18N.pinned + '</span>' : '';
+      return '<div class="q-item" data-pid="' + p.id + '" style="cursor:pointer;">' +
+        '<div class="q-head"><span>' + escapeHtml(p.author) + '</span><span>' + escapeHtml(p.created_at) + '</span></div>' +
+        '<div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:6px;">' + pin + escapeHtml(p.title) + '</div>' +
+        '<div style="font-size:11px;color:#6b7280;">' + p.comment_count + ' レス</div>' +
+        '</div>';
+    }).join("");
+    postsContainer.querySelectorAll(".q-item").forEach(el => {
+      el.addEventListener("click", () => openPost(el.dataset.pid));
+    });
+  }
+  renderPosts(window.INITIAL_POSTS || []);
+
+  async function loadPosts() {
+    const postsContainer = document.getElementById("posts-container");
+    if (!postsContainer) return;
+    try {
+      const res = await fetch('/api/posts/' + CLASS_ID);
+      const d = await res.json();
+      if (res.ok) renderPosts(d.posts || []);
+    } catch (e) {}
+  }
+
+  async function openPost(pid) {
+    currentPostId = pid;
+    postListView.style.display = "none";
+    postDetailView.style.display = "block";
+    try {
+      const res = await fetch('/api/posts/' + pid + '/comments');
+      const d = await res.json();
+      const post = (window.INITIAL_POSTS || []).find(p => p.id == pid);
+      if (post) {
+        const del = (ROLE === "teacher" || post.author === USER_NAME)
+          ? '<button id="btn-del-post" class="q-delete" style="margin-top:8px;background:#ef4444;color:#fff;padding:4px 10px;border-radius:6px;">' + I18N.qa_delete + '</button>'
+          : '';
+        postContentContainer.innerHTML =
+          '<div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:8px;">' + escapeHtml(post.title) + '</div>' +
+          '<div style="font-size:11px;color:#6b7280;margin-bottom:12px;">' + escapeHtml(post.author) + ' · ' + escapeHtml(post.created_at) + '</div>' +
+          '<div style="font-size:13px;color:#e5e7eb;line-height:1.7;white-space:pre-wrap;">' + renderMessageBody(post.content) + '</div>' +
+          del;
+        const delBtn = document.getElementById("btn-del-post");
+        if (delBtn) delBtn.addEventListener("click", async () => {
+          if (!confirm(I18N.qa_confirm_delete)) return;
+          await fetch('/api/posts/' + pid + '/delete', { method: "POST" });
+          backToList();
+          loadPosts();
+        });
+      }
+      if (!d.comments || !d.comments.length) {
+        commentsContainer.innerHTML = '<div style="color:#6b7280;font-size:12px;padding:8px;">まだレスはありません</div>';
+      } else {
+        commentsContainer.innerHTML = d.comments.map(c =>
+          '<div class="q-item" style="padding:10px 12px;margin-bottom:8px;">' +
+          '<div class="q-head"><span>' + escapeHtml(c.author) + '</span><span>' + escapeHtml(c.created_at) + '</span></div>' +
+          '<div style="font-size:13px;color:#e5e7eb;white-space:pre-wrap;">' + renderMessageBody(c.content) + '</div>' +
+          '</div>'
+        ).join("");
+      }
+    } catch (e) {}
+  }
+
+  function backToList() {
+    currentPostId = null;
+    postDetailView.style.display = "none";
+    postListView.style.display = "block";
+  }
+
+  const btnBack = document.getElementById("btn-back-to-list");
+  if (btnBack) btnBack.addEventListener("click", backToList);
+
+  const btnNewPost = document.getElementById("btn-new-post");
+  if (btnNewPost) btnNewPost.addEventListener("click", () => {
+    newPostTitle.value = "";
+    newPostContent.value = "";
+    postDrawer.classList.add("open");
+  });
+  const btnPostCancel = document.getElementById("btn-post-cancel");
+  if (btnPostCancel) btnPostCancel.addEventListener("click", () => postDrawer.classList.remove("open"));
+
+  // Quillエディタの初期化
+  let postQuill = null;
+  const postEditorContainer = document.getElementById("post-editor-container");
+  if (postEditorContainer) {
+    postQuill = new Quill('#post-editor-container', {
+      theme: 'snow',
+      modules: {
+        toolbar: [
+          [{ 'header': [1, 2, 3, false] }],
+          ['bold', 'italic', 'underline', 'strike'],
+          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+          ['blockquote', 'code-block'],
+          ['link', 'image'],
+          ['clean']
+        ]
+      },
+      placeholder: 'ここに本文を書きます...'
+    });
+
+    // 画像アップロードのカスタムハンドラ
+    const toolbar = postQuill.getModule('toolbar');
+    toolbar.addHandler('image', () => {
+      const input = document.createElement('input');
+      input.setAttribute('type', 'file');
+      input.setAttribute('accept', 'image/*');
+      input.click();
+      input.onchange = async () => {
+        const file = input.files[0];
+        if (!file) return;
+        const fd = new FormData();
+        fd.append('file', file);
+        try {
+          const res = await fetch('/api/upload_global', { method: 'POST', body: fd });
+          const d = await res.json();
+          if (res.ok) {
+            const range = postQuill.getSelection(true);
+            postQuill.insertEmbed(range.index, 'image', d.url);
+            postQuill.setSelection(range.index + 1);
+          } else {
+            alert('Upload failed: ' + (d.error || 'Unknown error'));
+          }
+        } catch (e) { alert('Error: ' + e); }
+      };
+    });
+  }
+
+  // 投稿ボタンのイベント
+  window.postQuill = postQuill;
+  document.getElementById("btn-post-submit").addEventListener("click", async () => {
+    const titleEl = document.getElementById("new-post-title");
+    if (!titleEl) return;
+    const title = titleEl.value.trim();
+    
+    let content = "";
+    if (window.postQuill) {
+      content = window.postQuill.root.innerHTML;
+      if (window.postQuill.getText().trim().length === 0) return;
+    } else {
+      const contentEl = document.getElementById("new-post-content");
+      if (contentEl) {
+        content = contentEl.value.trim();
+        if (!content) return;
+      } else {
+        return;
+      }
+    }
+
+    const btn = document.getElementById("btn-post-submit");
+    btn.disabled = true; btn.textContent = "...";
+
+    try {
+      const res = await fetch('/api/posts/' + window.CLASS_ID, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, content })
+      });
+      if (res.ok) {
+        document.getElementById("post-drawer").classList.remove("open");
+        if (window.postQuill) window.postQuill.root.innerHTML = "";
+        titleEl.value = "";
+        await loadPosts();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        alert("Error: " + (d.error || res.status));
+      }
+    } catch (e) { alert("Error: " + e); }
+    
+    btn.disabled = false; btn.textContent = I18N.submit || "投稿する";
+  });
+
+
+  const btnSubmitComment = document.getElementById("btn-submit-comment");
+  if (btnSubmitComment) btnSubmitComment.addEventListener("click", async () => {
+    if (!currentPostId) return;
+    const ta = document.getElementById("comment-input");
+    const content = ta.value.trim();
+    if (!content) return;
+    try {
+      const res = await fetch('/api/posts/' + currentPostId + '/comments', {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content })
+      });
+      if (res.ok) {
+        ta.value = "";
+        await openPost(currentPostId);
+        await loadPosts();
+      }
+    } catch (e) {}
+  });
+
+  // ===== INITIAL POLL + SCHEDULE =====
+  pollNow().then(() => scheduleNextPoll());
+})();
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+(async () => {
+  const container = document.getElementById("canvas-container");
+  const I18N = window.I18N;
+  const MEMBERS = window.MEMBERS;
+  const TEACHER_DISPLAY_NAME = window.TEACHER_DISPLAY_NAME;
+  const USER_NAME = window.USER_NAME;
+
+  let THREE, OrbitControls;
+  try {
+    THREE = await import('three');
+    ({ OrbitControls } = await import('three/addons/controls/OrbitControls.js'));
+  } catch (e) {
+    container.innerHTML = '<div class="threed-fallback">' + I18N.threed_fallback + '</div>';
+    return;
+  }
+
+  try {
+    /* =========================================================
+       RENDERER / SCENE / CAMERA
+    ========================================================= */
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    container.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xcfe0f5);
+    scene.fog = new THREE.Fog(0xcfe0f5, 28, 60);
+
+    const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 120);
+    const CAM_START = { pos: [0, 3.4, 8], target: [0, 1.3, -2] };
+    camera.position.set(...CAM_START.pos);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(...CAM_START.target);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.1;
+    controls.minDistance = 4;
+    controls.maxDistance = 22;
+    controls.maxPolarAngle = Math.PI / 2.15;
+    controls.enablePan = false;
+    controls.zoomSpeed = 0.6;
+    controls.rotateSpeed = 0.6;
+    controls.update();
+
+    let firstPersonMode = false;
+    let firstPersonYaw = Math.PI;
+    let firstPersonPitch = 0;
+
+    window._resetCamera = () => {
+      if (firstPersonMode) return;
+      camera.position.set(...CAM_START.pos);
+      controls.target.set(...CAM_START.target);
+      controls.update();
+    };
+
+    /* =========================================================
+       LIGHTING
+    ========================================================= */
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    scene.add(new THREE.HemisphereLight(0xdfeaff, 0x8b6b4a, 0.6));
+
+    const sun = new THREE.DirectionalLight(0xfff2d6, 1.15);
+    sun.position.set(9, 15, 7);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -14; sun.shadow.camera.right = 14;
+    sun.shadow.camera.top = 14; sun.shadow.camera.bottom = -14;
+    sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = 0.02;
+    scene.add(sun);
+
+    const fill = new THREE.DirectionalLight(0xffd8a8, 0.25);
+    fill.position.set(-7, 6, 5);
+    scene.add(fill);
+
+    const ceilA = new THREE.PointLight(0xfff8e0, 0.45, 16, 2);
+    ceilA.position.set(-3.5, 4.5, -1);
+    scene.add(ceilA);
+    const ceilB = new THREE.PointLight(0xfff8e0, 0.45, 16, 2);
+    ceilB.position.set(3.5, 4.5, -1);
+    scene.add(ceilB);
+
+    /* =========================================================
+       FLOOR (wooden) + GRASS
+    ========================================================= */
+    const floorTex = (() => {
+      const c = document.createElement("canvas");
+      c.width = c.height = 512;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#c9a17a"; ctx.fillRect(0, 0, 512, 512);
+      // wood planks
+      for (let row = 0; row < 8; row++) {
+        const y0 = row * 64;
+        ctx.fillStyle = row % 2 === 0 ? "#c9a17a" : "#c19770";
+        ctx.fillRect(0, y0, 512, 64);
+        ctx.strokeStyle = "rgba(60,35,15,0.25)";
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(0, y0); ctx.lineTo(512, y0); ctx.stroke();
+        // grain
+        for (let i = 0; i < 30; i++) {
+          ctx.strokeStyle = `rgba(90,55,25,${0.05 + Math.random()*0.08})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(0, y0 + Math.random() * 64);
+          ctx.lineTo(512, y0 + Math.random() * 64);
+          ctx.stroke();
+        }
+      }
+      const t = new THREE.CanvasTexture(c);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(2, 2);
+      return t;
+    })();
+    const deck = new THREE.Mesh(
+      new THREE.BoxGeometry(16, 0.15, 12),
+      new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.85 })
+    );
+    deck.position.y = 0.075;
+    deck.receiveShadow = true;
+    scene.add(deck);
+
+    const grass = new THREE.Mesh(
+      new THREE.PlaneGeometry(80, 80),
+      new THREE.MeshStandardMaterial({ color: 0x8cc86c, roughness: 0.95 })
+    );
+    grass.rotation.x = -Math.PI / 2;
+    grass.position.y = -0.01;
+    grass.receiveShadow = true;
+    scene.add(grass);
+
+    /* =========================================================
+       WALLS + TRIM
+    ========================================================= */
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xf3efe6, roughness: 0.95 });
+    const trimMat = new THREE.MeshStandardMaterial({ color: 0xe8e0d2, roughness: 0.85 });
+    const baseboardMat = new THREE.MeshStandardMaterial({ color: 0xd9c8b0, roughness: 0.8 });
+
+    // back wall
+    const backWall = new THREE.Mesh(new THREE.PlaneGeometry(16, 8), wallMat);
+    backWall.position.set(0, 4, -6.5);
+    backWall.receiveShadow = true;
+    scene.add(backWall);
+    // left wall
+    const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(12, 8), wallMat);
+    leftWall.position.set(-8, 4, 0); leftWall.rotation.y = Math.PI / 2;
+    leftWall.receiveShadow = true;
+    scene.add(leftWall);
+    // right wall
+    const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(12, 8), wallMat);
+    rightWall.position.set(8, 4, 0); rightWall.rotation.y = -Math.PI / 2;
+    rightWall.receiveShadow = true;
+    scene.add(rightWall);
+
+    // baseboards
+    [[-8.02, 0.15, 0, 0, Math.PI/2, 12],
+     [8.02, 0.15, 0, 0, -Math.PI/2, 12],
+     [0, 0.15, -6.52, 0, 0, 16]].forEach(([x, y, z, rx, ry, len]) => {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(len, 0.3, 0.08), baseboardMat);
+      b.position.set(x, y, z);
+      b.rotation.set(rx, ry, 0);
+      scene.add(b);
+    });
+
+    /* =========================================================
+       WINDOWS (left wall, with sky)
+    ========================================================= */
+    function makeWindow(w, h) {
+      const g = new THREE.Group();
+      // frame
+      const frame = new THREE.Mesh(
+        new THREE.BoxGeometry(w, h, 0.12),
+        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 })
+      );
+      g.add(frame);
+      // sky
+      const sky = new THREE.Mesh(
+        new THREE.PlaneGeometry(w - 0.2, h - 0.2),
+        new THREE.MeshBasicMaterial({ color: 0x9ec8f0 })
+      );
+      sky.position.z = 0.07;
+      g.add(sky);
+      // crossbars
+      const ch = new THREE.Mesh(new THREE.BoxGeometry(w - 0.2, 0.06, 0.08),
+        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 }));
+      ch.position.z = 0.08; g.add(ch);
+      const cv = new THREE.Mesh(new THREE.BoxGeometry(0.06, h - 0.2, 0.08),
+        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 }));
+      cv.position.z = 0.08; g.add(cv);
+      // clouds
+      const cl1 = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 10),
+        new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      cl1.position.set(-0.6, 0.5, 0.1); cl1.scale.set(1, 0.6, 1);
+      g.add(cl1);
+      const cl2 = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 10),
+        new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      cl2.position.set(0.5, -0.3, 0.1); cl2.scale.set(1, 0.6, 1);
+      g.add(cl2);
+      return g;
+    }
+    const win1 = makeWindow(2.4, 2.6);
+    win1.position.set(-7.95, 3.6, -3.2);
+    win1.rotation.y = Math.PI / 2;
+    scene.add(win1);
+    const win2 = makeWindow(2.4, 2.6);
+    win2.position.set(-7.95, 3.6, 1.2);
+    win2.rotation.y = Math.PI / 2;
+    scene.add(win2);
+
+    // curtains (left wall)
+    function makeCurtain(x, y, z) {
+      const c = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.55, 0.55, 2.8, 12, 1, true, 0, Math.PI),
+        new THREE.MeshStandardMaterial({ color: 0x6b7ba8, roughness: 0.9, side: THREE.DoubleSide })
+      );
+      c.position.set(x, y, z);
+      c.rotation.y = Math.PI / 2;
+      return c;
+    }
+    scene.add(makeCurtain(-7.65, 3.6, -4.6));
+    scene.add(makeCurtain(-7.65, 3.6, -1.8));
+    scene.add(makeCurtain(-7.65, 3.6, 0.0));
+    scene.add(makeCurtain(-7.65, 3.6, 2.6));
+
+    /* =========================================================
+       DOOR (right wall)
+    ========================================================= */
+    const doorGroup = new THREE.Group();
+    const doorMat = new THREE.MeshStandardMaterial({ color: 0x8b5e3c, roughness: 0.75 });
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.4, 3.2, 0.12), doorMat);
+    doorGroup.add(door);
+    const doorFrame = new THREE.Mesh(
+      new THREE.BoxGeometry(1.7, 3.5, 0.1),
+      new THREE.MeshStandardMaterial({ color: 0xf3efe6, roughness: 0.9 })
+    );
+    doorFrame.position.z = -0.05;
+    doorGroup.add(doorFrame);
+    const handle = new THREE.Mesh(
+      new THREE.SphereGeometry(0.08, 10, 10),
+      new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.8, roughness: 0.3 })
+    );
+    handle.position.set(0.5, 0, 0.1);
+    doorGroup.add(handle);
+    doorGroup.position.set(7.95, 1.75, 3.2);
+    doorGroup.rotation.y = -Math.PI / 2;
+    scene.add(doorGroup);
+
+    /* =========================================================
+       POSTERS on back wall
+    ========================================================= */
+    function makePoster(color, x, y, w, h, text) {
+      const c = document.createElement("canvas");
+      c.width = 256; c.height = 320;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = color; ctx.fillRect(0, 0, 256, 320);
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.fillRect(16, 16, 224, 60);
+      ctx.fillStyle = "#1e293b";
+      ctx.font = "bold 28px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(text, 128, 55);
+      // simple shapes below
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.beginPath(); ctx.arc(128, 180, 60, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.fillRect(50, 260, 156, 40);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const p = new THREE.Mesh(
+        new THREE.PlaneGeometry(w, h),
+        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 })
+      );
+      p.position.set(x, y, -6.45);
+      return p;
+    }
+    scene.add(makePoster("#f59e0b", -6.5, 4, 1.4, 1.8, "ABC"));
+    scene.add(makePoster("#10b981", -5.2, 4, 1.4, 1.8, "123"));
+
+    /* =========================================================
+       BOOKSHELF (left front corner)
+    ========================================================= */
+    const shelfGroup = new THREE.Group();
+    const shelfMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.85 });
+    for (let i = 0; i < 3; i++) {
+      const board = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.1, 0.6), shelfMat);
+      board.position.y = i * 1.0 + 0.5;
+      board.castShadow = true; board.receiveShadow = true;
+      shelfGroup.add(board);
+    }
+    [-1.1, 1.1].forEach(x => {
+      const side = new THREE.Mesh(new THREE.BoxGeometry(0.1, 3.1, 0.6), shelfMat);
+      side.position.set(x, 1.55, 0);
+      side.castShadow = true;
+      shelfGroup.add(side);
+    });
+    // books
+    const bookColors = [0xef4444, 0x3b82f6, 0x10b981, 0xf59e0b, 0x8b5cf6, 0xec4899, 0x14b8a6];
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 5; j++) {
+        const book = new THREE.Mesh(
+          new THREE.BoxGeometry(0.15, 0.65, 0.4),
+          new THREE.MeshStandardMaterial({ color: bookColors[(i*5+j) % bookColors.length], roughness: 0.8 })
+        );
+        book.position.set(-0.9 + j * 0.2, i * 1.0 + 1.0, 0);
+        book.castShadow = true;
+        shelfGroup.add(book);
+      }
+    }
+    shelfGroup.position.set(-6.8, 0.15, 5.4);
+    scene.add(shelfGroup);
+
+    /* =========================================================
+       PLANT (right front corner)
+    ========================================================= */
+    const plantGroup = new THREE.Group();
+    const potMat = new THREE.MeshStandardMaterial({ color: 0xb85c3a, roughness: 0.8 });
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.32, 0.6, 16), potMat);
+    pot.position.y = 0.3; pot.castShadow = true;
+    plantGroup.add(pot);
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x2d7a3e, roughness: 0.85, side: THREE.DoubleSide });
+    for (let i = 0; i < 9; i++) {
+      const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.16, 1.4, 6), leafMat);
+      const ang = (i / 9) * Math.PI * 2;
+      leaf.position.set(Math.cos(ang) * 0.15, 1.4, Math.sin(ang) * 0.15);
+      leaf.rotation.z = Math.cos(ang) * 0.4;
+      leaf.rotation.x = Math.sin(ang) * 0.4;
+      leaf.castShadow = true;
+      plantGroup.add(leaf);
+    }
+    plantGroup.position.set(6.8, 0.15, 5.2);
+    scene.add(plantGroup);
+
+    /* =========================================================
+       BLACKBOARD
+    ========================================================= */
+    const bbCanvas = document.createElement("canvas");
+    bbCanvas.width = 1024; bbCanvas.height = 512;
+    const bbCtx = bbCanvas.getContext("2d");
+    const bbTexture = new THREE.CanvasTexture(bbCanvas);
+    bbTexture.colorSpace = THREE.SRGBColorSpace;
+    
+
+function drawBlackboardText(text) {
+      const W = bbCanvas.width, H = bbCanvas.height;
+      const grad = bbCtx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, "#254a35"); grad.addColorStop(1, "#152a1d");
+      bbCtx.fillStyle = grad; bbCtx.fillRect(0, 0, W, H);
+      for (let i = 0; i < 150; i++) {
+        bbCtx.fillStyle = "rgba(255,255,255,0.03)";
+        bbCtx.fillRect(Math.random()*W, Math.random()*H, 2, 2);
+      }
+      bbCtx.strokeStyle = "#0a1a12"; bbCtx.lineWidth = 8;
+      bbCtx.strokeRect(4, 4, W-8, H-8);
+      bbCtx.font = "26px 'Hiragino Mincho ProN', 'Yu Mincho', serif";
+      bbCtx.textBaseline = "top";
+      const mw = W - 80, lh = 34, x0 = 40;
+      let y = 40;
+      let raw = (text || "")
+        .replace(/\[img\][^\[]+\[\/img\]/g, "[image]")
+        .replace(/\[pdf\][^\[]+\[\/pdf\]/g, "[pdf]")
+        .replace(/\[draw\][^\[]+\[\/draw\]/g, "[drawing]");
+      if (!raw) { bbTexture.needsUpdate = true; return; }
+      const lines = [];
+      for (const para of raw.split("\n")) {
+        const parts = [];
+        let buf = "";
+        let curColor = "#f5f5e8";
+        const tokens = para.split(/(\[c=(?:white|yellow|red|blue)\]|\[\/c\])/g);
+        for (const tk of tokens) {
+          if (tk.startsWith("[c=")) {
+            if (buf) parts.push({ text: buf, color: curColor });
+            buf = "";
+            const c = tk.match(/\[c=(\w+)\]/)[1];
+            curColor = { white: "#f5f5e8", yellow: "#fbbf24", red: "#ef4444", blue: "#60a5fa" }[c] || "#f5f5e8";
+          } else if (tk === "[/c]") {
+            if (buf) parts.push({ text: buf, color: curColor });
+            buf = ""; curColor = "#f5f5e8";
+          } else { buf += tk; }
+        }
+        if (buf) parts.push({ text: buf, color: curColor });
+        let curLine = [];
+        let curWidth = 0;
+        for (const p of parts) {
+          for (const ch of p.text.split("")) {
+            const w = bbCtx.measureText(ch).width;
+            if (curWidth + w > mw) { lines.push(curLine); curLine = []; curWidth = 0; }
+            curLine.push({ ch, color: p.color });
+            curWidth += w;
+          }
+        }
+        lines.push(curLine);
+      }
+      for (const line of lines) {
+        if (y > H - 40) break;
+        let x = x0;
+        for (const seg of line) {
+          bbCtx.fillStyle = seg.color;
+          bbCtx.fillText(seg.ch, x, y);
+          x += bbCtx.measureText(seg.ch).width;
+        }
+        y += lh;
+      }
+      bbTexture.needsUpdate = true;
+    }
+    const blackboard = new THREE.Mesh(
+      new THREE.PlaneGeometry(9, 4.5),
+      new THREE.MeshStandardMaterial({ map: bbTexture, roughness: 0.95 })
+    );
+    blackboard.position.set(0, 2.6, -6.2);
+    scene.add(blackboard);
+    const bbframe = new THREE.Mesh(
+      new THREE.BoxGeometry(9.6, 5.1, 0.25),
+      new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.8 })
+    );
+    bbframe.position.set(0, 2.6, -6.35);
+    scene.add(bbframe);
+    const chalkTray = new THREE.Mesh(
+      new THREE.BoxGeometry(9.6, 0.15, 0.4),
+      new THREE.MeshStandardMaterial({ color: 0x8a6a44, roughness: 0.8 })
+    );
+    chalkTray.position.set(0, 0.05, -6.0);
+    chalkTray.castShadow = true;
+    scene.add(chalkTray);
+    // chalk pieces
+    [[-2, "#ffffff"], [0, "#fbbf24"], [2, "#ef4444"]].forEach(([x, color]) => {
+      const chalk = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.04, 0.04, 0.2, 6),
+        new THREE.MeshStandardMaterial({ color: color })
+      );
+      chalk.position.set(x, 0.18, -6.0);
+      chalk.rotation.z = Math.PI / 2;
+      scene.add(chalk);
+    });
+    drawBlackboardText(window.INITIAL_BB);
+
+    /* =========================================================
+       CLOCK
+    ========================================================= */
+    const clockCanvas = document.createElement("canvas");
+    clockCanvas.width = clockCanvas.height = 128;
+    const clockCtx = clockCanvas.getContext("2d");
+    const clockTex = new THREE.CanvasTexture(clockCanvas);
+    clockTex.colorSpace = THREE.SRGBColorSpace;
+    let lastClockMinute = -1;
+    function drawClock() {
+      const n = new Date();
+      const minute = n.getMinutes();
+      if (minute === lastClockMinute) return;
+      lastClockMinute = minute;
+      const W = 128, cx = 64, cy = 64, r = 60;
+      clockCtx.fillStyle = "#f8fafc";
+      clockCtx.beginPath(); clockCtx.arc(cx, cy, r, 0, Math.PI*2); clockCtx.fill();
+      clockCtx.strokeStyle = "#1e293b"; clockCtx.lineWidth = 4; clockCtx.stroke();
+      for (let i = 0; i < 12; i++) {
+        const a = (i/12)*Math.PI*2 - Math.PI/2;
+        const x1 = cx + Math.cos(a)*(r-10), y1 = cy + Math.sin(a)*(r-10);
+        const x2 = cx + Math.cos(a)*(r-4), y2 = cy + Math.sin(a)*(r-4);
+        clockCtx.strokeStyle = i%3===0 ? "#1e293b" : "#94a3b8";
+        clockCtx.lineWidth = i%3===0 ? 3 : 1.5;
+        clockCtx.beginPath(); clockCtx.moveTo(x1,y1); clockCtx.lineTo(x2,y2); clockCtx.stroke();
+      }
+      const h = n.getHours()%12, m = n.getMinutes();
+      const ha = ((h+m/60)/12)*Math.PI*2 - Math.PI/2;
+      clockCtx.strokeStyle = "#1e293b"; clockCtx.lineWidth = 5;
+      clockCtx.beginPath(); clockCtx.moveTo(cx, cy);
+      clockCtx.lineTo(cx + Math.cos(ha)*(r*0.5), cy + Math.sin(ha)*(r*0.5)); clockCtx.stroke();
+      const ma = (m/60)*Math.PI*2 - Math.PI/2;
+      clockCtx.strokeStyle = "#1e293b"; clockCtx.lineWidth = 3;
+      clockCtx.beginPath(); clockCtx.moveTo(cx, cy);
+      clockCtx.lineTo(cx + Math.cos(ma)*(r*0.75), cy + Math.sin(ma)*(r*0.75)); clockCtx.stroke();
+      clockCtx.fillStyle = "#1e293b"; clockCtx.beginPath(); clockCtx.arc(cx, cy, 3, 0, Math.PI*2); clockCtx.fill();
+      clockTex.needsUpdate = true;
+    }
+    drawClock();
+    setInterval(drawClock, 30000);
+    const clockMesh = new THREE.Mesh(
+      new THREE.CircleGeometry(0.8, 24),
+      new THREE.MeshStandardMaterial({ map: clockTex, roughness: 0.8 })
+    );
+    clockMesh.position.set(-7.4, 5.5, -6.49);
+    scene.add(clockMesh);
+    // clock ring
+    const clockRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.8, 0.95, 24),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, metalness: 0.3 })
+    );
+    clockRing.position.set(-7.4, 5.5, -6.48);
+    scene.add(clockRing);
+
+    /* =========================================================
+       ATTENDANCE board
+    ========================================================= */
+    const attCanvas = document.createElement("canvas");
+    attCanvas.width = 256; attCanvas.height = 128;
+    const attCtx = attCanvas.getContext("2d");
+    const attTex = new THREE.CanvasTexture(attCanvas);
+    attTex.colorSpace = THREE.SRGBColorSpace;
+    (function drawAttendance() {
+      const W = 256, H = 128;
+      const grad = attCtx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, "#1e3a5f"); grad.addColorStop(1, "#0f2038");
+      attCtx.fillStyle = grad; attCtx.fillRect(0, 0, W, H);
+      attCtx.strokeStyle = "#60a5fa"; attCtx.lineWidth = 3;
+      attCtx.strokeRect(5, 5, W-10, H-10);
+      attCtx.fillStyle = "#93c5fd"; attCtx.font = "bold 16px sans-serif";
+      attCtx.textAlign = "center";
+      attCtx.fillText("ATTENDANCE", W/2, 30);
+      attCtx.fillStyle = "#fff"; attCtx.font = "bold 48px sans-serif";
+      attCtx.fillText(String(window.MEMBERS ? window.MEMBERS.length : 0), W/2, 85);
+      attCtx.fillStyle = "#93c5fd"; attCtx.font = "12px sans-serif";
+      attCtx.fillText("members", W/2, 108);
+      attTex.needsUpdate = true;
+    })();
+    const attMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.2, 1.6),
+      new THREE.MeshStandardMaterial({ map: attTex, roughness: 0.8 })
+    );
+    attMesh.position.set(7.85, 4.5, -3.5); attMesh.rotation.y = -Math.PI/2;
+    scene.add(attMesh);
+
+    /* =========================================================
+       AVATARS (improved)
+    ========================================================= */
+    function hashName(name) {
+      if (!name) return 0;
+      let h = 0;
+      for (let i = 0; i < name.length; i++) h = ((h<<5)-h + name.charCodeAt(i)) | 0;
+      return Math.abs(h);
+    }
+    const SKIN_TONES = [0xffe0bd, 0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffd8b0];
+    const HAIR_COLORS = [0x1a1a1a, 0x2a1a0a, 0x3b2314, 0x5a3825, 0x8b4513, 0xd4a574, 0x1e293b, 0x6b3410];
+    const SHIRT_COLORS = [0x3b82f6, 0xef4444, 0x10b981, 0xf59e0b, 0x8b5cf6, 0xec4899, 0x14b8a6, 0xf97316, 0x6366f1, 0x0ea5e9, 0x84cc16, 0x06b6d4];
+    const PANTS_COLORS = [0x1e293b, 0x334155, 0x475569, 0x1e3a8a, 0x365314, 0x7c2d12, 0x4c1d95, 0x0f172a];
+    const HAIR_STYLES = ["short", "long", "spiky", "ponytail", "bun"];
+
+        // ---- custom fields from server (per member) ----
+    const CUSTOM_HANDLES = {};
+    window.MEMBERS.forEach(m => {
+      CUSTOM_HANDLES[m.name] = {
+        hair: (m.custom_hair !== undefined && m.custom_hair !== null) ? m.custom_hair : -1,
+        skin: (m.custom_skin !== undefined && m.custom_skin !== null) ? m.custom_skin : -1,
+        shirt: (m.custom_shirt !== undefined && m.custom_shirt !== null) ? m.custom_shirt : -1,
+        style: m.custom_style || "",
+      };
+    });
+
+    const HAIR_PALETTE = [
+      0x1a1a1a, 0x2a1a0a, 0x3b2314, 0x5a3825, 0x8b4513,
+      0xd4a574, 0x1e293b, 0x6b3410, 0xa0522d,
+      0xdc2626, 0xfbbf24, 0xa855f7, 0x0ea5e9,
+    ];
+    const SKIN_PALETTE = [
+      0xffe0bd, 0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffd8b0,
+      0xa0e0d0, 0xe0b0d0,
+    ];
+    const SHIRT_PALETTE = [
+      0x3b82f6, 0xef4444, 0x10b981, 0xf59e0b, 0x8b5cf6, 0xec4899,
+      0x14b8a6, 0xf97316, 0x6366f1, 0x0ea5e9,
+      0x84cc16, 0x06b6d4, 0xa855f7, 0xdc2626,
+    ];
+
+    function paletteFor(name) {
+    if (name === window.TEACHER_DISPLAY_NAME) {
+      console.log("[3D] paletteFor teacher:", name, "custom:", CUSTOM_HANDLES[name], "custom_shirt:", CUSTOM_HANDLES[name]?.shirt);
+    }
+      const h = hashName(name);
+      const custom = CUSTOM_HANDLES[name] || { hair: -1, skin: -1, shirt: -1, style: "" };
+      const base = {
+        skin: SKIN_TONES[h % SKIN_TONES.length],
+        hair: HAIR_COLORS[(h>>3) % HAIR_COLORS.length],
+        shirt: SHIRT_COLORS[(h>>6) % SHIRT_COLORS.length],
+        pants: PANTS_COLORS[(h>>9) % PANTS_COLORS.length],
+        style: HAIR_STYLES[(h>>12) % HAIR_STYLES.length],
+        headTilt: ((h>>15) % 10) / 200 - 0.025,
+        bodyScale: 0.95 + (((h>>18) % 10) / 100),
+      };
+      if (custom.hair >= 0 && custom.hair < HAIR_PALETTE.length) base.hair = HAIR_PALETTE[custom.hair];
+      if (custom.skin >= 0 && custom.skin < SKIN_PALETTE.length) base.skin = SKIN_PALETTE[custom.skin];
+      if (custom.shirt >= 0 && custom.shirt < SHIRT_PALETTE.length) base.shirt = SHIRT_PALETTE[custom.shirt];
+      if (custom.style) base.style = custom.style;
+      return base;
+    }
+
+    function makeNameSprite(name, isTeacher) {
+      const c = document.createElement("canvas");
+      c.width = 256; c.height = 64;
+      const ctx = c.getContext("2d");
+      const bg = isTeacher ? "rgba(245,158,11,0.95)" : "rgba(15,23,42,0.92)";
+      const r = 22;
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.moveTo(8+r, 8); ctx.lineTo(248-r, 8);
+      ctx.quadraticCurveTo(248, 8, 248, 8+r);
+      ctx.lineTo(248, 56-r);
+      ctx.quadraticCurveTo(248, 56, 248-r, 56);
+      ctx.lineTo(8+r, 56);
+      ctx.quadraticCurveTo(8, 56, 8, 56-r);
+      ctx.lineTo(8, 8+r);
+      ctx.quadraticCurveTo(8, 8, 8+r, 8);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 26px 'Hiragino Sans', sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(name, 128, 34);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true });
+      const sp = new THREE.Sprite(mat);
+      sp.scale.set(1.5, 0.38, 1);
+      sp.renderOrder = 999;
+      return sp;
+    }
+
+    // geometries
+    const HEAD_GEO = new THREE.SphereGeometry(0.48, 24, 20);
+    const TORSO_GEO = new THREE.CapsuleGeometry(0.40, 0.32, 8, 18);
+    const UPPER_ARM_GEO = new THREE.CapsuleGeometry(0.11, 0.14, 6, 12);
+    const LOWER_ARM_GEO = new THREE.CapsuleGeometry(0.10, 0.14, 6, 12);
+    const HAND_GEO = new THREE.SphereGeometry(0.115, 12, 10);
+    const LEG_GEO = new THREE.CapsuleGeometry(0.16, 0.14, 6, 12);
+    const SHOE_GEO = new THREE.SphereGeometry(0.13, 12, 10);
+    const EAR_GEO = new THREE.SphereGeometry(0.08, 10, 8);
+    const NOSE_GEO = new THREE.SphereGeometry(0.045, 10, 8);
+    const NECK_GEO = new THREE.CylinderGeometry(0.14, 0.15, 0.12, 12);
+    const EYE_WHITE_GEO = new THREE.SphereGeometry(0.10, 12, 10);
+    const EYE_PUPIL_GEO = new THREE.SphereGeometry(0.058, 10, 10);
+    const EYE_HIGHLIGHT_GEO = new THREE.SphereGeometry(0.024, 8, 8);
+    const BROW_GEO = new THREE.BoxGeometry(0.12, 0.02, 0.028);
+    const MOUTH_GEO = new THREE.SphereGeometry(0.055, 12, 10);
+    const BLUSH_GEO = new THREE.CircleGeometry(0.065, 12);
+
+    // materials
+    const EYE_WHITE_MAT = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const EYE_PUPIL_MAT = new THREE.MeshBasicMaterial({ color: 0x111111 });
+    const EYE_HIGHLIGHT_MAT = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const MOUTH_MAT = new THREE.MeshBasicMaterial({ color: 0x7a2a2a });
+    const BLUSH_MAT = new THREE.MeshBasicMaterial({ color: 0xff9ca3, transparent: true, opacity: 0.55 });
+    const SHOE_MAT = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.6 });
+
+    function buildHair(group, head, style, hairColor) {
+      const hm = new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.8 });
+      const hy = head.position.y;
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.44, 20, 16, 0, Math.PI*2, 0, Math.PI/1.75), hm);
+      cap.position.y = hy + 0.03;
+      cap.castShadow = true;
+      group.add(cap);
+      if (style === "long") {
+        const back = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.22), hm);
+        back.position.set(0, hy - 0.25, -0.32);
+        back.castShadow = true;
+        group.add(back);
+        const strand = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.5, 0.15), hm);
+        strand.position.set(0.28, hy - 0.2, 0.15);
+        group.add(strand);
+      } else if (style === "spiky") {
+        const cone = new THREE.ConeGeometry(0.09, 0.26, 6);
+        for (let i = 0; i < 7; i++) {
+          const spike = new THREE.Mesh(cone, hm);
+          const a = (i/7)*Math.PI*2;
+          spike.position.set(Math.cos(a)*0.26, hy + 0.46, Math.sin(a)*0.26);
+          spike.rotation.z = -Math.cos(a)*0.38;
+          spike.rotation.x = Math.sin(a)*0.38;
+          spike.castShadow = true;
+          group.add(spike);
+        }
+      } else if (style === "ponytail") {
+        const pony = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.5, 6, 10), hm);
+        pony.position.set(0, hy - 0.1, -0.5);
+        pony.rotation.x = 0.4;
+        pony.castShadow = true;
+        group.add(pony);
+        const tie = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.03, 6, 12),
+          new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.6 }));
+        tie.position.set(0, hy + 0.05, -0.42);
+        tie.rotation.x = Math.PI / 2;
+        group.add(tie);
+      } else if (style === "bun") {
+        const bun = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 12), hm);
+        bun.position.set(0, hy + 0.5, -0.15);
+        bun.castShadow = true;
+        group.add(bun);
+      }
+    }
+
+    function addSkinAccessory(group, head, skinKey, seated) {
+      if (skinKey === "glasses") {
+        const gm = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4, metalness: 0.4 });
+        const torusGeo = new THREE.TorusGeometry(0.11, 0.018, 8, 20);
+        [-0.15, 0.15].forEach(x => {
+          const lens = new THREE.Mesh(torusGeo, gm);
+          lens.position.set(x, head.position.y + 0.03, 0.38);
+          group.add(lens);
+        });
+        const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.018, 0.018), gm);
+        bridge.position.set(0, head.position.y + 0.03, 0.38);
+        group.add(bridge);
+      } else if (skinKey === "hat") {
+        const hm = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 });
+        const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.045, 20), hm);
+        brim.position.set(0, head.position.y + 0.36, 0);
+        const top = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.38, 0.32, 20), hm);
+        top.position.set(0, head.position.y + 0.52, 0);
+        group.add(brim, top);
+      } else if (skinKey === "robe") {
+        const rm = new THREE.MeshStandardMaterial({ color: 0x4c1d95, roughness: 0.6 });
+        const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.72, 1.15, 16), rm);
+        robe.position.y = seated ? 0.55 : 0.72;
+        robe.castShadow = true;
+        group.add(robe);
+      } else if (skinKey === "crown") {
+        const cm = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.3, metalness: 0.75 });
+        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.14, 14), cm);
+        ring.position.set(0, head.position.y + 0.44, 0);
+        group.add(ring);
+        const coneGeo = new THREE.ConeGeometry(0.06, 0.2, 6);
+        for (let i = 0; i < 5; i++) {
+          const spike = new THREE.Mesh(coneGeo, cm);
+          const a = (i/5)*Math.PI*2 - Math.PI/2;
+          spike.position.set(Math.cos(a)*0.4, head.position.y + 0.62, Math.sin(a)*0.4);
+          group.add(spike);
+        }
+      } else if (skinKey === "aura") {
+        const aura = new THREE.Mesh(
+          new THREE.SphereGeometry(0.95, 16, 12),
+          new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.14, side: THREE.DoubleSide })
+        );
+        aura.position.y = seated ? 0.7 : 0.85;
+        group.add(aura);
+            } else if (skinKey === "mortarboard") {
+        const hm2 = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.7 });
+        const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 0.045, 20), hm2);
+        brim.position.set(0, head.position.y + 0.36, 0);
+        group.add(brim);
+        const top = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.1, 20), hm2);
+        top.position.set(0, head.position.y + 0.44, 0);
+        group.add(top);
+        const tassel = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.4, 6),
+          new THREE.MeshStandardMaterial({ color: 0xfbbf24 }));
+        tassel.position.set(0.35, head.position.y + 0.35, 0);
+        group.add(tassel);
+      } else if (skinKey === "cape") {
+        const capeMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.7, side: THREE.DoubleSide });
+        const cape = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.3), capeMat);
+        cape.position.set(0, 0.8, -0.5);
+        cape.rotation.x = 0.1;
+        cape.castShadow = true;
+        group.add(cape);
+      } else if (skinKey === "golden") {
+        const rm = new THREE.MeshStandardMaterial({ color: 0xd4a017, roughness: 0.6, metalness: 0.5 });
+        const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.72, 1.15, 16), rm);
+        robe.position.y = seated ? 0.55 : 0.72;
+        robe.castShadow = true;
+        group.add(robe);
+      } else if (skinKey === "legend") {
+        const cm = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3, metalness: 0.75 });
+        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.14, 14), cm);
+        ring.position.set(0, head.position.y + 0.44, 0);
+        group.add(ring);
+        for (let i = 0; i < 6; i++) {
+          const spike = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.28, 6), cm);
+          const a = (i/6)*Math.PI*2 - Math.PI/2;
+          spike.position.set(Math.cos(a)*0.4, head.position.y + 0.62, Math.sin(a)*0.4);
+          group.add(spike);
+        }
+        const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0),
+          new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.9, roughness: 0.2 }));
+        star.position.set(0, head.position.y + 0.78, 0);
+        group.add(star);
+      }
+    }
+
+    function createChibiAvatar({ name, seated = false, skinKey = "default", isTeacher = false }) {
+      const g = new THREE.Group();
+      const pal = paletteFor(name);
+      const skinColors = { default: 0x3b82f6, glasses: 0x6366f1, hat: 0xf59e0b, robe: 0x8b5cf6, crown: 0xfbbf24, aura: 0xef4444 };
+      const shirtColor = (skinKey !== "default" && skinColors[skinKey]) || pal.shirt;
+      const headY = seated ? 1.20 : 1.40;
+      const bodyY = seated ? 0.68 : 0.85;
+      const bs = pal.bodyScale;
+
+      // legs
+      const legMat = new THREE.MeshStandardMaterial({ color: pal.pants, roughness: 0.85 });
+      const lLeg = new THREE.Mesh(LEG_GEO, legMat);
+      lLeg.position.set(-0.17, 0.22, 0); lLeg.castShadow = true;
+      const rLeg = new THREE.Mesh(LEG_GEO, legMat);
+      rLeg.position.set(0.17, 0.22, 0); rLeg.castShadow = true;
+      g.add(lLeg, rLeg);
+
+      // shoes
+      const lShoe = new THREE.Mesh(SHOE_GEO, SHOE_MAT);
+      lShoe.position.set(-0.17, 0.07, 0.06); lShoe.scale.set(1, 0.7, 1.35); lShoe.castShadow = true;
+      const rShoe = new THREE.Mesh(SHOE_GEO, SHOE_MAT);
+      rShoe.position.set(0.17, 0.07, 0.06); rShoe.scale.set(1, 0.7, 1.35); rShoe.castShadow = true;
+      g.add(lShoe, rShoe);
+
+      // torso
+      const torsoMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.78 });
+      const torso = new THREE.Mesh(TORSO_GEO, torsoMat);
+      torso.position.y = bodyY;
+      torso.scale.set(bs, 1, bs);
+      torso.castShadow = true;
+      g.add(torso);
+
+      // collar / tie
+      const collarMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7 });
+      const collar = new THREE.Mesh(new THREE.RingGeometry(0.14, 0.20, 14, 1, 0, Math.PI), collarMat);
+      collar.position.set(0, bodyY + 0.36, 0.30);
+      collar.rotation.x = -Math.PI/6;
+      g.add(collar);
+      if (isTeacher) {
+        const tie = new THREE.Mesh(
+          new THREE.BoxGeometry(0.08, 0.35, 0.03),
+          new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.7 })
+        );
+        tie.position.set(0, bodyY + 0.15, 0.36);
+        g.add(tie);
+      }
+
+      // arms
+      const armMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.78 });
+      const handMat = new THREE.MeshStandardMaterial({ color: pal.skin, roughness: 0.6 });
+      const armY = bodyY + 0.04;
+
+      const lUpper = new THREE.Mesh(UPPER_ARM_GEO, armMat);
+      lUpper.position.set(-0.42, armY - 0.06, 0);
+      lUpper.rotation.z = 0.28; lUpper.castShadow = true;
+      const lLower = new THREE.Mesh(LOWER_ARM_GEO, armMat);
+      lLower.position.set(-0.52, armY - 0.32, 0.02);
+      lLower.rotation.z = 0.15; lLower.castShadow = true;
+      const lHand = new THREE.Mesh(HAND_GEO, handMat);
+      lHand.position.set(-0.56, armY - 0.5, 0.03);
+      g.add(lUpper, lLower, lHand);
+
+      const rArmGroup = new THREE.Group();
+      rArmGroup.position.set(0.42, armY - 0.06, 0);
+      const rUpper = new THREE.Mesh(UPPER_ARM_GEO, armMat);
+      rUpper.castShadow = true;
+      const rLower = new THREE.Mesh(LOWER_ARM_GEO, armMat);
+      rLower.position.set(0.10, -0.26, 0.02); rLower.castShadow = true;
+      const rHand = new THREE.Mesh(HAND_GEO, handMat);
+      rHand.position.set(0.14, -0.44, 0.03);
+      rArmGroup.add(rUpper, rLower, rHand);
+      g.add(rArmGroup);
+
+      // head group (so we can rotate separately)
+      const headGroup = new THREE.Group();
+      headGroup.position.y = headY;
+
+      const headMat = new THREE.MeshStandardMaterial({ color: pal.skin, roughness: 0.55 });
+      const head = new THREE.Mesh(HEAD_GEO, headMat);
+      head.scale.set(1, 1.06, 0.96);
+      head.castShadow = true;
+      headGroup.add(head);
+
+      // neck
+      const neck = new THREE.Mesh(NECK_GEO, headMat);
+      neck.position.y = -0.42;
+      headGroup.add(neck);
+
+      // ears
+      [-0.46, 0.46].forEach(x => {
+        const ear = new THREE.Mesh(EAR_GEO, headMat);
+        ear.position.set(x, 0, 0);
+        headGroup.add(ear);
+      });
+
+      // hair
+      buildHair(headGroup, head, pal.style, pal.hair);
+
+      // eyes (grouped for blink)
+      const eyeY = 0.02;
+      const eyeZ = 0.43;
+      const eyeOffset = 0.16;
+      const eyeGroups = [];
+      [-1, 1].forEach(side => {
+        const grp = new THREE.Group();
+        const white = new THREE.Mesh(EYE_WHITE_GEO, EYE_WHITE_MAT);
+        white.scale.set(1, 1, 0.55);
+        const pupil = new THREE.Mesh(EYE_PUPIL_GEO, EYE_PUPIL_MAT);
+        pupil.position.set(0, 0, 0.058);
+        const highlight = new THREE.Mesh(EYE_HIGHLIGHT_GEO, EYE_HIGHLIGHT_MAT);
+        highlight.position.set(0.026, 0.03, 0.085);
+        grp.add(white, pupil, highlight);
+        grp.position.set(side * eyeOffset, eyeY, eyeZ);
+        headGroup.add(grp);
+        eyeGroups.push(grp);
+      });
+
+      // eyebrows
+      const browMat = new THREE.MeshBasicMaterial({ color: pal.hair });
+      [-1, 1].forEach(side => {
+        const b = new THREE.Mesh(BROW_GEO, browMat);
+        b.position.set(side * eyeOffset, eyeY + 0.13, eyeZ);
+        b.rotation.z = side * 0.08;
+        headGroup.add(b);
+      });
+
+      // nose
+      const nose = new THREE.Mesh(NOSE_GEO, headMat);
+      nose.position.set(0, eyeY - 0.05, eyeZ + 0.02);
+      headGroup.add(nose);
+
+      // mouth
+      const mouth = new THREE.Mesh(MOUTH_GEO, MOUTH_MAT);
+      mouth.position.set(0, eyeY - 0.20, eyeZ + 0.02);
+      mouth.scale.set(1.4, 0.35, 0.6);
+      headGroup.add(mouth);
+
+      // blush
+      [-1, 1].forEach(side => {
+        const blush = new THREE.Mesh(BLUSH_GEO, BLUSH_MAT);
+        blush.position.set(side * 0.32, eyeY - 0.1, 0.37);
+        blush.rotation.y = side * 0.3;
+        headGroup.add(blush);
+      });
+
+      addSkinAccessory(headGroup, head, skinKey, seated);
+
+      g.add(headGroup);
+
+      if (name) {
+        const sp = makeNameSprite(name, isTeacher);
+        sp.position.y = seated ? 1.95 : 2.20;
+        g.add(sp);
+      }
+
+      g.userData = {
+        rArmGroup, headGroup, head, torso, mouth,
+        eyeL: eyeGroups[0], eyeR: eyeGroups[1],
+        baseY: g.position.y,
+        handRaised: false,
+        highlight: 0,
+        talkUntil: 0,
+        gestureUntil: 0,
+        nextBlink: performance.now() + 2000 + Math.random() * 3000,
+        blinkUntil: 0,
+        breathingOffset: Math.random() * Math.PI * 2,
+        lookOffset: Math.random() * Math.PI * 2,
+        swayPhase: Math.random() * Math.PI * 2,
+        fidgetPhase: Math.random() * Math.PI * 2,
+        baseHeadRotY: 0,
+        targetHeadRotY: 0,
+        baseHeadRotX: 0,
+        targetHeadRotX: 0,
+        lUpper, lLower, lHand,
+        name,
+      };
+      return g;
+    }
+
+    /* =========================================================
+       DESK / CHAIR
+    ========================================================= */
+    const DESK_TOP_GEO = new THREE.BoxGeometry(1.4, 0.09, 0.8);
+    const DESK_LEG_GEO = new THREE.BoxGeometry(0.09, 0.7, 0.09);
+    const CHAIR_SEAT_GEO = new THREE.BoxGeometry(0.6, 0.08, 0.6);
+    const CHAIR_BACK_GEO = new THREE.BoxGeometry(0.6, 0.6, 0.08);
+    const CHAIR_LEG_GEO = new THREE.BoxGeometry(0.07, 0.45, 0.07);
+    const DESK_TOP_MAT = new THREE.MeshStandardMaterial({ color: 0xe0b88a, roughness: 0.75 });
+    const DESK_LEG_MAT = new THREE.MeshStandardMaterial({ color: 0x5a4530, roughness: 0.85 });
+    const CHAIR_MAT = new THREE.MeshStandardMaterial({ color: 0x4a6fa5, roughness: 0.78 });
+    const CHAIR_LEG_MAT = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.85 });
+
+    function createDesk() {
+      const g = new THREE.Group();
+      const top = new THREE.Mesh(DESK_TOP_GEO, DESK_TOP_MAT);
+      top.position.y = 0.7; top.castShadow = true; top.receiveShadow = true;
+      g.add(top);
+      [[-0.6, -0.32], [0.6, -0.32], [-0.6, 0.32], [0.6, 0.32]].forEach(([x, z]) => {
+        const leg = new THREE.Mesh(DESK_LEG_GEO, DESK_LEG_MAT);
+        leg.position.set(x, 0.35, z); leg.castShadow = true;
+        g.add(leg);
+      });
+      return g;
+    }
+    function createChair() {
+      const g = new THREE.Group();
+      const seat = new THREE.Mesh(CHAIR_SEAT_GEO, CHAIR_MAT);
+      seat.position.y = 0.45; seat.castShadow = true;
+      g.add(seat);
+      const back = new THREE.Mesh(CHAIR_BACK_GEO, CHAIR_MAT);
+      back.position.set(0, 0.75, -0.28); back.castShadow = true;
+      g.add(back);
+      [[-0.26, -0.26], [0.26, -0.26], [-0.26, 0.26], [0.26, 0.26]].forEach(([x, z]) => {
+        const leg = new THREE.Mesh(CHAIR_LEG_GEO, CHAIR_LEG_MAT);
+        leg.position.set(x, 0.22, z);
+        g.add(leg);
+      });
+      return g;
+    }
+
+    /* =========================================================
+       PLACE TEACHER + STUDENTS
+    ========================================================= */
+    // teacher faces students (rotation.y = 0 means faces +z which is toward students)
+        const teacherMember = MEMBERS.find(m => m.role === "teacher");
+    const teacherSkin = (teacherMember && teacherMember.skin) || "default";
+    const studentMembers = MEMBERS.filter(m => m.role === "student");
+    const characterMap = {};
+
+    if (window.IS_INTERVIEW) {
+      // ===== 個人面談モード =====
+      // 大きな共有デスク1つ、隣り合う2席、先生と生徒が横並び
+      const desk = new THREE.Group();
+      const topMat = new THREE.MeshStandardMaterial({ color: 0xe0b88a, roughness: 0.75 });
+      const top = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.1, 1.0), topMat);
+      top.position.y = 0.75; top.castShadow = true; top.receiveShadow = true;
+      desk.add(top);
+      const legMat = new THREE.MeshStandardMaterial({ color: 0x5a4530, roughness: 0.85 });
+      const legGeo = new THREE.BoxGeometry(0.1, 0.7, 0.1);
+      [[-1.15, -0.4], [1.15, -0.4], [-1.15, 0.4], [1.15, 0.4]].forEach(([x, z]) => {
+        const leg = new THREE.Mesh(legGeo, legMat);
+        leg.position.set(x, 0.35, z); leg.castShadow = true;
+        desk.add(leg);
+      });
+      desk.position.set(0, 0.15, -1.5);
+      scene.add(desk);
+
+      // 椅子2つ
+      const c1 = createChair(); c1.position.set(-0.75, 0.15, -0.6); scene.add(c1);
+      const c2 = createChair(); c2.position.set(0.75, 0.15, -0.6); scene.add(c2);
+
+      // 先生（左）
+      const teacher = createChibiAvatar({
+          name: TEACHER_DISPLAY_NAME, seated: true, skinKey: teacherSkin, isTeacher: true,
+        });
+        teacher.position.set(-0.75, 0.15, -0.6);
+        teacher.rotation.y = Math.PI;
+        teacher.userData.baseHeadRotX = -0.05;
+        if (teacher) scene.add(teacher);
+      characterMap[TEACHER_DISPLAY_NAME] = teacher;
+
+      // 生徒（右、1人だけ）
+      const stu = studentMembers[0];
+      if (stu) {
+        const s = createChibiAvatar({
+          name: stu.name, seated: true, skinKey: stu.skin || "default", isTeacher: false,
+        });
+        s.position.set(0.75, 0.15, -0.6);
+        s.rotation.y = Math.PI;
+        s.userData.baseHeadRotX = -0.05;
+        scene.add(s);
+        characterMap[stu.name] = s;
+      }
+    } else {
+      // ===== 通常クラスモード =====
+      const teacher = createChibiAvatar({
+          name: TEACHER_DISPLAY_NAME, seated: false, skinKey: teacherSkin, isTeacher: true,
+        });
+        teacher.position.set(0, 0.15, -4.2);
+        teacher.rotation.y = 0;
+        teacher.userData.baseHeadRotY = 0;
+        if (teacher) scene.add(teacher);
+      characterMap[TEACHER_DISPLAY_NAME] = teacher;
+
+      const positions = [];
+      const cols = 4;
+      const rows = Math.min(2, Math.max(1, Math.ceil(studentMembers.length / cols)));
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          positions.push({ x: -3.3 + c * 2.2, z: -0.4 + r * 2.3 });
+        }
+      }
+      studentMembers.forEach((m, i) => {
+        if (i >= positions.length) return;
+        const p = positions[i];
+        const desk = createDesk(); desk.position.set(p.x, 0.15, p.z); scene.add(desk);
+        const chair = createChair(); chair.position.set(p.x, 0.15, p.z + 0.9); scene.add(chair);
+        const stu = createChibiAvatar({
+          name: m.name, seated: true, skinKey: m.skin || "default", isTeacher: false,
+        });
+        stu.position.set(p.x, 0.15, p.z + 0.9);
+        const inwardTurn = (p.x < 0) ? 0.25 : -0.25;
+        stu.rotation.y = Math.PI + inwardTurn * 0.6;
+        stu.userData.baseHeadRotY = 0;
+        stu.userData.baseHeadRotX = -0.05;
+        scene.add(stu);
+        characterMap[m.name] = stu;
+      });
+    }
+
+    /* =========================================================
+       LIKE floating hearts
+    ========================================================= */
+    const heartGroup = new THREE.Group();
+    scene.add(heartGroup);
+    function showLike(name) {
+      const c = characterMap[name];
+      if (!c) return;
+      const heartCanvas = document.createElement("canvas");
+      heartCanvas.width = heartCanvas.height = 64;
+      const hctx = heartCanvas.getContext("2d");
+      hctx.font = "48px sans-serif";
+      hctx.textAlign = "center";
+      hctx.textBaseline = "middle";
+      hctx.fillText("❤️", 32, 34);
+      const tex = new THREE.CanvasTexture(heartCanvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+      const sprite = new THREE.Sprite(mat);
+      sprite.position.set(c.position.x, c.position.y + 2.3, c.position.z);
+      sprite.scale.set(0.8, 0.8, 1);
+      heartGroup.add(sprite);
+      const start = performance.now();
+      function anim() {
+        const t = (performance.now() - start) / 1000;
+        if (t > 1.5) { heartGroup.remove(sprite); return; }
+        sprite.position.y += 0.02;
+        sprite.material.opacity = 1 - t / 1.5;
+        requestAnimationFrame(anim);
+      }
+      anim();
+    }
+
+    window._3d = { characterMap, drawBlackboardText, showLike };
+
+    /* =========================================================
+       VIEW TOGGLE (first person)
+    ========================================================= */
+    const viewToggle = document.getElementById("btn-view-toggle");
+    if (viewToggle) {
+      viewToggle.addEventListener("click", () => {
+        firstPersonMode = !firstPersonMode;
+        viewToggle.classList.toggle("active", firstPersonMode);
+        viewToggle.textContent = firstPersonMode ? "👁 " + I18N.view_firstperson : "👁 " + I18N.view_overview;
+        if (firstPersonMode) {
+          controls.enabled = false;
+          const me = characterMap[USER_NAME];
+          if (me) {
+            me.visible = false;
+            camera.position.set(me.position.x, 1.6, me.position.z);
+            // face board
+            firstPersonYaw = Math.PI;
+            firstPersonPitch = -0.05;
+          }
+        } else {
+          controls.enabled = true;
+          const me = characterMap[USER_NAME];
+          if (me) me.visible = true;
+          camera.position.set(...CAM_START.pos);
+          controls.target.set(...CAM_START.target);
+          controls.update();
+        }
+      });
+    }
+
+    // first person drag
+    let dragStart = null;
+    renderer.domElement.addEventListener("pointerdown", (e) => {
+      if (!firstPersonMode) return;
+      dragStart = { x: e.clientX, y: e.clientY, yaw: firstPersonYaw, pitch: firstPersonPitch };
+    });
+    window.addEventListener("pointermove", (e) => {
+      if (!firstPersonMode || !dragStart) return;
+      firstPersonYaw = dragStart.yaw - (e.clientX - dragStart.x) * 0.005;
+      firstPersonPitch = Math.max(-1.2, Math.min(1.2, dragStart.pitch + (e.clientY - dragStart.y) * 0.005));
+    });
+    window.addEventListener("pointerup", () => { dragStart = null; });
+
+    /* =========================================================
+       ANIMATION LOOP
+    ========================================================= */
+    let lastFrame = performance.now();
+    let globalTime = 0;
+    // vector scratch for look-at
+    const _focusPoint = new THREE.Vector3();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const now = performance.now();
+      const delta = (now - lastFrame) / 1000;
+      lastFrame = now;
+      globalTime += delta;
+      const t = globalTime;
+
+      for (const name in characterMap) {
+        const c = characterMap[name];
+        const d = c.userData;
+        const isTeacher = (name === TEACHER_DISPLAY_NAME);
+
+        // breathing
+        if (d.torso) {
+          const s = 1 + Math.sin(t * 2 + d.breathingOffset) * 0.02;
+          d.torso.scale.y = s;
+        }
+        // sway
+        c.rotation.z = Math.sin(t * 0.8 + d.swayPhase) * 0.018;
+
+        // fidget (weight shift) - seated only
+        if (d.headGroup) {
+          const fidget = Math.sin(t * 1.7 + d.fidgetPhase) * 0.02;
+          d.headGroup.position.x = fidget;
+        }
+
+        // ===== head look: focus on blackboard or camera =====
+        // compute where this char should look
+        if (isTeacher) {
+          // teacher looks at students (center-ish) but also occasionally at board
+          const studentMid = new THREE.Vector3(0, 1.4, 0);
+          _focusPoint.copy(studentMid);
+        } else {
+          // students look at the board / teacher
+          // teacher is at (0, 1.4, -4.2). Board at (0, 2.6, -6.2)
+          // Blend: look at teacher most of the time
+          _focusPoint.set(0, 1.6, -4.2);
+        }
+
+        // convert to local angle offset
+        const dx = _focusPoint.x - c.position.x;
+        const dz = _focusPoint.z - c.position.z;
+        const targetWorldYaw = Math.atan2(dx, dz);
+        const localYaw = targetWorldYaw - c.rotation.y;
+        // normalize to [-PI, PI]
+        let yaw = localYaw;
+        while (yaw > Math.PI) yaw -= Math.PI * 2;
+        while (yaw < -Math.PI) yaw += Math.PI * 2;
+        // clamp so they don't over-rotate
+        yaw = Math.max(-0.9, Math.min(0.9, yaw));
+
+        // slight vertical look
+        const dy = _focusPoint.y - (c.position.y + (isTeacher ? 1.4 : 1.2));
+        const dxz = Math.sqrt(dx*dx + dz*dz);
+        let pitch = Math.atan2(dy, dxz);
+        pitch = Math.max(-0.5, Math.min(0.5, pitch));
+
+        // idle wandering — occasionally look around
+        const wanderY = Math.sin(t * 0.35 + d.lookOffset) * 0.15;
+        const wanderX = Math.sin(t * 0.25 + d.lookOffset * 1.7) * 0.05;
+
+        // talking override
+        const talking = d.talkUntil > now;
+        const gesture = d.gestureUntil > now;
+
+        const targetYawFinal = yaw + wanderY + (talking ? Math.sin(t*8) * 0.05 : 0);
+        const targetPitchFinal = pitch + wanderX;
+
+        if (d.headGroup) {
+          d.headGroup.rotation.y += (targetYawFinal - d.headGroup.rotation.y) * 0.06;
+          d.headGroup.rotation.x += (targetPitchFinal - d.headGroup.rotation.x) * 0.06;
+        }
+
+        // blink
+        if (now > d.nextBlink && d.blinkUntil === 0) {
+          d.blinkUntil = now + 130;
+          d.nextBlink = now + 2200 + Math.random() * 3500;
+        }
+        const blinkScale = (now < d.blinkUntil) ? 0.1 : 1;
+        if (d.eyeL) d.eyeL.scale.y = blinkScale;
+        if (d.eyeR) d.eyeR.scale.y = blinkScale;
+
+        // hand raise
+        const targetRotZ = d.handRaised ? -2.55 : (gesture ? -1.4 : 0);
+        if (d.rArmGroup) {
+          d.rArmGroup.rotation.z += (targetRotZ - d.rArmGroup.rotation.z) * 0.15;
+          // gesture wiggle
+          if (gesture) {
+            d.rArmGroup.rotation.x = Math.sin(t * 12) * 0.15;
+          } else {
+            d.rArmGroup.rotation.x += (0 - d.rArmGroup.rotation.x) * 0.1;
+          }
+        }
+
+        // highlight bounce
+        if (d.highlight > 0) {
+          c.position.y = d.baseY + Math.sin(t * 14) * 0.06;
+          d.highlight -= delta;
+        } else {
+          c.position.y = d.baseY;
+        }
+
+        // mouth animation
+        if (d.mouth && talking) {
+          const open = 1 + Math.abs(Math.sin(t * 22)) * 1.4;
+          d.mouth.scale.y = 0.35 * open;
+        } else if (d.mouth) {
+          d.mouth.scale.y += (0.35 - d.mouth.scale.y) * 0.15;
+        }
+      }
+
+      // camera
+      if (firstPersonMode) {
+        const me = characterMap[USER_NAME];
+        if (me) {
+          camera.position.set(me.position.x, 1.6, me.position.z);
+          const dir = new THREE.Vector3(
+            Math.sin(firstPersonYaw) * Math.cos(firstPersonPitch),
+            Math.sin(firstPersonPitch),
+            Math.cos(firstPersonYaw) * Math.cos(firstPersonPitch)
+          );
+          camera.lookAt(camera.position.clone().add(dir));
+        }
+      } else {
+        controls.update();
+      }
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    /* =========================================================
+       HOOK: message for 3D
+    ========================================================= */
+    window._onMessageFor3D = function (msgName, content) {
+      const c = characterMap[msgName];
+      if (!c) return;
+      if (content === "_LIKE_") {
+        showLike(msgName);
+        c.userData.highlight = 1.0;
+        return;
+      }
+      c.userData.highlight = 1.2;
+      c.userData.talkUntil = performance.now() + 2000;
+      c.userData.gestureUntil = performance.now() + 1500;
+    };
+
+    window.addEventListener("resize", () => {
+      const w = container.clientWidth, h = container.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    });
+  } catch (e) {
+    console.error(e);
+    container.innerHTML = '<div class="threed-fallback">' + I18N.threed_fallback + '</div>';
+  }
+})();
+</script>
+<div id="bulletin-modal">
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h2 style="margin:0;">{{ T.posts }}</h2>
+      <button onclick="document.getElementById('bulletin-modal').style.display='none'">✕</button>
+    </div>
+    <div class="body-grid">
+      <div id="bulletin-list"></div>
+      <div id="bulletin-reader"></div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;">
+      <a class="btn" href="/posts/new">{{ T.write_post }}</a>
+      <a class="btn gray" href="/posts">{{ T.view_all }}</a>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+<script>
+if ({{ (cls.room_type or 'class')|tojson }} === "study") {
+  document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll(".controls-card").forEach(el => {
+      const s = el.querySelector("summary");
+      if (s && /ステップ|Steps/.test(s.textContent)) el.style.display = "none";
+    });
+  });
+}
+</script>

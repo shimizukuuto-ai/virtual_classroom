@@ -543,7 +543,13 @@ def class_room(request: Request, class_id: int):
     my_group = get_user_group(class_id, user["id"]) if role == "student" else None
     
 
-    template_name = "study_room.html" if (cls.get("room_type") or "class") == "study" else "class_room.html"
+    # VC_SOCIAL_ROOM_I18N
+    room_kind = cls.get("room_type") or "class"
+    template_name = {
+        "class": "class_room.html",
+        "study": "study_room.html",
+        "social": "social_room.html",
+    }.get(room_kind, "class_room.html")
     return templates.TemplateResponse(
         request,
         template_name,
@@ -585,7 +591,10 @@ async def api_poll(request: Request, class_id: int, since_id: int = 0):
         "blackboard": cls["blackboard"] or "",
         "stage": cls["stage"] or 0,
         "allow_anonymous": bool(cls.get("allow_anonymous") or 0),
-                "is_interview": bool(cls.get("is_interview") or 0),
+                "is_interview": (
+            bool(cls.get("is_interview") or 0)
+            or cls.get("room_type") == "social"
+        ),
         "study_voice_enabled": bool(cls.get("study_voice_enabled") or 0),
         "record_shared_teacher": bool(cls.get("record_shared_teacher") or 0),
         "record_shared_student": bool(cls.get("record_shared_student") or 0),

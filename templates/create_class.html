@@ -84,6 +84,10 @@ document.querySelector('form').addEventListener('submit', function() {
 <select name="room_type">
   <option value="class">{{ T.room_class }}</option>
   <option value="study">{{ T.room_study }}</option>
+
+<option value="social">
+  {{ "💬 交流ルーム" if (lang|default("ja")) == "ja" else "💬 Social Lounge" }}
+</option>
 </select>
 
 <script>
