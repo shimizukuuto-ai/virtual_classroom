@@ -1,0 +1,234 @@
+
+<style>
+.vc-social-pane {
+  padding: 16px;
+  color: #e5e7eb;
+}
+.vc-social-pane h3 {
+  font-size: 17px;
+  margin: 0 0 8px;
+}
+.vc-social-pane p {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 0 0 14px;
+}
+.vc-social-pane textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 105px;
+  resize: vertical;
+  background: #1c2430;
+  color: #fff;
+  border: 1px solid #475569;
+  border-radius: 10px;
+  padding: 12px;
+  font: inherit;
+}
+.vc-social-pane .social-save {
+  background: #24766b;
+  color: #fff;
+  border: none;
+  border-radius: 9px;
+  padding: 10px 16px;
+  margin: 10px 0;
+  cursor: pointer;
+}
+.vc-social-pane .social-entry {
+  background: #202938;
+  border: 1px solid #374151;
+  border-radius: 10px;
+  padding: 12px;
+  margin: 9px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.vc-social-pane small {
+  display: block;
+  color: #a7b4c5;
+  margin-bottom: 6px;
+}
+.vc-social-status {
+  min-height: 20px;
+  font-size: 12px;
+  color: #a7d9c8;
+}
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const tabs = document.querySelector(".side-tabs");
+  const body = document.querySelector(".side-body");
+  if (!tabs || !body) return;
+
+  const roomId = {{ cls.id|tojson }};
+  const ja = {{ (lang == "ja")|tojson }};
+  const t = (jp, en) => ja ? jp : en;
+
+  const features = [
+    {
+      id: "social-notes",
+      endpoint: "notes",
+      title: t("共有ノート", "Shared notes"),
+      description: t(
+        "参加者全員でアイデアや参考情報を共有できます。",
+        "Share ideas and resources with room members."
+      ),
+      placeholder: t(
+        "共有したいことを書く",
+        "Write something to share"
+      )
+    },
+    {
+      id: "social-diary",
+      endpoint: "reflections",
+      title: t("自分の日記", "My journal"),
+      description: t(
+        "ここに保存した内容は自分だけが閲覧できます。",
+        "Only you can view your journal."
+      ),
+      placeholder: t(
+        "今日学んだことや、次にやりたいことを書く",
+        "Write what you learned and what comes next"
+      )
+    }
+  ];
+
+  const customPanes = [];
+
+  for (const feature of features) {
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.className = "side-tab";
+    tab.dataset.tab = feature.id;
+    tab.textContent = feature.title;
+    tabs.appendChild(tab);
+
+    const pane = document.createElement("div");
+    pane.className = "pane vc-social-pane";
+    pane.dataset.pane = feature.id;
+
+    const title = document.createElement("h3");
+    title.textContent = feature.title;
+
+    const description = document.createElement("p");
+    description.textContent = feature.description;
+
+    const textarea = document.createElement("textarea");
+    textarea.placeholder = feature.placeholder;
+    textarea.maxLength = feature.endpoint === "notes" ? 2000 : 4000;
+
+    const save = document.createElement("button");
+    save.type = "button";
+    save.className = "social-save";
+    save.textContent = t("保存する", "Save");
+
+    const status = document.createElement("div");
+    status.className = "vc-social-status";
+
+    const entries = document.createElement("div");
+
+    pane.append(title, description, textarea, save, status, entries);
+    body.appendChild(pane);
+    customPanes.push(pane);
+
+    const url = `/api/social/${roomId}/${feature.endpoint}`;
+
+    async function load() {
+      status.textContent = t("読み込み中", "Loading");
+      entries.replaceChildren();
+
+      try {
+        const response = await fetch(url, {
+          credentials: "same-origin"
+        });
+
+        if (!response.ok) throw new Error(String(response.status));
+
+        const data = await response.json();
+
+        for (const item of data.items || []) {
+          const entry = document.createElement("div");
+          entry.className = "social-entry";
+
+          const meta = document.createElement("small");
+          meta.textContent = [
+            item.author_name || "",
+            item.created_at || ""
+          ].filter(Boolean).join(" / ");
+
+          const content = document.createElement("div");
+          content.textContent = item.content;
+
+          entry.append(meta, content);
+          entries.appendChild(entry);
+        }
+
+        status.textContent = "";
+      } catch (error) {
+        status.textContent = t(
+          "読み込みに失敗しました。",
+          "Failed to load."
+        );
+      }
+    }
+
+    save.addEventListener("click", async () => {
+      const content = textarea.value.trim();
+      if (!content) return;
+
+      save.disabled = true;
+      status.textContent = t("保存中", "Saving");
+
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({content})
+        });
+
+        if (!response.ok) throw new Error(String(response.status));
+
+        textarea.value = "";
+        await load();
+      } catch (error) {
+        status.textContent = t(
+          "保存に失敗しました。",
+          "Failed to save."
+        );
+      } finally {
+        save.disabled = false;
+      }
+    });
+
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".side-tab").forEach(
+        element => element.classList.toggle("active", element === tab)
+      );
+
+      document.querySelectorAll(".side-body .pane").forEach(
+        element => element.classList.toggle("active", element === pane)
+      );
+
+      load();
+    });
+  }
+
+  tabs.querySelectorAll(
+    '.side-tab:not([data-tab="social-notes"]):not([data-tab="social-diary"])'
+  ).forEach(tab => {
+    tab.addEventListener("click", () => {
+      for (const pane of customPanes) {
+        pane.classList.remove("active");
+      }
+      tabs.querySelectorAll(
+        '[data-tab="social-notes"],[data-tab="social-diary"]'
+      ).forEach(element => element.classList.remove("active"));
+    });
+  });
+});
+</script>
